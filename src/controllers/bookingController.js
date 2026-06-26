@@ -76,8 +76,17 @@ exports.listBookings = asyncHandler(async (req, res) => {
   const { status, lab, page = 1, limit = 20 } = req.query;
   const filter = {};
   if (status) filter.status = status;
-  if (lab) filter.lab = lab;
-  if (req.user.role === 'customer') filter.user = req.user._id;
+
+  if (req.user.role === 'customer') {
+    filter.user = req.user._id;
+  } else if (req.user.role === 'lab') {
+    const Lab = require('../models/Lab');
+    const myLab = await Lab.findOne({ owner: req.user._id });
+    filter.lab = myLab?._id || null;
+  } else {
+    if (lab) filter.lab = lab;
+  }
+
   const skip = (Number(page) - 1) * Number(limit);
   const items = await Booking.find(filter).populate('user lab items.product').sort('-createdAt').skip(skip).limit(Number(limit));
   const total = await Booking.countDocuments(filter);

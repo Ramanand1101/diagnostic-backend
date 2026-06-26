@@ -1,8 +1,10 @@
 const asyncHandler = require('express-async-handler');
 const Lab = require('../models/Lab');
 const Product = require('../models/Product');
-const Page = require('../models/Page');
-const { searchIndex } = require('../services/algoliaSync');
+const { hasAlgoliaConfig } = require('../config/algolia');
+const { searchIndex, syncObjects, setIndexSettings } = require('../services/algoliaSync');
+
+// ─── Algolia record builders ────────────────────────────────────────────────
 
 function labRecord(lab) {
   return {
@@ -11,18 +13,20 @@ function labRecord(lab) {
     name: lab.name,
     slug: lab.slug,
     city: lab.city,
-    address: lab.address,
+    state: lab.state || '',
+    address: lab.address || '',
     description: lab.description || '',
     ratingAvg: lab.ratingAvg || 0,
     reviewCount: lab.reviewCount || 0,
     homeCollection: !!lab.homeCollection,
     approved: !!lab.approved,
     featured: !!lab.featured,
+    verificationStatus: lab.verificationStatus || 'pending',
     sampleCollectionTime: lab.sampleCollectionTime || '',
     reportDeliveryTime: lab.reportDeliveryTime || '',
     accreditation: lab.accreditation || [],
     badges: lab.badges || [],
-    _geoloc: (lab.lat && lab.lng) ? { lat: lab.lat, lng: lab.lng } : undefined
+    _geoloc: (lab.lat && lab.lng) ? { lat: lab.lat, lng: lab.lng } : undefined,
   };
 }
 
@@ -38,14 +42,14 @@ function productRecord(p) {
     salePrice: p.salePrice || null,
     discountPercent: p.discountPercent || null,
     reportTime: p.reportTime || '',
+    sampleType: p.sampleType || '',
     homeCollection: !!p.homeCollection,
     fastingRequired: !!p.fastingRequired,
-    brand: p.brand || '',
     tags: p.tags || [],
     category: p.category ? String(p.category) : null,
     lab: p.lab ? String(p.lab) : null,
     isFeatured: !!p.isFeatured,
-    isActive: !!p.isActive
+    isActive: !!p.isActive,
   };
 }
 
@@ -58,43 +62,111 @@ function pageRecord(page) {
     content: page.content || '',
     seoTitle: page.seoTitle || '',
     seoDescription: page.seoDescription || '',
-    isPublished: !!page.isPublished
+    isPublished: !!page.isPublished,
   };
 }
+
+// Escape string for safe use in RegExp
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ─── MongoDB fallback search ─────────────────────────────────────────────────
+
+async function mongoSearch(q, type, city, limit) {
+  const regex = new RegExp(escapeRegex(q), 'i');
+  const cityRegex = city ? new RegExp(escapeRegex(city), 'i') : null;
+  const result = { labs: [], products: [], pages: [] };
+
+  // When city is given, find matching lab IDs once and reuse for both labs + products
+  let cityLabIds = null;
+  if (cityRegex) {
+    const cityLabs = await Lab.find({ city: cityRegex, approved: true }).select('_id').lean();
+    cityLabIds = cityLabs.map((l) => l._id);
+  }
+
+  if (type === 'all' || type === 'labs') {
+    const filter = {
+      approved: true,
+      $or: [
+        { name: regex }, { city: regex },
+        { description: regex }, { address: regex },
+        { badges: regex }, { accreditation: regex },
+      ],
+    };
+    if (cityRegex) filter.city = cityRegex;
+    result.labs = await Lab.find(filter).limit(limit).lean();
+  }
+
+  if (type === 'all' || type === 'products') {
+    const filter = {
+      isActive: true,
+      $or: [
+        { name: regex }, { description: regex },
+        { tags: regex }, { sampleType: regex },
+      ],
+    };
+    if (cityLabIds) filter.lab = { $in: cityLabIds };
+    result.products = await Product.find(filter)
+      .populate('lab', 'name slug city')
+      .limit(limit)
+      .lean();
+  }
+
+  if (type === 'all' || type === 'pages') {
+    try {
+      const Page = require('../models/Page');
+      result.pages = await Page.find({
+        isPublished: true,
+        $or: [{ title: regex }, { content: regex }],
+      }).limit(limit).lean();
+    } catch {
+      result.pages = [];
+    }
+  }
+
+  return result;
+}
+
+// ─── Controllers ─────────────────────────────────────────────────────────────
 
 exports.globalSearch = asyncHandler(async (req, res) => {
   const q = String(req.query.q || '').trim();
   const type = String(req.query.type || 'all');
   const city = String(req.query.city || '').trim();
-  const limit = Math.min(Number(req.query.limit || 10), 20);
+  const limit = Math.min(Number(req.query.limit || 12), 30);
 
-  const response = { query: q, results: {} };
+  const response = { query: q, labs: [], products: [], pages: [] };
+  if (!q) return res.json(response);
 
-  if (!q) {
-    return res.json(response);
-  }
-
-  if (type === 'all' || type === 'labs') {
-    const params = {
-      hitsPerPage: limit,
-      filters: 'approved:true'
-    };
-    if (city) params.optionalFilters = [`city:${city}`];
-    response.results.labs = await searchIndex('labs', q, params);
-  }
-
-  if (type === 'all' || type === 'products') {
-    response.results.products = await searchIndex('products', q, {
-      hitsPerPage: limit,
-      filters: 'isActive:true'
-    });
-  }
-
-  if (type === 'all' || type === 'pages') {
-    response.results.pages = await searchIndex('pages', q, {
-      hitsPerPage: limit,
-      filters: 'isPublished:true'
-    });
+  if (hasAlgoliaConfig()) {
+    try {
+      if (type === 'all' || type === 'labs') {
+        const params = { hitsPerPage: limit, filters: 'approved:true' };
+        if (city) params.optionalFilters = [`city:${city}`];
+        const r = await searchIndex('labs', q, params);
+        response.labs = r.hits || [];
+      }
+      if (type === 'all' || type === 'products') {
+        const r = await searchIndex('products', q, { hitsPerPage: limit, filters: 'isActive:true' });
+        response.products = r.hits || [];
+      }
+      if (type === 'all' || type === 'pages') {
+        const r = await searchIndex('pages', q, { hitsPerPage: limit, filters: 'isPublished:true' });
+        response.pages = r.hits || [];
+      }
+    } catch (algoliaErr) {
+      console.warn('Algolia search failed, using MongoDB fallback:', algoliaErr.message);
+      const fallback = await mongoSearch(q, type, city, limit);
+      response.labs = fallback.labs;
+      response.products = fallback.products;
+      response.pages = fallback.pages;
+    }
+  } else {
+    const fallback = await mongoSearch(q, type, city, limit);
+    response.labs = fallback.labs;
+    response.products = fallback.products;
+    response.pages = fallback.pages;
   }
 
   res.json(response);
@@ -103,12 +175,14 @@ exports.globalSearch = asyncHandler(async (req, res) => {
 exports.reindexLabs = asyncHandler(async (req, res) => {
   const labs = await Lab.find();
   const records = labs.map(labRecord);
-  const { syncObjects, setIndexSettings } = require('../services/algoliaSync');
 
   await setIndexSettings('labs', {
     searchableAttributes: ['name', 'city', 'address', 'description', 'badges', 'accreditation'],
-    attributesForFaceting: ['filterOnly(approved)', 'filterOnly(homeCollection)', 'filterOnly(featured)', 'searchable(city)'],
-    customRanking: ['desc(ratingAvg)', 'desc(reviewCount)']
+    attributesForFaceting: [
+      'filterOnly(approved)', 'filterOnly(homeCollection)',
+      'filterOnly(featured)', 'searchable(city)',
+    ],
+    customRanking: ['desc(ratingAvg)', 'desc(reviewCount)'],
   });
 
   await syncObjects('labs', records);
@@ -118,12 +192,14 @@ exports.reindexLabs = asyncHandler(async (req, res) => {
 exports.reindexProducts = asyncHandler(async (req, res) => {
   const products = await Product.find();
   const records = products.map(productRecord);
-  const { syncObjects, setIndexSettings } = require('../services/algoliaSync');
 
   await setIndexSettings('products', {
-    searchableAttributes: ['name', 'brand', 'description', 'tags', 'type'],
-    attributesForFaceting: ['filterOnly(type)', 'filterOnly(homeCollection)', 'filterOnly(fastingRequired)', 'filterOnly(isFeatured)', 'searchable(brand)'],
-    customRanking: ['desc(price)', 'desc(discountPercent)']
+    searchableAttributes: ['name', 'description', 'tags', 'type', 'sampleType'],
+    attributesForFaceting: [
+      'filterOnly(type)', 'filterOnly(homeCollection)',
+      'filterOnly(fastingRequired)', 'filterOnly(isFeatured)',
+    ],
+    customRanking: ['asc(price)'],
   });
 
   await syncObjects('products', records);
@@ -131,13 +207,13 @@ exports.reindexProducts = asyncHandler(async (req, res) => {
 });
 
 exports.reindexPages = asyncHandler(async (req, res) => {
+  const Page = require('../models/Page');
   const pages = await Page.find({ isPublished: true });
   const records = pages.map(pageRecord);
-  const { syncObjects, setIndexSettings } = require('../services/algoliaSync');
 
   await setIndexSettings('pages', {
     searchableAttributes: ['title', 'seoTitle', 'seoDescription', 'content'],
-    attributesForFaceting: ['filterOnly(isPublished)']
+    attributesForFaceting: ['filterOnly(isPublished)'],
   });
 
   await syncObjects('pages', records);

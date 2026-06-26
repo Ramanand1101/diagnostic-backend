@@ -1,5 +1,7 @@
 node_modules
 .env
+.env.local
+.env*.local
 dist
 coverage
 *.log
@@ -9,7 +11,11 @@ coverage
 *.bak
 *.tmp
 *.swp
-*.swo 
+*.swo
+uploads/
 
-.env
-.env
+# Next.js
+frontend/.next/
+frontend/node_modules/
+frontend/.env.local
+frontend/.env*.local

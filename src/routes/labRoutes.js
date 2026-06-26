@@ -3,8 +3,10 @@ const { protect, allowRoles } = require('../middleware/authMiddleware');
 const lab = require('../controllers/labController');
 
 router.get('/', lab.listLabs);
+router.get('/cities', lab.getCities);
 router.get('/nearby', lab.nearbyLabs);
 router.get('/compare', lab.compareLabs);
+router.get('/mine', protect, allowRoles('lab'), lab.getMyLab);
 router.get('/:slug', lab.getLabBySlug);
 router.post('/', protect, allowRoles('superadmin', 'subadmin', 'lab'), lab.createLab);
 router.put('/:id', protect, allowRoles('superadmin', 'subadmin', 'lab'), lab.updateLab);

@@ -3,7 +3,7 @@ const { hasAlgoliaConfig, getClient, indexName } = require('../config/algolia');
 async function syncObjects(index, objects) {
   if (!hasAlgoliaConfig()) return null;
   const client = getClient();
-  return client.saveObjects(indexName(index), objects);
+  return client.saveObjects({ indexName: indexName(index), objects });
 }
 
 async function deleteObject(index, objectID) {
@@ -15,7 +15,7 @@ async function deleteObject(index, objectID) {
 async function setIndexSettings(index, settings) {
   if (!hasAlgoliaConfig()) return null;
   const client = getClient();
-  return client.setSettings(indexName(index), settings);
+  return client.setSettings({ indexName: indexName(index), indexSettings: settings });
 }
 
 async function searchIndex(index, query, params = {}) {
@@ -27,9 +27,4 @@ async function searchIndex(index, query, params = {}) {
   });
 }
 
-module.exports = {
-  syncObjects,
-  deleteObject,
-  setIndexSettings,
-  searchIndex
-};
+module.exports = { syncObjects, deleteObject, setIndexSettings, searchIndex };

@@ -51,20 +51,6 @@ exports.register = asyncHandler(async (req, res) => {
 
   const token = signToken(user);
 
-  if (email) {
-    try {
-      const { otp } = await createOtpRecord({ identifier: email, purpose: 'verify_email' });
-      await sendMail({
-        to: email,
-        subject: 'Verify your email',
-        text: `Your verification OTP is ${otp}. It expires in ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.`,
-        html: `<p>Your verification OTP is <b>${otp}</b>.</p><p>It expires in ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.</p>`
-      });
-    } catch (error) {
-      console.error('Email send failed:', error.message);
-    }
-  }
-
   res.status(201).json({
     token,
     user: {
@@ -72,7 +58,8 @@ exports.register = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       mobile: user.mobile,
-      role: user.role
+      role: user.role,
+      verified: true
     }
   });
 });

@@ -15,6 +15,8 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, unique: true, sparse: true },
   mobile: { type: String, unique: true, sparse: true },
+  alternateMobile: { type: String, default: '' },
+  alternateEmail: { type: String, default: '' },
   password: { type: String, required: true, select: false },
   role: {
     type: String,
@@ -22,9 +24,14 @@ const userSchema = new mongoose.Schema({
     default: 'customer'
   },
   isActive: { type: Boolean, default: true },
-  verified: { type: Boolean, default: false },
+  verified: { type: Boolean, default: true },
   avatar: String,
   addresses: [addressSchema],
+  location: {
+    lat: Number,
+    lng: Number,
+    address: String,
+  },
   lastLoginAt: Date
 }, { timestamps: true });
 

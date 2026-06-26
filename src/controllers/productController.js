@@ -4,16 +4,23 @@ const { syncObjects, deleteObject } = require('../services/algoliaSync');
 const makeSlug = require('../utils/slug');
 
 exports.listProducts = asyncHandler(async (req, res) => {
-  const { type, q, lab, category, brand, featured, fastingRequired, homeCollection, page = 1, limit = 20, sort = '-createdAt' } = req.query;
-  const filter = {};
+  const { type, q, lab, city, category, brand, featured, fastingRequired, homeCollection, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const filter = { isActive: true };
   if (type) filter.type = type;
   if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }, { tags: new RegExp(q, 'i') }];
-  if (lab) filter.lab = lab;
   if (category) filter.category = category;
   if (brand) filter.brand = new RegExp(brand, 'i');
   if (featured !== undefined) filter.isFeatured = featured === 'true';
   if (fastingRequired !== undefined) filter.fastingRequired = fastingRequired === 'true';
   if (homeCollection !== undefined) filter.homeCollection = homeCollection === 'true';
+
+  if (city) {
+    const Lab = require('../models/Lab');
+    const cityLabs = await Lab.find({ city: new RegExp(city, 'i'), approved: true }).select('_id').lean();
+    filter.lab = { $in: cityLabs.map((l) => l._id) };
+  } else if (lab) {
+    filter.lab = lab;
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
   const items = await Product.find(filter).populate('lab category').sort(sort).skip(skip).limit(Number(limit));
@@ -56,6 +63,16 @@ exports.createProduct = asyncHandler(async (req, res) => {
 exports.updateProduct = asyncHandler(async (req, res) => {
   const payload = { ...req.body };
   if (payload.name && !payload.slug) payload.slug = makeSlug(payload.name);
+
+  // Lab role: only update products that belong to their lab
+  if (req.user.role === 'lab') {
+    const Lab = require('../models/Lab');
+    const myLab = await Lab.findOne({ owner: req.user._id });
+    if (!myLab) return res.status(403).json({ message: 'No lab found for this user' });
+    const existing = await Product.findOne({ _id: req.params.id, lab: myLab._id });
+    if (!existing) return res.status(403).json({ message: 'Not your product' });
+  }
+
   const product = await Product.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
   if (!product) return res.status(404).json({ message: 'Product not found' });
   await syncObjects('products', [{

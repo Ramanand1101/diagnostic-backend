@@ -27,4 +27,38 @@ function makeUpload(prefix) {
   });
 }
 
-module.exports = { makeUpload };
+function memoryUpload(options = {}) {
+  return multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: options.maxSize || 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      const allowed = options.mimetypes || ['application/pdf'];
+      cb(null, allowed.includes(file.mimetype));
+    }
+  });
+}
+
+function makePublicUpload(prefix) {
+  return multer({
+    storage: multerS3({
+      s3,
+      bucket,
+      contentType: multerS3.AUTO_CONTENT_TYPE,
+      metadata: (req, file, cb) => {
+        cb(null, { fieldName: file.fieldname });
+      },
+      key: (req, file, cb) => {
+        const safeName = file.originalname.replace(/\s+/g, '_');
+        const key = `${prefix || 'uploads'}/${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}`;
+        cb(null, key);
+      }
+    }),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      cb(null, allowed.includes(file.mimetype));
+    }
+  });
+}
+
+module.exports = { makeUpload, memoryUpload, makePublicUpload };

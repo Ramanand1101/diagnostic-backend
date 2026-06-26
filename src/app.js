@@ -25,6 +25,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const heroSlideRoutes = require('./routes/heroSlideRoutes');
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/uploads', uploadRoutes);
 app.use('/api/v1/email', emailRoutes);
 app.use('/api/v1/search', searchRoutes);
+app.use('/api/v1/hero-slides', heroSlideRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
