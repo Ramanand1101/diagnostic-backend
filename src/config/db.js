@@ -1,11 +1,28 @@
 const mongoose = require('mongoose');
 
+// Reuse connection across warm serverless invocations
+let cached = global._mongooseCache;
+if (!cached) {
+  cached = global._mongooseCache = { conn: null, promise: null };
+}
+
 module.exports = async function connectDB() {
+  if (cached.conn) return cached.conn;
+
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
+  }
+
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    cached.conn = await cached.promise;
     console.log('MongoDB connected');
-  } catch (error) {
-    console.error('MongoDB connection error:', error.message);
-    process.exit(1);
+    return cached.conn;
+  } catch (err) {
+    cached.promise = null;
+    console.error('MongoDB connection error:', err.message);
+    throw err;
   }
 };
