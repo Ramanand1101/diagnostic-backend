@@ -3,13 +3,15 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { FiMenu, FiX, FiUser, FiLogOut, FiPhone } from 'react-icons/fi';
+import { useCart } from '@/context/CartContext';
+import { FiMenu, FiX, FiUser, FiLogOut, FiPhone, FiShoppingCart } from 'react-icons/fi';
 import { MdBiotech } from 'react-icons/md';
 
 const PHONE_NUMBER = '+91-98765-43210';
 
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth();
+  const { count: cartCount } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
 
@@ -62,6 +64,17 @@ export default function Navbar() {
                 <FiPhone className="text-base" />
                 <span className="font-medium">{PHONE_NUMBER}</span>
               </a>
+
+              <div className="w-px h-5 bg-gray-200" />
+
+              <Link href="/cart" className="relative p-1.5 text-gray-600 hover:text-primary-600 transition-colors">
+                <FiShoppingCart className="text-xl" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                    {cartCount > 9 ? '9+' : cartCount}
+                  </span>
+                )}
+              </Link>
 
               <div className="w-px h-5 bg-gray-200" />
 

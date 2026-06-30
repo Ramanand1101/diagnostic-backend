@@ -1,7 +1,11 @@
+'use client';
 import Link from 'next/link';
+import { useCart } from '@/context/CartContext';
 import { MdOutlineScience, MdOutlineBloodtype, MdOutlineMedication } from 'react-icons/md';
 import { TbHeartbeat } from 'react-icons/tb';
 import { GiMicroscope } from 'react-icons/gi';
+import { FiShoppingCart, FiCheck } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 const TYPE_STYLES = {
   test:     { grad: 'from-blue-500 to-indigo-600',    Icon: MdOutlineBloodtype },
@@ -9,7 +13,6 @@ const TYPE_STYLES = {
   medicine: { grad: 'from-teal-500 to-green-600',     Icon: MdOutlineMedication },
 };
 
-// Pick a style deterministically from name hash so different cards look varied
 function pickStyle(name = '', type = '') {
   const base = TYPE_STYLES[type];
   if (base) return base;
@@ -24,30 +27,37 @@ function pickStyle(name = '', type = '') {
 }
 
 export default function ProductCard({ product }) {
+  const { addItem, items } = useCart();
+  const inCart = items.some((i) => i._id === product._id);
+
   const price = product.salePrice || product.price;
   const hasDiscount = product.salePrice && product.salePrice < product.price;
   const features = (product.tags || []).slice(0, 4);
   const { grad, Icon } = pickStyle(product.name, product.type);
 
+  const handleAddToCart = () => {
+    addItem(product);
+    toast.success(`${product.name} added to cart!`, { icon: '🛒' });
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all group overflow-hidden flex flex-col">
 
-      {/* Image / gradient header */}
-      <div className={`relative h-44 bg-gradient-to-br ${grad} flex items-center justify-center overflow-hidden`}>
-        {/* Large faded background icon */}
-        <Icon className="absolute -bottom-3 -right-3 text-[130px] text-white/15" />
-        {/* Centered icon */}
-        <Icon className="text-white text-5xl drop-shadow-lg" />
-        {/* Type badge */}
-        <span className="absolute top-3 left-3 text-xs font-semibold capitalize bg-white/20 text-white px-2.5 py-0.5 rounded-full backdrop-blur-sm">
-          {product.type}
-        </span>
-        {hasDiscount && (
-          <span className="absolute top-3 right-3 text-xs font-bold bg-red-500 text-white px-2.5 py-0.5 rounded-full">
-            Sale
+      {/* Gradient header */}
+      <Link href={`/products/${product.slug}`} className="block">
+        <div className={`relative h-44 bg-gradient-to-br ${grad} flex items-center justify-center overflow-hidden`}>
+          <Icon className="absolute -bottom-3 -right-3 text-[130px] text-white/15" />
+          <Icon className="text-white text-5xl drop-shadow-lg" />
+          <span className="absolute top-3 left-3 text-xs font-semibold capitalize bg-white/20 text-white px-2.5 py-0.5 rounded-full backdrop-blur-sm">
+            {product.type}
           </span>
-        )}
-      </div>
+          {hasDiscount && (
+            <span className="absolute top-3 right-3 text-xs font-bold bg-red-500 text-white px-2.5 py-0.5 rounded-full">
+              Sale
+            </span>
+          )}
+        </div>
+      </Link>
 
       {/* Content */}
       <div className="p-5 flex flex-col flex-1">
@@ -66,7 +76,7 @@ export default function ProductCard({ product }) {
           </p>
         )}
 
-        {/* Features list from tags */}
+        {/* Tags */}
         {features.length > 0 && (
           <div className="mb-4 flex-1">
             {features.map((tag, i) => (
@@ -87,13 +97,22 @@ export default function ProductCard({ product }) {
           )}
         </div>
 
-        {/* Book Now */}
-        <Link
-          href={`/products/${product.slug}`}
-          className="block w-full text-center py-3 rounded-xl bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-bold text-sm transition-colors shadow-sm"
-        >
-          Book Now
-        </Link>
+        {/* Add to Cart */}
+        {inCart ? (
+          <Link
+            href="/cart"
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-colors shadow-sm"
+          >
+            <FiCheck /> View Cart
+          </Link>
+        ) : (
+          <button
+            onClick={handleAddToCart}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-bold text-sm transition-colors shadow-sm"
+          >
+            <FiShoppingCart /> Add to Cart
+          </button>
+        )}
       </div>
     </div>
   );

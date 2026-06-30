@@ -6,10 +6,12 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { PageLoader } from '@/components/ui/Spinner';
 import { searchApi } from '@/lib/api';
+import { useCart } from '@/context/CartContext';
 import {
   FiSearch, FiX, FiMapPin, FiClock,
-  FiChevronDown, FiChevronUp, FiFilter,
+  FiChevronDown, FiChevronUp, FiFilter, FiShoppingCart, FiCheck,
 } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 // ── Sidebar filter section ────────────────────────────────────────────────────
 function FilterSection({ title, items, selected, onToggle, searchable }) {
@@ -62,64 +64,138 @@ function labColor(name = '') {
 }
 
 // ── Product / test result row ─────────────────────────────────────────────────
+const TYPE_COLOR = {
+  test:     'bg-blue-50 text-blue-700 border-blue-100',
+  package:  'bg-purple-50 text-purple-700 border-purple-100',
+  medicine: 'bg-teal-50 text-teal-700 border-teal-100',
+};
+
 function ProductRow({ product }) {
+  const { addItem, items } = useCart();
   const lab = product.lab || {};
   const initial = (lab.name || '?')[0].toUpperCase();
   const price = product.salePrice || product.price;
   const discount = product.salePrice && product.salePrice < product.price
     ? Math.round(((product.price - product.salePrice) / product.price) * 100)
     : null;
+  const visibleTags = (product.tags || []).slice(0, 3);
+  const inCart = items.some((i) => i._id === product._id);
+
+  const handleAddToCart = () => {
+    addItem(product);
+    toast.success(`${product.name} added to cart!`, { icon: '🛒' });
+  };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4 hover:shadow-md transition-all hover:-translate-y-0.5">
-      <div className={`w-12 h-12 ${labColor(lab.name)} rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm`}>
-        {initial}
+    <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all hover:-translate-y-0.5">
+
+      {/* Top row: left = badges + name + tags | right = description + price + button */}
+      <div className="flex gap-5">
+
+        {/* Left: test identity */}
+        <div className="flex-1 min-w-0">
+          {/* Type / fasting / sample badges */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+            {product.type && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                {product.type}
+              </span>
+            )}
+            {product.fastingRequired && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-orange-50 text-orange-700 border border-orange-100">
+                Fasting Required
+              </span>
+            )}
+            {product.sampleType && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-gray-50 text-gray-600 border border-gray-200">
+                {product.sampleType}
+              </span>
+            )}
+          </div>
+
+          {/* Test name */}
+          <h3 className="font-bold text-gray-900 text-base leading-snug mb-2">{product.name}</h3>
+
+          {/* Tags */}
+          {visibleTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {visibleTags.map((tag) => (
+                <span key={tag} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Vertical divider */}
+        <div className="w-px bg-gray-100 flex-shrink-0 self-stretch" />
+
+        {/* Right: description + price + button */}
+        <div className="flex flex-col gap-3 flex-shrink-0 w-64">
+
+          {/* Description */}
+          {product.description ? (
+            <p className="text-sm text-gray-500 leading-relaxed line-clamp-3">
+              {product.description}
+            </p>
+          ) : (
+            <p className="text-sm text-gray-300 italic">No description available</p>
+          )}
+
+          {/* Price + button */}
+          <div className="flex items-center justify-between gap-2 mt-auto">
+            <div>
+              {discount && (
+                <span className="inline-block text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full mb-0.5">
+                  {discount}% OFF
+                </span>
+              )}
+              <p className="text-xl font-extrabold text-gray-900">₹{price?.toLocaleString('en-IN')}</p>
+              {discount && (
+                <p className="text-xs text-gray-400 line-through">₹{product.price?.toLocaleString('en-IN')}</p>
+              )}
+            </div>
+
+            {inCart ? (
+              <Link href="/cart"
+                className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors whitespace-nowrap">
+                <FiCheck className="text-base" /> View Cart
+              </Link>
+            ) : (
+              <button onClick={handleAddToCart}
+                className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors whitespace-nowrap">
+                <FiShoppingCart className="text-base" /> Add to Cart
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-gray-900 text-sm leading-tight">{lab.name || '—'}</p>
-        <div className="flex flex-wrap items-center gap-1.5 mt-1">
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
-            product.homeCollection
-              ? 'bg-green-50 text-green-700 border border-green-100'
-              : 'bg-blue-50 text-blue-700 border border-blue-100'
-          }`}>
-            {product.homeCollection ? '🏠 Home Collection' : '🏥 Lab Center Visit'}
-          </span>
-          {lab.accreditation?.slice(0, 1).map((acc) => (
-            <span key={acc} className="text-[11px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100 font-medium">{acc}</span>
-          ))}
+      {/* Divider */}
+      <div className="h-px bg-gray-100 my-3" />
+
+      {/* Lab info */}
+      <div className="flex items-center gap-3">
+        <div className={`w-7 h-7 ${labColor(lab.name)} rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0`}>
+          {initial}
         </div>
-        <div className="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-gray-400">
-          {lab.openingHours && (
-            <span className="flex items-center gap-1">
-              <FiClock className="text-[10px]" /> {lab.openingHours}
-            </span>
-          )}
+        <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-400">
+          <span className="font-semibold text-gray-600 text-xs truncate">{lab.name || '—'}</span>
+          <span className={`font-medium ${product.homeCollection ? 'text-green-600' : 'text-blue-600'}`}>
+            {product.homeCollection ? '🏠 Home Collection' : '🏥 Lab Visit'}
+          </span>
           {product.reportTime && <span>Report in {product.reportTime}</span>}
           {(lab.city || lab.state) && (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-0.5">
               <FiMapPin className="text-[10px]" />
               {[lab.city, lab.state].filter(Boolean).join(', ')}
             </span>
           )}
+          {lab.accreditation?.slice(0, 1).map((acc) => (
+            <span key={acc} className="text-purple-600 font-medium">{acc}</span>
+          ))}
         </div>
-      </div>
-
-      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-        {discount && (
-          <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded-full">
-            {discount}% OFF
-          </span>
-        )}
-        <p className="text-lg font-extrabold text-gray-900">₹{price?.toLocaleString('en-IN')}</p>
-        {discount && (
-          <p className="text-xs text-gray-400 line-through">₹{product.price?.toLocaleString('en-IN')}</p>
-        )}
-        <Link href={`/products/${product.slug}`}
-          className="mt-1 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-colors">
-          Select
-        </Link>
       </div>
     </div>
   );

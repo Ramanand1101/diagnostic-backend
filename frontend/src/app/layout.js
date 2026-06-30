@@ -2,6 +2,7 @@ import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '@/context/AuthContext';
 import { CityProvider } from '@/context/CityContext';
+import { CartProvider } from '@/context/CartContext';
 
 export const metadata = {
   title: 'DiagnosticHub - Book Lab Tests & Health Packages',
@@ -14,8 +15,10 @@ export default function RootLayout({ children }) {
       <body>
         <AuthProvider>
           <CityProvider>
-            {children}
-            <Toaster position="top-right" />
+            <CartProvider>
+              {children}
+              <Toaster position="top-right" />
+            </CartProvider>
           </CityProvider>
         </AuthProvider>
       </body>
