@@ -10,6 +10,7 @@ import { useCart } from '@/context/CartContext';
 import {
   FiSearch, FiX, FiMapPin, FiClock,
   FiChevronDown, FiChevronUp, FiFilter, FiShoppingCart, FiCheck,
+  FiDroplet, FiHome, FiAlertCircle, FiInfo,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -25,7 +26,6 @@ function FilterSection({ title, items, selected, onToggle, searchable }) {
         className="w-full flex items-center justify-between py-2 text-xs font-bold text-gray-500 uppercase tracking-widest">
         {title} {open ? <FiChevronUp /> : <FiChevronDown />}
       </button>
-
       {open && (
         <div className="space-y-2 mt-1">
           {searchable && (
@@ -54,23 +54,97 @@ function FilterSection({ title, items, selected, onToggle, searchable }) {
   );
 }
 
-// ── Lab colour based on initial ───────────────────────────────────────────────
-const PALETTE = [
-  'bg-blue-500', 'bg-indigo-500', 'bg-purple-500',
-  'bg-teal-500', 'bg-rose-500', 'bg-amber-500', 'bg-emerald-500',
-];
-function labColor(name = '') {
-  return PALETTE[name.charCodeAt(0) % PALETTE.length];
-}
+// ── Lab colour ────────────────────────────────────────────────────────────────
+const PALETTE = ['bg-blue-500','bg-indigo-500','bg-purple-500','bg-teal-500','bg-rose-500','bg-amber-500','bg-emerald-500'];
+function labColor(name = '') { return PALETTE[name.charCodeAt(0) % PALETTE.length]; }
 
-// ── Product / test result row ─────────────────────────────────────────────────
 const TYPE_COLOR = {
   test:     'bg-blue-50 text-blue-700 border-blue-100',
   package:  'bg-purple-50 text-purple-700 border-purple-100',
   medicine: 'bg-teal-50 text-teal-700 border-teal-100',
 };
 
-function ProductRow({ product }) {
+// ── Description panel (right sticky) ─────────────────────────────────────────
+function DescriptionPanel({ product }) {
+  if (!product) {
+    return (
+      <div className="bg-white rounded-xl border border-dashed border-gray-200 p-6 flex flex-col items-center justify-center text-center min-h-[220px]">
+        <FiInfo className="text-3xl text-gray-200 mb-3" />
+        <p className="text-sm text-gray-400 font-medium">Hover over a test</p>
+        <p className="text-xs text-gray-300 mt-1">to see its description here</p>
+      </div>
+    );
+  }
+
+  const lab = product.lab || {};
+
+  return (
+    <div className="bg-white rounded-xl border border-primary-100 shadow-sm p-5 transition-all">
+      {/* Type badges */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {product.type && (
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+            {product.type}
+          </span>
+        )}
+        {product.fastingRequired && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-orange-50 text-orange-700 border border-orange-100 flex items-center gap-1">
+            <FiAlertCircle className="text-[10px]" /> Fasting Required
+          </span>
+        )}
+        {product.sampleType && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-gray-50 text-gray-500 border border-gray-200 flex items-center gap-1">
+            <FiDroplet className="text-[10px]" /> {product.sampleType}
+          </span>
+        )}
+      </div>
+
+      {/* Test name */}
+      <h3 className="font-bold text-gray-900 text-base leading-snug mb-3">{product.name}</h3>
+
+      {/* Description */}
+      {product.description ? (
+        <p className="text-sm text-gray-600 leading-relaxed mb-4">{product.description}</p>
+      ) : (
+        <p className="text-sm text-gray-300 italic mb-4">No description available for this test.</p>
+      )}
+
+      {/* Key info */}
+      <div className="space-y-1.5 mb-4">
+        {product.reportTime && (
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <FiClock className="text-gray-400 flex-shrink-0" />
+            <span>Report ready in <strong>{product.reportTime}</strong></span>
+          </div>
+        )}
+        {product.homeCollection && (
+          <div className="flex items-center gap-2 text-xs text-green-600">
+            <FiHome className="flex-shrink-0" />
+            <span>Home collection available</span>
+          </div>
+        )}
+        {lab.name && (
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <div className={`w-4 h-4 ${labColor(lab.name)} rounded-full flex-shrink-0`} />
+            <span>{lab.name}{lab.city ? `, ${lab.city}` : ''}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Tags */}
+      {product.tags?.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-3 border-t border-gray-100">
+          {product.tags.map((tag) => (
+            <span key={tag} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{tag}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Compact product row ───────────────────────────────────────────────────────
+function ProductRow({ product, isActive, onHover }) {
   const { addItem, items } = useCart();
   const lab = product.lab || {};
   const initial = (lab.name || '?')[0].toUpperCase();
@@ -78,7 +152,6 @@ function ProductRow({ product }) {
   const discount = product.salePrice && product.salePrice < product.price
     ? Math.round(((product.price - product.salePrice) / product.price) * 100)
     : null;
-  const visibleTags = (product.tags || []).slice(0, 3);
   const inCart = items.some((i) => i._id === product._id);
 
   const handleAddToCart = () => {
@@ -87,114 +160,70 @@ function ProductRow({ product }) {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all hover:-translate-y-0.5">
+    <div
+      onMouseEnter={() => onHover(product)}
+      onClick={() => onHover(product)}
+      className={`bg-white rounded-xl border p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${
+        isActive ? 'border-primary-300 shadow-sm ring-1 ring-primary-100' : 'border-gray-100'
+      }`}
+    >
+      <div className="flex items-center gap-4">
 
-      {/* Top row: left = badges + name + tags | right = description + price + button */}
-      <div className="flex gap-5">
+        {/* Lab avatar */}
+        <div className={`w-10 h-10 ${labColor(lab.name)} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm`}>
+          {initial}
+        </div>
 
-        {/* Left: test identity */}
+        {/* Test info */}
         <div className="flex-1 min-w-0">
-          {/* Type / fasting / sample badges */}
-          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
             {product.type && (
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
                 {product.type}
               </span>
             )}
             {product.fastingRequired && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-orange-50 text-orange-700 border border-orange-100">
-                Fasting Required
-              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-orange-50 text-orange-600 border border-orange-100">Fasting</span>
             )}
-            {product.sampleType && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-gray-50 text-gray-600 border border-gray-200">
-                {product.sampleType}
+          </div>
+          <p className="font-semibold text-gray-900 text-sm leading-tight truncate">{product.name}</p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-gray-400">
+            <span className="truncate">{lab.name || '—'}</span>
+            {product.homeCollection && <span className="text-green-600">🏠 Home</span>}
+            {product.reportTime && <span>· {product.reportTime}</span>}
+            {(lab.city || lab.state) && (
+              <span className="flex items-center gap-0.5">
+                <FiMapPin className="text-[10px]" />
+                {[lab.city, lab.state].filter(Boolean).join(', ')}
               </span>
             )}
           </div>
-
-          {/* Test name */}
-          <h3 className="font-bold text-gray-900 text-base leading-snug mb-2">{product.name}</h3>
-
-          {/* Tags */}
-          {visibleTags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {visibleTags.map((tag) => (
-                <span key={tag} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
-        {/* Vertical divider */}
-        <div className="w-px bg-gray-100 flex-shrink-0 self-stretch" />
-
-        {/* Right: description + price + button */}
-        <div className="flex flex-col gap-3 flex-shrink-0 w-64">
-
-          {/* Description */}
-          {product.description ? (
-            <p className="text-sm text-gray-500 leading-relaxed line-clamp-3">
-              {product.description}
-            </p>
+        {/* Price + button */}
+        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+          <div className="text-right">
+            {discount && (
+              <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">
+                {discount}% OFF
+              </span>
+            )}
+            <p className="text-base font-extrabold text-gray-900">₹{price?.toLocaleString('en-IN')}</p>
+            {discount && (
+              <p className="text-[11px] text-gray-400 line-through">₹{product.price?.toLocaleString('en-IN')}</p>
+            )}
+          </div>
+          {inCart ? (
+            <Link href="/cart"
+              className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+              <FiCheck className="text-xs" /> View Cart
+            </Link>
           ) : (
-            <p className="text-sm text-gray-300 italic">No description available</p>
+            <button onClick={(e) => { e.stopPropagation(); handleAddToCart(); }}
+              className="flex items-center gap-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+              <FiShoppingCart className="text-xs" /> Add to Cart
+            </button>
           )}
-
-          {/* Price + button */}
-          <div className="flex items-center justify-between gap-2 mt-auto">
-            <div>
-              {discount && (
-                <span className="inline-block text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full mb-0.5">
-                  {discount}% OFF
-                </span>
-              )}
-              <p className="text-xl font-extrabold text-gray-900">₹{price?.toLocaleString('en-IN')}</p>
-              {discount && (
-                <p className="text-xs text-gray-400 line-through">₹{product.price?.toLocaleString('en-IN')}</p>
-              )}
-            </div>
-
-            {inCart ? (
-              <Link href="/cart"
-                className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors whitespace-nowrap">
-                <FiCheck className="text-base" /> View Cart
-              </Link>
-            ) : (
-              <button onClick={handleAddToCart}
-                className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors whitespace-nowrap">
-                <FiShoppingCart className="text-base" /> Add to Cart
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div className="h-px bg-gray-100 my-3" />
-
-      {/* Lab info */}
-      <div className="flex items-center gap-3">
-        <div className={`w-7 h-7 ${labColor(lab.name)} rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0`}>
-          {initial}
-        </div>
-        <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-400">
-          <span className="font-semibold text-gray-600 text-xs truncate">{lab.name || '—'}</span>
-          <span className={`font-medium ${product.homeCollection ? 'text-green-600' : 'text-blue-600'}`}>
-            {product.homeCollection ? '🏠 Home Collection' : '🏥 Lab Visit'}
-          </span>
-          {product.reportTime && <span>Report in {product.reportTime}</span>}
-          {(lab.city || lab.state) && (
-            <span className="flex items-center gap-0.5">
-              <FiMapPin className="text-[10px]" />
-              {[lab.city, lab.state].filter(Boolean).join(', ')}
-            </span>
-          )}
-          {lab.accreditation?.slice(0, 1).map((acc) => (
-            <span key={acc} className="text-purple-600 font-medium">{acc}</span>
-          ))}
         </div>
       </div>
     </div>
@@ -209,7 +238,6 @@ function LabRow({ lab }) {
       <div className={`w-12 h-12 ${labColor(lab.name)} rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm`}>
         {initial}
       </div>
-
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-900 text-sm">{lab.name}</p>
         <div className="flex flex-wrap gap-1.5 mt-1">
@@ -231,7 +259,6 @@ function LabRow({ lab }) {
           {lab.ratingAvg > 0 && <span>★ {lab.ratingAvg.toFixed(1)} ({lab.reviewCount} reviews)</span>}
         </div>
       </div>
-
       <Link href={`/labs/${lab.slug}`}
         className="flex-shrink-0 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-colors">
         View Lab
@@ -252,6 +279,7 @@ function SearchContent() {
   const [selectedLabs, setSelectedLabs] = useState(new Set());
   const [selectedLocations, setSelectedLocations] = useState(new Set());
   const [mobileSidebar, setMobileSidebar] = useState(false);
+  const [activeProduct, setActiveProduct] = useState(null);
   const debounceRef = useRef(null);
   const isOwnNavRef = useRef(false);
 
@@ -262,13 +290,17 @@ function SearchContent() {
   }, [searchParams]);
 
   const runSearch = useCallback(async (q, c) => {
-    if (!q.trim()) { setResults({ labs: [], products: [], pages: [] }); return; }
+    if (!q.trim()) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
     setLoading(true);
     setSelectedLabs(new Set());
     setSelectedLocations(new Set());
+    setActiveProduct(null);
     try {
       const res = await searchApi.search({ q: q.trim(), city: c.trim() });
-      setResults(res.data || { labs: [], products: [], pages: [] });
+      const data = res.data || { labs: [], products: [], pages: [] };
+      setResults(data);
+      // Auto-select first product
+      if (data.products?.length > 0) setActiveProduct(data.products[0]);
     } catch {
       setResults({ labs: [], products: [], pages: [] });
     } finally {
@@ -278,7 +310,7 @@ function SearchContent() {
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
-    if (!inputVal.trim()) { setResults({ labs: [], products: [], pages: [] }); return; }
+    if (!inputVal.trim()) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
     debounceRef.current = setTimeout(() => {
       runSearch(inputVal, city);
       isOwnNavRef.current = true;
@@ -302,7 +334,6 @@ function SearchContent() {
   const products = results.products || [];
   const labs = results.labs || [];
 
-  // Derive filter options from results
   const labNames = [...new Set(products.map((p) => p.lab?.name).filter(Boolean))];
   const locations = [...new Set([
     ...products.map((p) => p.lab?.city).filter(Boolean),
@@ -333,9 +364,7 @@ function SearchContent() {
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-bold text-gray-800 text-sm">Filters</h2>
         {hasFilters && (
-          <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700 font-medium">
-            Clear all
-          </button>
+          <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700 font-medium">Clear all</button>
         )}
       </div>
       {labNames.length > 0 && (
@@ -356,8 +385,7 @@ function SearchContent() {
 
         {/* Top search bar */}
         <div className="bg-white border-b border-gray-100 px-4 py-4 sticky top-16 z-30">
-          <div className="max-w-6xl mx-auto flex gap-3 flex-wrap sm:flex-nowrap">
-            {/* City — LEFT */}
+          <div className="max-w-7xl mx-auto flex gap-3 flex-wrap sm:flex-nowrap">
             <div className="flex gap-2 flex-shrink-0">
               <div className="relative">
                 <FiMapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
@@ -372,14 +400,13 @@ function SearchContent() {
                 </button>
               )}
             </div>
-            {/* Search input — RIGHT */}
             <div className="flex-1 relative min-w-0">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input type="text" value={inputVal} onChange={(e) => setInputVal(e.target.value)}
                 placeholder="Search tests, packages, labs..."
                 className="input pl-9 pr-9 w-full" autoFocus autoComplete="off" />
               {inputVal && (
-                <button onClick={() => { setInputVal(''); setResults({ labs: [], products: [], pages: [] }); }}
+                <button onClick={() => { setInputVal(''); setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <FiX className="text-sm" />
                 </button>
@@ -397,7 +424,7 @@ function SearchContent() {
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="max-w-7xl mx-auto px-4 py-6">
           {!inputVal.trim() ? (
             <div className="text-center py-24 text-gray-400">
               <FiSearch className="text-5xl mx-auto mb-4 opacity-20" />
@@ -421,10 +448,10 @@ function SearchContent() {
               )}
             </div>
           ) : (
-            <div className="flex gap-6 items-stretch">
+            <div className="flex gap-5">
 
-              {/* ── Left sidebar — desktop (sticky) ── */}
-              <aside className="w-60 flex-shrink-0 hidden md:block sticky top-36 self-start">
+              {/* ── Left: Filters sidebar ── */}
+              <aside className="w-52 flex-shrink-0 hidden md:block sticky top-36 self-start">
                 <div className="bg-white rounded-xl border border-gray-100 p-4 max-h-[calc(100vh-10rem)] overflow-y-auto">
                   {sidebar}
                 </div>
@@ -444,9 +471,9 @@ function SearchContent() {
                 </div>
               )}
 
-              {/* ── Results ── */}
-              <div className="flex-1 min-w-0 space-y-5">
-                {/* Summary row */}
+              {/* ── Middle: Compact results list ── */}
+              <div className="flex-1 min-w-0 space-y-4">
+                {/* Summary */}
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <p className="text-sm text-gray-500">
                     <span className="font-bold text-gray-900">{totalFiltered}</span> result{totalFiltered !== 1 ? 's' : ''} for &ldquo;{inputVal}&rdquo;
@@ -460,17 +487,22 @@ function SearchContent() {
                   </p>
                 </div>
 
-                {/* Tests & Packages */}
                 {filteredProducts.length > 0 && (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tests &amp; Packages</h3>
-                    {filteredProducts.map((p) => <ProductRow key={p._id || p.objectID} product={p} />)}
+                    {filteredProducts.map((p) => (
+                      <ProductRow
+                        key={p._id || p.objectID}
+                        product={p}
+                        isActive={activeProduct?._id === p._id}
+                        onHover={setActiveProduct}
+                      />
+                    ))}
                   </div>
                 )}
 
-                {/* Labs */}
                 {filteredLabs.length > 0 && (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Labs</h3>
                     {filteredLabs.map((lab) => <LabRow key={lab._id || lab.objectID} lab={lab} />)}
                   </div>
@@ -483,6 +515,14 @@ function SearchContent() {
                   </div>
                 )}
               </div>
+
+              {/* ── Right: Description panel (desktop only) ── */}
+              {filteredProducts.length > 0 && (
+                <aside className="w-72 flex-shrink-0 hidden lg:block sticky top-36 self-start">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">About this test</p>
+                  <DescriptionPanel product={activeProduct} />
+                </aside>
+              )}
             </div>
           )}
         </div>
