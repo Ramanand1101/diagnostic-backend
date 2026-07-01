@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FiChevronLeft, FiChevronRight, FiSearch, FiMapPin, FiX, FiShoppingCart, FiCheck } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiSearch, FiMapPin, FiX, FiPlus, FiCheck } from 'react-icons/fi';
 import { MdOutlineScience } from 'react-icons/md';
 import { heroSlideApi, searchApi } from '@/lib/api';
 import { useCity } from '@/context/CityContext';
@@ -249,18 +249,20 @@ export default function HeroSlider() {
                             </div>
                           </button>
 
-                          {/* Add to Cart button */}
+                          {/* + / ✓ icon */}
                           {inCart ? (
                             <Link href="/cart"
                               onClick={() => setShowDrop(false)}
-                              className="flex items-center gap-1 shrink-0 bg-green-600 hover:bg-green-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
-                              <FiCheck size={11} /> Cart
+                              title="View cart"
+                              className="w-8 h-8 shrink-0 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center text-white transition shadow-sm">
+                              <FiCheck size={15} />
                             </Link>
                           ) : (
                             <button type="button"
-                              onClick={() => { addItem(p); toast.success(`${p.name} added!`, { icon: '🛒' }); }}
-                              className="flex items-center gap-1 shrink-0 bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
-                              <FiShoppingCart size={11} /> Add
+                              title="Add to cart"
+                              onClick={() => { addItem(p); toast.success(`${p.name} added to cart!`, { icon: '🛒' }); }}
+                              className="w-8 h-8 shrink-0 rounded-full bg-primary-600 hover:bg-primary-700 active:scale-95 flex items-center justify-center text-white transition shadow-sm">
+                              <FiPlus size={16} />
                             </button>
                           )}
                         </div>
