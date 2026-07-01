@@ -3,11 +3,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FiChevronLeft, FiChevronRight, FiSearch, FiMapPin, FiX } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiSearch, FiMapPin, FiX, FiShoppingCart, FiCheck } from 'react-icons/fi';
 import { MdOutlineScience } from 'react-icons/md';
 import { heroSlideApi, searchApi } from '@/lib/api';
 import { useCity } from '@/context/CityContext';
+import { useCart } from '@/context/CartContext';
 import CityPickerModal from '@/components/layout/CityPickerModal';
+import toast from 'react-hot-toast';
 
 const TYPEWRITER = ['CBC Test', 'Thyroid Panel', 'Vitamin D', 'HbA1c', 'Full Body Checkup', 'Lipid Profile'];
 
@@ -38,6 +40,7 @@ export default function HeroSlider() {
   const [swDel, setSwDel] = useState(false);
 
   const router = useRouter();
+  const { addItem, items: cartItems } = useCart();
 
   /* ── Slides ── */
   useEffect(() => {
@@ -224,22 +227,45 @@ export default function HeroSlider() {
                     <p className="px-4 pt-3 pb-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
                       Tests &amp; Packages{city ? ` in ${city}` : ''}
                     </p>
-                    {liveResults.products.map((p) => (
-                      <button key={p._id || p.objectID} type="button"
-                        onClick={() => goTo(`/products/${p.slug || p._id}`)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left">
-                        <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
-                          <MdOutlineScience className="text-sky-600 text-base" />
+                    {liveResults.products.map((p) => {
+                      const inCart = cartItems.some((i) => i._id === p._id);
+                      const price = p.salePrice || p.price;
+                      return (
+                        <div key={p._id || p.objectID} className="flex items-center gap-2 hover:bg-sky-50 transition pr-3">
+                          {/* Clickable area → product page */}
+                          <button type="button"
+                            onClick={() => goTo(`/products/${p.slug || p._id}`)}
+                            className="flex-1 flex items-center gap-3 px-4 py-2.5 text-left min-w-0">
+                            <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
+                              <MdOutlineScience className="text-sky-600 text-base" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                              <p className="text-xs text-gray-400 truncate">
+                                {p.lab?.name || ''}
+                                {p.reportTime ? ` · ${p.reportTime}` : ''}
+                                {price ? ` · ₹${price.toLocaleString('en-IN')}` : ''}
+                              </p>
+                            </div>
+                          </button>
+
+                          {/* Add to Cart button */}
+                          {inCart ? (
+                            <Link href="/cart"
+                              onClick={() => setShowDrop(false)}
+                              className="flex items-center gap-1 shrink-0 bg-green-600 hover:bg-green-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
+                              <FiCheck size={11} /> Cart
+                            </Link>
+                          ) : (
+                            <button type="button"
+                              onClick={() => { addItem(p); toast.success(`${p.name} added!`, { icon: '🛒' }); }}
+                              className="flex items-center gap-1 shrink-0 bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap">
+                              <FiShoppingCart size={11} /> Add
+                            </button>
+                          )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-                          <p className="text-xs text-gray-400 truncate">
-                            {p.lab?.name || p.lab || ''}
-                            {p.reportTime ? ` · ${p.reportTime}` : ''}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
