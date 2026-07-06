@@ -3,13 +3,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FiChevronLeft, FiChevronRight, FiSearch, FiMapPin, FiX, FiPlus, FiCheck } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiSearch, FiMapPin, FiX } from 'react-icons/fi';
 import { MdOutlineScience } from 'react-icons/md';
 import { heroSlideApi, searchApi } from '@/lib/api';
 import { useCity } from '@/context/CityContext';
-import { useCart } from '@/context/CartContext';
+
 import CityPickerModal from '@/components/layout/CityPickerModal';
-import toast from 'react-hot-toast';
+
 
 const TYPEWRITER = ['CBC Test', 'Thyroid Panel', 'Vitamin D', 'HbA1c', 'Full Body Checkup', 'Lipid Profile'];
 
@@ -24,7 +24,7 @@ export default function HeroSlider() {
 
   // search bar
   const [query, setQuery] = useState('');
-  const [liveResults, setLiveResults] = useState({ products: [], labs: [] });
+  const [liveResults, setLiveResults] = useState({ tests: [], labs: [] });
   const [showDrop, setShowDrop] = useState(false);
   const [searching, setSearching] = useState(false);
   const searchWrapRef = useRef(null);
@@ -40,7 +40,7 @@ export default function HeroSlider() {
   const [swDel, setSwDel] = useState(false);
 
   const router = useRouter();
-  const { addItem, items: cartItems } = useCart();
+
 
   /* ── Slides ── */
   useEffect(() => {
@@ -80,22 +80,22 @@ export default function HeroSlider() {
 
   /* ── Live search dropdown ── */
   useEffect(() => {
-    if (query.trim().length < 2) { setLiveResults({ products: [], labs: [] }); setShowDrop(false); return; }
+    if (query.trim().length < 2) { setLiveResults({ tests: [], labs: [] }); setShowDrop(false); return; }
     const t = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await searchApi.search({ q: query.trim(), city, limit: 8 });
+        const res = await searchApi.suggest({ q: query.trim(), city, limit: 10 });
         setLiveResults({
-          products: (res.data.products || []).slice(0, 6),
-          labs: (res.data.labs || []).slice(0, 3),
+          tests: res.data.tests || [],
+          labs: (res.data.labs || []).slice(0, 2),
         });
         setShowDrop(true);
       } catch {
-        setLiveResults({ products: [], labs: [] });
+        setLiveResults({ tests: [], labs: [] });
       } finally {
         setSearching(false);
       }
-    }, 300);
+    }, 280);
     return () => clearTimeout(t);
   }, [query, city]);
 
@@ -131,7 +131,11 @@ export default function HeroSlider() {
 
   const goTo = (href) => { setShowDrop(false); setQuery(''); router.push(href); };
 
-  const hasResults = liveResults.products.length > 0 || liveResults.labs.length > 0;
+  const hasResults = liveResults.tests.length > 0 || liveResults.labs.length > 0;
+
+  const fmtPrice = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+  const priceRange = (min, max) =>
+    min === max ? fmtPrice(min) : `${fmtPrice(min)} – ${fmtPrice(max)}`;
 
   return (
     <div>
@@ -221,59 +225,42 @@ export default function HeroSlider() {
                   </div>
                 )}
 
-                {/* Tests & Packages */}
-                {liveResults.products.length > 0 && (
+                {/* Tests — grouped by name */}
+                {liveResults.tests.length > 0 && (
                   <div>
-                    <p className="px-4 pt-3 pb-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                    <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
                       Tests &amp; Packages{city ? ` in ${city}` : ''}
                     </p>
-                    {liveResults.products.map((p) => {
-                      const inCart = cartItems.some((i) => i._id === p._id);
-                      const price = p.salePrice || p.price;
-                      return (
-                        <div key={p._id || p.objectID} className="flex items-center gap-2 hover:bg-sky-50 transition pr-3">
-                          {/* Clickable area → product page */}
-                          <button type="button"
-                            onClick={() => goTo(`/products/${p.slug || p._id}`)}
-                            className="flex-1 flex items-center gap-3 px-4 py-2.5 text-left min-w-0">
-                            <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
-                              <MdOutlineScience className="text-sky-600 text-base" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-                              <p className="text-xs text-gray-400 truncate">
-                                {p.lab?.name || ''}
-                                {p.reportTime ? ` · ${p.reportTime}` : ''}
-                                {price ? ` · ₹${price.toLocaleString('en-IN')}` : ''}
-                              </p>
-                            </div>
-                          </button>
-
-                          {/* + / ✓ icon */}
-                          {inCart ? (
-                            <Link href="/cart"
-                              onClick={() => setShowDrop(false)}
-                              title="View cart"
-                              className="w-8 h-8 shrink-0 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center text-white transition shadow-sm">
-                              <FiCheck size={15} />
-                            </Link>
-                          ) : (
-                            <button type="button"
-                              title="Add to cart"
-                              onClick={() => { addItem(p); toast.success(`${p.name} added to cart!`, { icon: '🛒' }); }}
-                              className="w-8 h-8 shrink-0 rounded-full bg-primary-600 hover:bg-primary-700 active:scale-95 flex items-center justify-center text-white transition shadow-sm">
-                              <FiPlus size={16} />
-                            </button>
-                          )}
+                    {liveResults.tests.map((t) => (
+                      <button
+                        key={t.name}
+                        type="button"
+                        onClick={() => goTo(`/search?q=${encodeURIComponent(t.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left"
+                      >
+                        <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
+                          <MdOutlineScience className="text-sky-600 text-base" />
                         </div>
-                      );
-                    })}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{t.name}</p>
+                          <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
+                            <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded font-medium">
+                              {t.labCount} lab{t.labCount !== 1 ? 's' : ''}
+                            </span>
+                            <span>·</span>
+                            <span className="font-medium text-gray-600">{priceRange(t.minPrice, t.maxPrice)}</span>
+                            {t.reportTime && <><span>·</span><span>{t.reportTime}</span></>}
+                          </p>
+                        </div>
+                        <FiChevronRight size={14} className="text-gray-300 shrink-0" />
+                      </button>
+                    ))}
                   </div>
                 )}
 
                 {/* Labs */}
                 {liveResults.labs.length > 0 && (
-                  <div className={liveResults.products.length > 0 ? 'border-t border-gray-50' : ''}>
+                  <div className={liveResults.tests.length > 0 ? 'border-t border-gray-50' : ''}>
                     <p className="px-4 pt-3 pb-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
                       Labs
                     </p>

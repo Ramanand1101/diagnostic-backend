@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { GoogleLogin } from '@react-oauth/google';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage } from '@/utils/helpers';
@@ -86,6 +87,20 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    try {
+      const res = await authApi.googleAuth(credentialResponse.credential);
+      login(res.data.token, res.data.user);
+      toast.success('Welcome!');
+      redirectAfterLogin(res.data.user?.role, router);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleResendOtp = async () => {
     setLoading(true);
     setForm({ ...form, otp: '' });
@@ -110,6 +125,23 @@ export default function LoginPage() {
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
           <p className="text-gray-500 text-sm mt-1">Sign in to your account</p>
+        </div>
+
+        {/* Google Sign-In */}
+        <div className="mb-5 flex flex-col items-center gap-3">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => toast.error('Google sign-in failed')}
+            width="368"
+            text="signin_with"
+            shape="rectangular"
+            logo_alignment="left"
+          />
+          <div className="flex items-center w-full gap-3">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400">or continue with</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
         </div>
 
         {/* Mode toggle */}

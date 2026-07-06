@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import {
   FiGrid, FiUsers, FiMapPin, FiPackage, FiTag, FiCalendar,
   FiFileText, FiPercent, FiStar, FiBook, FiFile, FiMail,
-  FiSettings, FiHelpCircle, FiImage,
+  FiSettings, FiHelpCircle, FiImage, FiUploadCloud,
 } from 'react-icons/fi';
 import { MdBiotech } from 'react-icons/md';
 
@@ -13,6 +13,7 @@ const navItems = [
   { href: '/admin/hero-slides', label: 'Hero Slides', icon: FiImage },
   { href: '/admin/labs', label: 'Labs', icon: FiMapPin },
   { href: '/admin/products', label: 'Products', icon: FiPackage },
+  { href: '/admin/bulk-upload', label: 'Bulk Upload', icon: FiUploadCloud },
   { href: '/admin/categories', label: 'Categories', icon: FiTag },
   { href: '/admin/bookings', label: 'Bookings', icon: FiCalendar },
   { href: '/admin/reports', label: 'Reports', icon: FiFileText },

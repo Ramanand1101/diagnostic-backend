@@ -29,6 +29,7 @@ api.interceptors.response.use(
 export const authApi = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
+  googleAuth: (credential) => api.post('/auth/google', { credential }),
   sendOtp: (data) => api.post('/auth/send-otp', data),
   verifyOtp: (data) => api.post('/auth/verify-otp', data),
   me: () => api.get('/auth/me'),
@@ -71,6 +72,7 @@ export const productApi = {
   create: (data) => api.post('/products', data),
   update: (id, data) => api.put(`/products/${id}`, data),
   delete: (id) => api.delete(`/products/${id}`),
+  bulkUploadTests: (data) => api.post('/products/bulk-tests', data),
 };
 
 // Bookings
@@ -153,6 +155,7 @@ export const dashboardApi = {
 // Search
 export const searchApi = {
   search: (params) => api.get('/search', { params }),
+  suggest: (params) => api.get('/search/suggest', { params }),
   reindexLabs: () => api.post('/search/reindex/labs'),
   reindexProducts: () => api.post('/search/reindex/products'),
 };
