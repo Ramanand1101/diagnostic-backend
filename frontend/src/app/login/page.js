@@ -4,21 +4,97 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { GoogleLogin } from '@react-oauth/google';
-import { authApi } from '@/lib/api';
+import { authApi, userApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage } from '@/utils/helpers';
 import { MdBiotech } from 'react-icons/md';
+import { FiPhone, FiX } from 'react-icons/fi';
 import Spinner from '@/components/ui/Spinner';
+
+// ── Phone number collection modal (shown after Google sign-in if no mobile) ──
+function PhoneModal({ onSave, onSkip }) {
+  const [mobile, setMobile] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      toast.error('Enter a valid 10-digit Indian mobile number');
+      return;
+    }
+    setSaving(true);
+    try {
+      await userApi.updateMe({ mobile });
+      toast.success('Mobile number saved!');
+      onSave();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
+        <button onClick={onSkip} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+          <FiX size={20} />
+        </button>
+
+        <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mx-auto mb-4">
+          <FiPhone className="text-green-600 text-xl" />
+        </div>
+        <h2 className="text-lg font-bold text-gray-900 text-center mb-1">Add your mobile number</h2>
+        <p className="text-sm text-gray-500 text-center mb-5">
+          Get booking updates &amp; OTP login on your phone.
+        </p>
+
+        <form onSubmit={handleSave} className="space-y-3">
+          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-primary-500">
+            <span className="px-3 py-3 bg-gray-50 border-r border-gray-300 text-sm text-gray-500 font-medium">+91</span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              pattern="[6-9][0-9]{9}"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              placeholder="98765 43210"
+              autoFocus
+              className="flex-1 px-3 py-3 text-sm outline-none bg-transparent"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={saving || mobile.length !== 10}
+            className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {saving && <Spinner size="sm" />}
+            Save &amp; Continue
+          </button>
+          <button
+            type="button"
+            onClick={onSkip}
+            className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition"
+          >
+            Skip for now
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function redirectAfterLogin(role, router) {
   router.push(role === 'superadmin' || role === 'subadmin' ? '/admin' : '/dashboard');
 }
 
 export default function LoginPage() {
-  const [mode, setMode] = useState('password'); // 'password' | 'otp'
-  const [step, setStep] = useState(1);           // OTP: 1 = enter identifier, 2 = enter OTP
+  const [mode, setMode] = useState('password');
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState({ emailOrMobile: '', password: '', otp: '' });
   const [loading, setLoading] = useState(false);
+  const [phoneModal, setPhoneModal] = useState(null); // { role } — shown after Google login
   const { login } = useAuth();
   const router = useRouter();
 
@@ -93,7 +169,12 @@ export default function LoginPage() {
       const res = await authApi.googleAuth(credentialResponse.credential);
       login(res.data.token, res.data.user);
       toast.success('Welcome!');
-      redirectAfterLogin(res.data.user?.role, router);
+      // If user has no mobile yet, show phone modal before redirecting
+      if (!res.data.user?.mobile) {
+        setPhoneModal({ role: res.data.user?.role });
+      } else {
+        redirectAfterLogin(res.data.user?.role, router);
+      }
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -114,7 +195,14 @@ export default function LoginPage() {
     }
   };
 
+  const finishGoogleLogin = () => {
+    redirectAfterLogin(phoneModal?.role, router);
+    setPhoneModal(null);
+  };
+
   return (
+    <>
+    {phoneModal && <PhoneModal onSave={finishGoogleLogin} onSkip={finishGoogleLogin} />}
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
 
@@ -299,5 +387,6 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+    </>
   );
 }
