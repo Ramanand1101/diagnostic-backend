@@ -15,6 +15,7 @@ import Spinner from '@/components/ui/Spinner';
 function PhoneModal({ onSave, onSkip }) {
   const [mobile, setMobile] = useState('');
   const [saving, setSaving] = useState(false);
+  const { refreshUser } = useAuth();
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -25,6 +26,7 @@ function PhoneModal({ onSave, onSkip }) {
     setSaving(true);
     try {
       await userApi.updateMe({ mobile });
+      await refreshUser(); // sync user.mobile into AuthContext immediately
       toast.success('Mobile number saved!');
       onSave();
     } catch (err) {
@@ -169,7 +171,6 @@ export default function LoginPage() {
       const res = await authApi.googleAuth(credentialResponse.credential);
       login(res.data.token, res.data.user);
       toast.success('Welcome!');
-      // If user has no mobile yet, show phone modal before redirecting
       if (!res.data.user?.mobile) {
         setPhoneModal({ role: res.data.user?.role });
       } else {

@@ -14,6 +14,7 @@ import Spinner from '@/components/ui/Spinner';
 function PhoneModal({ onSave, onSkip }) {
   const [mobile, setMobile] = useState('');
   const [saving, setSaving] = useState(false);
+  const { refreshUser } = useAuth();
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -24,6 +25,7 @@ function PhoneModal({ onSave, onSkip }) {
     setSaving(true);
     try {
       await userApi.updateMe({ mobile });
+      await refreshUser(); // sync user.mobile into AuthContext immediately
       toast.success('Mobile number saved!');
       onSave();
     } catch (err) {

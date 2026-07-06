@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/layout/Navbar';
@@ -8,7 +8,10 @@ import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { bookingApi } from '@/lib/api';
 import { getErrorMessage } from '@/utils/helpers';
-import { FiTrash2, FiShoppingCart, FiMapPin, FiClock, FiArrowLeft, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import {
+  FiTrash2, FiShoppingCart, FiMapPin, FiArrowLeft,
+  FiCheckCircle, FiAlertCircle, FiLoader,
+} from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
 const TYPE_COLOR = {
@@ -17,6 +20,7 @@ const TYPE_COLOR = {
   medicine: 'bg-teal-50 text-teal-700 border-teal-100',
 };
 
+// ── Cart item card ────────────────────────────────────────────────────────────
 function CartItem({ item, onRemove }) {
   const lab = item.lab || {};
   const price = item.salePrice || item.price;
@@ -51,10 +55,9 @@ function CartItem({ item, onRemove }) {
         <div className="flex items-center gap-2 mt-1.5 text-[11px] text-gray-400">
           {lab.name && <span className="font-medium text-gray-600">{lab.name}</span>}
           {item.reportTime && <span>· Report in {item.reportTime}</span>}
-          {(lab.city || lab.state) && (
+          {(lab.city) && (
             <span className="flex items-center gap-0.5">
-              · <FiMapPin className="text-[10px]" />
-              {[lab.city, lab.state].filter(Boolean).join(', ')}
+              · <FiMapPin className="text-[10px]" /> {lab.city}
             </span>
           )}
         </div>
@@ -79,21 +82,116 @@ function CartItem({ item, onRemove }) {
   );
 }
 
-function BookingForm({ groups, onSuccess }) {
+// ── Pincode validator ─────────────────────────────────────────────────────────
+function PincodeField({ pincode, onChange, groups, onValidated }) {
+  const [status, setStatus] = useState('idle'); // idle | loading | valid | invalid
+  const [city, setCity] = useState('');
+  const [unavailableLabs, setUnavailableLabs] = useState([]);
+
+  useEffect(() => {
+    if (pincode.length !== 6) { setStatus('idle'); setCity(''); setUnavailableLabs([]); onValidated(false); return; }
+    setStatus('loading');
+    fetch(`https://api.postalpincode.in/pincode/${pincode}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data[0]?.Status !== 'Success') { setStatus('invalid'); onValidated(false); return; }
+        const po = data[0].PostOffice?.[0];
+        const detectedCity = po?.District || po?.Block || po?.Name || '';
+        setCity(detectedCity);
+
+        // Check each lab's city against detected city
+        const unavailable = groups.filter((g) => {
+          const labCity = (g.items[0]?.lab?.city || '').toLowerCase();
+          return !labCity.includes(detectedCity.toLowerCase()) &&
+                 !detectedCity.toLowerCase().includes(labCity);
+        }).map((g) => g.labName);
+
+        setUnavailableLabs(unavailable);
+        setStatus(unavailable.length === 0 ? 'valid' : 'warning');
+        onValidated(unavailable.length === 0);
+      })
+      .catch(() => { setStatus('invalid'); onValidated(false); });
+  }, [pincode]);
+
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-1">
+        Pincode <span className="text-red-500">*</span>
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={6}
+          required
+          value={pincode}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          className="input text-sm pr-8"
+          placeholder="e.g. 226001"
+        />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base">
+          {status === 'loading' && <FiLoader className="animate-spin text-gray-400" />}
+          {status === 'valid'   && <FiCheckCircle className="text-green-500" />}
+          {(status === 'invalid' || status === 'warning') && <FiAlertCircle className="text-red-400" />}
+        </span>
+      </div>
+      {status === 'valid' && (
+        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+          <FiCheckCircle size={11} /> {city} — all labs available in this area
+        </p>
+      )}
+      {status === 'warning' && unavailableLabs.length > 0 && (
+        <p className="text-xs text-red-500 mt-1">
+          ⚠ {unavailableLabs.join(', ')} {unavailableLabs.length > 1 ? 'do' : 'does'} not serve {city}. Remove them or change pincode.
+        </p>
+      )}
+      {status === 'invalid' && (
+        <p className="text-xs text-red-500 mt-1">Invalid pincode. Please check.</p>
+      )}
+    </div>
+  );
+}
+
+// ── Booking form ──────────────────────────────────────────────────────────────
+function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
   const router = useRouter();
   const { user } = useAuth();
-  const [form, setForm] = useState({
-    patientName: '', patientAge: '', patientGender: 'male',
-    slotDate: '', slotTime: '', visitType: 'lab', address: '',
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [open, setOpen] = useState(true);
 
+  const [form, setForm] = useState({
+    patientName: '',
+    patientAge: '',
+    patientGender: 'male',
+    phone: '',
+    email: '',
+    pincode: '',
+    slotDate: '',
+    slotTime: '',
+    visitType: 'lab',
+    address: '',
+  });
+  const [pincodeValid, setPincodeValid] = useState(false);
+
+  // Pre-fill from user profile
+  useEffect(() => {
+    if (user) {
+      setForm((f) => ({
+        ...f,
+        patientName: f.patientName || user.name || '',
+        phone: f.phone || user.mobile || '',
+        email: f.email || user.email || '',
+      }));
+    }
+  }, [user]);
+
+  const F = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const today = new Date().toISOString().split('T')[0];
   const hasHome = groups.some((g) => g.items.some((i) => i.homeCollection));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) { router.push('/login'); return; }
+    if (!pincodeValid) { toast.error('Please enter a valid pincode first'); return; }
+
     setSubmitting(true);
     try {
       for (const group of groups) {
@@ -106,7 +204,15 @@ function BookingForm({ groups, onSuccess }) {
             qty: 1,
             price: i.salePrice || i.price,
           })),
-          patients: [{ name: form.patientName, age: +form.patientAge, gender: form.patientGender, relation: 'self' }],
+          patients: [{
+            name: form.patientName,
+            age: +form.patientAge,
+            gender: form.patientGender,
+            relation: 'self',
+            phone: form.phone,
+            email: form.email,
+          }],
+          pincode: form.pincode,
           slotDate: form.slotDate,
           slotTime: form.slotTime,
           visitType: form.visitType,
@@ -126,92 +232,110 @@ function BookingForm({ groups, onSuccess }) {
     }
   };
 
-  const F = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
-  const today = new Date().toISOString().split('T')[0];
-
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-5 py-4 font-bold text-gray-800 text-sm hover:bg-gray-50 transition-colors"
-      >
-        Patient &amp; Slot Details
-        {open ? <FiChevronUp /> : <FiChevronDown />}
-      </button>
+    <form id="booking-form" onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-100 p-5 md:p-6 space-y-4">
+      <h2 className="font-bold text-gray-800 text-base">Patient &amp; Slot Details</h2>
 
-      {open && (
-        <form onSubmit={handleSubmit} className="px-5 pb-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Patient Name</label>
-              <input required value={form.patientName} onChange={F('patientName')} className="input text-sm" placeholder="Full name" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Age</label>
-              <input required type="number" min="1" max="120" value={form.patientAge} onChange={F('patientAge')} className="input text-sm" placeholder="Age" />
-            </div>
+      {/* Row 1: Name | Age | Phone | Email */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Patient Name <span className="text-red-500">*</span></label>
+          <input required value={form.patientName} onChange={F('patientName')} className="input text-sm" placeholder="Full name" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Age <span className="text-red-500">*</span></label>
+          <input required type="number" min="1" max="120" value={form.patientAge} onChange={F('patientAge')} className="input text-sm" placeholder="Age" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Phone Number <span className="text-red-500">*</span></label>
+          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-primary-500">
+            <span className="px-2 py-2.5 bg-gray-50 border-r border-gray-300 text-xs text-gray-500 font-medium">+91</span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              required
+              pattern="[6-9][0-9]{9}"
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+              className="flex-1 px-2 py-2.5 text-sm outline-none bg-transparent"
+              placeholder="98765 43210"
+            />
           </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
+          <input required type="email" value={form.email} onChange={F('email')} className="input text-sm" placeholder="you@example.com" />
+        </div>
+      </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
-              <select value={form.patientGender} onChange={F('patientGender')} className="input text-sm">
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Visit Type</label>
-              <select value={form.visitType} onChange={F('visitType')} className="input text-sm">
-                <option value="lab">Visit Lab</option>
-                {hasHome && <option value="home">Home Collection</option>}
-              </select>
-            </div>
-          </div>
+      {/* Row 2: Gender | Visit Type | Pincode | Date | Time */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
+          <select value={form.patientGender} onChange={F('patientGender')} className="input text-sm">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Visit Type</label>
+          <select value={form.visitType} onChange={F('visitType')} className="input text-sm">
+            <option value="lab">Visit Lab</option>
+            {hasHome && <option value="home">Home Collection</option>}
+          </select>
+        </div>
+        <div>
+          <PincodeField
+            pincode={form.pincode}
+            onChange={(v) => setForm((f) => ({ ...f, pincode: v }))}
+            groups={groups}
+            onValidated={setPincodeValid}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Preferred Date <span className="text-red-500">*</span></label>
+          <input required type="date" min={today} value={form.slotDate} onChange={F('slotDate')} className="input text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Preferred Time <span className="text-red-500">*</span></label>
+          <input required type="time" value={form.slotTime} onChange={F('slotTime')} className="input text-sm" />
+        </div>
+      </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Preferred Date</label>
-              <input required type="date" min={today} value={form.slotDate} onChange={F('slotDate')} className="input text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Preferred Time</label>
-              <input required type="time" value={form.slotTime} onChange={F('slotTime')} className="input text-sm" />
-            </div>
-          </div>
-
-          {form.visitType === 'home' && (
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Collection Address</label>
-              <textarea required rows={2} value={form.address} onChange={F('address')} className="input text-sm resize-none" placeholder="Full address for sample collection" />
-            </div>
-          )}
-
-          {!user && (
-            <p className="text-xs text-center text-gray-500">
-              <Link href="/login" className="text-primary-600 font-semibold">Login</Link> required to confirm booking
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting || !user}
-            className="w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold text-sm transition-colors"
-          >
-            {submitting ? 'Confirming…' : `Confirm Booking${groups.length > 1 ? ` (${groups.length} labs)` : ''}`}
-          </button>
-        </form>
+      {/* Address for home collection */}
+      {form.visitType === 'home' && (
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Collection Address <span className="text-red-500">*</span></label>
+          <textarea required rows={2} value={form.address} onChange={F('address')} className="input text-sm resize-none" placeholder="Full address for sample collection" />
+        </div>
       )}
-    </div>
+
+      {!user && (
+        <p className="text-xs text-center text-gray-500 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+          <Link href="/login" className="text-primary-600 font-semibold">Login</Link> required to confirm booking
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold text-sm transition-colors mt-2"
+      >
+        {submitting
+          ? 'Confirming…'
+          : `Confirm Booking${groups.length > 1 ? ` (${groups.length} labs)` : ''}`}
+      </button>
+    </form>
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function CartPage() {
   const { items, removeItem, clearCart } = useCart();
+  const [submitting, setSubmitting] = useState(false);
 
-  // Group by lab so we create one booking per lab
   const groups = Object.values(
     items.reduce((acc, item) => {
       const labId = item.lab?._id || item.lab || 'unknown';
@@ -221,9 +345,9 @@ export default function CartPage() {
     }, {})
   );
 
-  const total = items.reduce((sum, i) => sum + (i.salePrice || i.price || 0), 0);
+  const total    = items.reduce((sum, i) => sum + (i.salePrice || i.price || 0), 0);
   const mrpTotal = items.reduce((sum, i) => sum + (i.price || 0), 0);
-  const savings = mrpTotal - total;
+  const savings  = mrpTotal - total;
 
   if (items.length === 0) {
     return (
@@ -259,14 +383,15 @@ export default function CartPage() {
                 <p className="text-sm text-gray-400">{items.length} test{items.length !== 1 ? 's' : ''} added</p>
               </div>
             </div>
-            <button onClick={clearCart} className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors">
+            <button onClick={clearCart} className="text-xs text-red-500 hover:text-red-700 font-medium">
               Clear all
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* TOP: Cart items (left) + Price summary (right, sticky) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6">
 
-            {/* Left: Cart items (grouped by lab) */}
+            {/* LEFT: Cart items grouped by lab */}
             <div className="lg:col-span-2 space-y-6">
               {groups.map((group) => (
                 <div key={group.labId}>
@@ -285,10 +410,8 @@ export default function CartPage() {
               ))}
             </div>
 
-            {/* Right: Summary + Booking form */}
-            <div className="space-y-4">
-
-              {/* Price summary */}
+            {/* RIGHT: Price summary (sticky) */}
+            <div className="lg:sticky lg:top-24">
               <div className="bg-white rounded-xl border border-gray-100 p-5">
                 <h2 className="font-bold text-gray-800 text-sm mb-4">Price Summary</h2>
                 <div className="space-y-2 text-sm">
@@ -314,9 +437,21 @@ export default function CartPage() {
                   </p>
                 )}
               </div>
+            </div>
+          </div>
 
-              {/* Booking form */}
-              <BookingForm groups={groups} onSuccess={clearCart} />
+          {/* BOTTOM: Patient & Slot form — same width as cart items (lg:col-span-2) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-3">
+              <BookingForm
+                groups={groups}
+                onSuccess={clearCart}
+                submitting={submitting}
+                setSubmitting={setSubmitting}
+              />
+              <p className="text-xs text-center text-gray-400">
+                By confirming, you agree to our terms &amp; conditions
+              </p>
             </div>
           </div>
         </div>

@@ -198,7 +198,7 @@ exports.me = asyncHandler(async (req, res) => {
 });
 
 // POST /api/v1/auth/google
-// Receives Google credential (ID token) from the frontend, verifies it, and returns a JWT.
+// Receives Google credential (ID token), verifies it, returns JWT.
 exports.googleAuth = asyncHandler(async (req, res) => {
   const { credential } = req.body;
   if (!credential) return res.status(400).json({ message: 'Google credential is required' });
@@ -219,21 +219,16 @@ exports.googleAuth = asyncHandler(async (req, res) => {
 
   const { sub: googleId, email, name, picture } = payload;
 
-  // Find existing user by googleId or email
   let user = await User.findOne({ $or: [{ googleId }, { email }] });
 
   if (user) {
-    // Link googleId if the account was created with email/password
     if (!user.googleId) {
       user.googleId = googleId;
       if (!user.avatar && picture) user.avatar = picture;
     }
   } else {
-    // First-time Google sign-in — create account (no password)
     user = await User.create({
-      name,
-      email,
-      googleId,
+      name, email, googleId,
       avatar: picture,
       role: 'customer',
       verified: true,
