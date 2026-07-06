@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const { sendMail } = require('../config/email');
+const { sendSms, sendWhatsapp } = require('../config/sms');
 
 function signToken(user) {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
@@ -92,28 +93,40 @@ exports.login = asyncHandler(async (req, res) => {
 });
 
 exports.sendOtp = asyncHandler(async (req, res) => {
-  const { emailOrMobile, purpose = 'login' } = req.body;
+  // channel: 'email' | 'sms' | 'whatsapp'
+  const { emailOrMobile, purpose = 'login', channel = 'email' } = req.body;
   const identifier = String(emailOrMobile || '').trim();
 
   if (!identifier) return res.status(400).json({ message: 'Email or mobile is required' });
 
+  const isEmail = identifier.includes('@');
+  // For mobile channels, validate it's a phone number
+  if (!isEmail && channel === 'email') {
+    return res.status(400).json({ message: 'Choose SMS or WhatsApp to receive OTP on mobile' });
+  }
+  if (isEmail && channel !== 'email') {
+    return res.status(400).json({ message: 'Enter a mobile number for SMS or WhatsApp OTP' });
+  }
+
   const { otp } = await createOtpRecord({ identifier, purpose });
 
-  const isEmail = identifier.includes('@');
-  if (isEmail) {
+  const expiryMins = process.env.OTP_EXPIRY_MINUTES || 10;
+  const message = `Your DiagnosticHub OTP is ${otp}. Valid for ${expiryMins} mins. Do not share with anyone.`;
+
+  if (channel === 'whatsapp') {
+    await sendWhatsapp({ to: identifier, message });
+  } else if (channel === 'sms') {
+    await sendSms({ to: identifier, message });
+  } else {
     await sendMail({
       to: identifier,
-      subject: 'Your OTP code',
-      text: `Your OTP is ${otp}. It expires in ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.`,
-      html: `<p>Your OTP is <b>${otp}</b>.</p><p>It expires in ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.</p>`
+      subject: 'Your DiagnosticHub OTP',
+      text: message,
+      html: `<p>Your OTP is <b>${otp}</b>. It expires in ${expiryMins} minutes.</p><p>Do not share this with anyone.</p>`,
     });
   }
 
-  res.json({
-    message: 'OTP sent',
-    delivery: isEmail ? 'email' : 'mobile',
-    purpose
-  });
+  res.json({ message: 'OTP sent', delivery: channel, purpose });
 });
 
 exports.verifyOtp = asyncHandler(async (req, res) => {
