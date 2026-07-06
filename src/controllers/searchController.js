@@ -128,6 +128,116 @@ async function mongoSearch(q, type, city, limit) {
   return result;
 }
 
+// ─── Abbreviation / alias expansion ──────────────────────────────────────────
+
+const ALIASES = {
+  cbc:        ['complete blood count', 'haemogram', 'cbp'],
+  lft:        ['liver function test', 'liver function'],
+  kft:        ['kidney function test', 'renal function', 'renal profile'],
+  rft:        ['kidney function test', 'renal function', 'renal profile'],
+  tft:        ['thyroid function test', 'thyroid profile', 'thyroid'],
+  tsh:        ['thyroid stimulating hormone', 'thyroid'],
+  hba1c:      ['glycosylated haemoglobin', 'glycated haemoglobin', 'a1c'],
+  a1c:        ['glycosylated haemoglobin', 'hba1c'],
+  sugar:      ['glucose', 'blood sugar'],
+  'vit d':    ['vitamin d', '25 oh', 'cholecalciferol'],
+  'vit d3':   ['vitamin d3', '25 oh'],
+  'vit b12':  ['vitamin b12', 'cobalamin'],
+  b12:        ['vitamin b12', 'cobalamin'],
+  lipid:      ['lipid profile', 'cholesterol', 'triglyceride'],
+  cholesterol:['lipid profile'],
+  dengue:     ['ns1', 'dengue antigen', 'dengue igg', 'dengue igm'],
+  typhoid:    ['widal', 'salmonella'],
+  widal:      ['typhoid', 'salmonella typhi'],
+  malaria:    ['malarial parasite', 'malarial antigen', 'mp'],
+  hiv:        ['retroviral', 'aids'],
+  esr:        ['erythrocyte sedimentation rate'],
+  crp:        ['c-reactive protein', 'c reactive protein'],
+  psa:        ['prostate specific antigen', 'prostate'],
+  fnac:       ['fine needle aspiration', 'cytology'],
+  pregnancy:  ['beta hcg', 'hcg'],
+  hcg:        ['pregnancy', 'beta hcg'],
+  syphilis:   ['vdrl', 'rpr', 'tpha'],
+  vdrl:       ['rpr', 'tpha', 'syphilis'],
+  'hepatitis b': ['hbsag', 'hbv', 'hbs ag'],
+  hbsag:      ['hepatitis b surface antigen'],
+  'hepatitis c': ['hcv'],
+  hcv:        ['hepatitis c'],
+  pcr:        ['rt-pcr', 'molecular', 'dna test'],
+  uric:       ['uric acid', 'gout'],
+  creatinine: ['kidney', 'renal'],
+  mantoux:    ['tuberculin', 'tb test'],
+  tb:         ['tuberculosis', 'mtb', 'mantoux', 'tb gold'],
+  urine:      ['urine routine', 'urine complete'],
+  'blood group': ['rh typing', 'blood type'],
+};
+
+function expandQuery(q) {
+  const lower = q.toLowerCase().trim();
+  const extra = ALIASES[lower] || [];
+  // partial-key match (e.g. "vitamin d" → "vit d")
+  for (const [k, v] of Object.entries(ALIASES)) {
+    if (lower.startsWith(k) || k.startsWith(lower)) extra.push(...v);
+  }
+  return [...new Set([lower, ...extra])];
+}
+
+// ─── Grouped autocomplete suggest ────────────────────────────────────────────
+
+exports.suggest = asyncHandler(async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  const city = String(req.query.city || '').trim();
+  const limit = Math.min(Number(req.query.limit || 10), 20);
+
+  if (q.length < 2) return res.json({ tests: [], labs: [] });
+
+  const terms = expandQuery(q);
+  const orPatterns = terms.map((t) => ({ name: new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }));
+
+  // Optional city filter — get lab IDs once
+  let cityLabIds = null;
+  if (city) {
+    const cityLabs = await Lab.find({ city: new RegExp(city, 'i'), approved: true }).select('_id').lean();
+    cityLabIds = cityLabs.map((l) => l._id);
+    if (!cityLabIds.length) return res.json({ tests: [], labs: [] });
+  }
+
+  const matchStage = { isActive: true, $or: orPatterns };
+  if (cityLabIds) matchStage.lab = { $in: cityLabIds };
+
+  // Group by test name → min/max price, lab count
+  const grouped = await Product.aggregate([
+    { $match: matchStage },
+    { $group: {
+      _id: '$name',
+      minPrice: { $min: { $ifNull: ['$salePrice', '$price'] } },
+      maxPrice: { $max: { $ifNull: ['$salePrice', '$price'] } },
+      labCount: { $sum: 1 },
+      sampleType: { $first: '$sampleType' },
+      reportTime: { $first: '$reportTime' },
+    }},
+    { $sort: { labCount: -1 } },
+    { $limit: limit },
+  ]);
+
+  // Also fetch a few matching labs
+  const labFilter = { approved: true, $or: terms.map((t) => ({ name: new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') })) };
+  if (city) labFilter.city = new RegExp(city, 'i');
+  const labs = await Lab.find(labFilter).select('name slug city ratingAvg').limit(4).lean();
+
+  res.json({
+    tests: grouped.map((g) => ({
+      name: g._id,
+      minPrice: g.minPrice,
+      maxPrice: g.maxPrice,
+      labCount: g.labCount,
+      sampleType: g.sampleType || 'Blood',
+      reportTime: g.reportTime || '',
+    })),
+    labs,
+  });
+});
+
 // ─── Controllers ─────────────────────────────────────────────────────────────
 
 exports.globalSearch = asyncHandler(async (req, res) => {
@@ -194,13 +304,49 @@ exports.reindexProducts = asyncHandler(async (req, res) => {
   const records = products.map(productRecord);
 
   await setIndexSettings('products', {
-    searchableAttributes: ['name', 'description', 'tags', 'type', 'sampleType'],
+    searchableAttributes: ['name', 'tags', 'description', 'type', 'sampleType'],
     attributesForFaceting: [
       'filterOnly(type)', 'filterOnly(homeCollection)',
       'filterOnly(fastingRequired)', 'filterOnly(isFeatured)',
+      'filterOnly(isActive)',
     ],
     customRanking: ['asc(price)'],
+    typoTolerance: true,
+    minWordSizefor1Typo: 3,
+    minWordSizefor2Typos: 7,
   });
+
+  // Push synonym rules so abbreviations resolve to full test names
+  if (hasAlgoliaConfig()) {
+    const { getClient, indexName } = require('../config/algolia');
+    const client = getClient();
+    const synonymRules = [
+      { objectID: 'syn_cbc',      type: 'synonym', synonyms: ['cbc', 'complete blood count', 'haemogram', 'cbp'] },
+      { objectID: 'syn_lft',      type: 'synonym', synonyms: ['lft', 'liver function test', 'liver function'] },
+      { objectID: 'syn_kft',      type: 'synonym', synonyms: ['kft', 'rft', 'kidney function test', 'renal profile', 'renal function'] },
+      { objectID: 'syn_thyroid',  type: 'synonym', synonyms: ['tft', 'tsh', 'thyroid', 'thyroid profile', 'thyroid function test'] },
+      { objectID: 'syn_hba1c',    type: 'synonym', synonyms: ['hba1c', 'a1c', 'glycosylated haemoglobin', 'glycated haemoglobin'] },
+      { objectID: 'syn_vitd',     type: 'synonym', synonyms: ['vitamin d', 'vit d', 'vit d3', '25 oh', 'cholecalciferol'] },
+      { objectID: 'syn_vitb12',   type: 'synonym', synonyms: ['vitamin b12', 'vit b12', 'b12', 'cobalamin'] },
+      { objectID: 'syn_lipid',    type: 'synonym', synonyms: ['lipid', 'lipid profile', 'cholesterol test', 'lipid panel'] },
+      { objectID: 'syn_dengue',   type: 'synonym', synonyms: ['dengue', 'ns1', 'dengue antigen', 'dengue test'] },
+      { objectID: 'syn_typhoid',  type: 'synonym', synonyms: ['typhoid', 'widal', 'salmonella'] },
+      { objectID: 'syn_malaria',  type: 'synonym', synonyms: ['malaria', 'malarial', 'mp', 'malarial parasite'] },
+      { objectID: 'syn_hiv',      type: 'synonym', synonyms: ['hiv', 'aids', 'retroviral'] },
+      { objectID: 'syn_esr',      type: 'synonym', synonyms: ['esr', 'erythrocyte sedimentation rate'] },
+      { objectID: 'syn_crp',      type: 'synonym', synonyms: ['crp', 'c reactive protein', 'c-reactive protein'] },
+      { objectID: 'syn_psa',      type: 'synonym', synonyms: ['psa', 'prostate specific antigen', 'prostate test'] },
+      { objectID: 'syn_uric',     type: 'synonym', synonyms: ['uric acid', 'gout test', 'urate'] },
+      { objectID: 'syn_sugar',    type: 'synonym', synonyms: ['blood sugar', 'glucose', 'sugar test', 'fasting sugar'] },
+      { objectID: 'syn_tb',       type: 'synonym', synonyms: ['tb', 'tuberculosis', 'mtb', 'tb pcr', 'tb gold'] },
+      { objectID: 'syn_pregnancy', type: 'synonym', synonyms: ['pregnancy test', 'beta hcg', 'hcg', 'pregnancy'] },
+      { objectID: 'syn_syphilis', type: 'synonym', synonyms: ['syphilis', 'vdrl', 'rpr', 'tpha'] },
+      { objectID: 'syn_hepatitisb', type: 'synonym', synonyms: ['hepatitis b', 'hbsag', 'hbv', 'hbs ag'] },
+      { objectID: 'syn_hepatitisc', type: 'synonym', synonyms: ['hepatitis c', 'hcv', 'hcv ab'] },
+      { objectID: 'syn_pcr',      type: 'synonym', synonyms: ['pcr', 'rt-pcr', 'molecular test', 'dna test', 'rna test'] },
+    ];
+    await client.saveSynonyms({ indexName: indexName('products'), synonyms: synonymRules, forwardToReplicas: true });
+  }
 
   await syncObjects('products', records);
   res.json({ message: 'Products reindexed', count: records.length });

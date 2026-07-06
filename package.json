@@ -8,7 +8,9 @@
     "dev": "nodemon server.js",
     "seed": "node src/seed/seed.js",
     "seed:labs": "node src/seed/seedLabs.js",
-    "seed:lucknow": "node src/seed/seedLucknow.js"
+    "seed:lucknow": "node src/seed/seedLucknow.js",
+    "seed:lucknow-10labs": "node src/seed/seedLucknow10Labs.js",
+    "seed:lucknow-tests": "node src/seed/seedLucknowTests.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1066.0",
@@ -23,6 +25,7 @@
     "express-async-handler": "^1.2.0",
     "express-rate-limit": "^7.4.1",
     "express-validator": "^7.2.0",
+    "google-auth-library": "^10.9.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.1",

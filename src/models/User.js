@@ -17,7 +17,8 @@ const userSchema = new mongoose.Schema({
   mobile: { type: String, unique: true, sparse: true },
   alternateMobile: { type: String, default: '' },
   alternateEmail: { type: String, default: '' },
-  password: { type: String, required: true, select: false },
+  password: { type: String, select: false },
+  googleId: { type: String, unique: true, sparse: true },
   role: {
     type: String,
     enum: ['superadmin', 'subadmin', 'lab', 'customer'],
@@ -36,7 +37,7 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || !this.password) return next();
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });

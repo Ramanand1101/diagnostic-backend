@@ -1,7 +1,8 @@
 const router = require('express').Router();
-const { globalSearch, reindexLabs, reindexProducts, reindexPages } = require('../controllers/searchController');
+const { globalSearch, suggest, reindexLabs, reindexProducts, reindexPages } = require('../controllers/searchController');
 const { protect, allowRoles } = require('../middleware/authMiddleware');
 
+router.get('/suggest', suggest);
 router.get('/', globalSearch);
 router.post('/reindex/labs', protect, allowRoles('superadmin'), reindexLabs);
 router.post('/reindex/products', protect, allowRoles('superadmin'), reindexProducts);
