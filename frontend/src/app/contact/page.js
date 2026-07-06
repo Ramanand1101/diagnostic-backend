@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { ticketApi, newsletterApi } from '@/lib/api';
@@ -108,7 +109,7 @@ export default function ContactPage() {
                 <h2 className="font-semibold text-gray-900 mb-6 text-lg">Send a Message</h2>
                 {!user && (
                   <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm px-4 py-3 rounded-lg mb-4">
-                    Please <a href="/login" className="font-medium underline">login</a> to submit a support ticket and track your request.
+                    Please <Link href="/login" className="font-medium underline">login</Link> to submit a support ticket and track your request.
                   </div>
                 )}
                 <form onSubmit={handleSubmit} className="space-y-4">
