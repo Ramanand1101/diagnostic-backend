@@ -1,11 +1,14 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: path.join(__dirname, '../'),
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.amazonaws.com' },
       { protocol: 'https', hostname: '**.cloudinary.com' },
       { protocol: 'https', hostname: 'via.placeholder.com' },
-      { protocol: 'https', hostname: 'images.unsplash.com' }, // ← add karo
+      { protocol: 'https', hostname: 'images.unsplash.com' },
     ],
   },
 };
