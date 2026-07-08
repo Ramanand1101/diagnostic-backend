@@ -13,6 +13,19 @@ import CityPickerModal from '@/components/layout/CityPickerModal';
 
 const TYPEWRITER = ['CBC Test', 'Thyroid Panel', 'Vitamin D', 'HbA1c', 'Full Body Checkup', 'Lipid Profile'];
 
+const POPULAR_TESTS = [
+  { name: 'CBC Complete Blood Count',       alsoKnown: 'CBP, Complete Blood Count, Haemogram' },
+  { name: 'HbA1c Glycosylated Hemoglobin',  alsoKnown: 'Glycosylated Haemoglobin, Serum HbA1c, HBA1C' },
+  { name: 'Kidney Function Test',            alsoKnown: 'KFT, RFT, Renal Function Test' },
+  { name: 'Thyroid Profile Total',           alsoKnown: 'TFT, TSH, T3, T4, Thyroid Panel' },
+  { name: 'Vitamin D Total',                 alsoKnown: '25-OH Vitamin D, Vitamin D3' },
+  { name: 'Lipid Profile',                   alsoKnown: 'Cholesterol Test, Lipid Panel, Triglycerides' },
+  { name: 'Liver Function Test',             alsoKnown: 'LFT, SGPT, SGOT, Bilirubin' },
+  { name: 'Blood Sugar Fasting',             alsoKnown: 'FBS, Fasting Glucose, Blood Glucose' },
+  { name: 'Vitamin B12',                     alsoKnown: 'Cyanocobalamin, Cobalamin, B12' },
+  { name: 'Full Body Checkup',               alsoKnown: 'Complete Health Package, Master Health Checkup' },
+];
+
 export default function HeroSlider() {
   const { city: contextCity } = useCity();
   const city = contextCity || '';
@@ -27,6 +40,7 @@ export default function HeroSlider() {
   const [liveResults, setLiveResults] = useState({ tests: [], labs: [] });
   const [showDrop, setShowDrop] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
   const searchWrapRef = useRef(null);
   const cityBtnRef = useRef(null);
   const searchBtnRef = useRef(null);
@@ -80,7 +94,11 @@ export default function HeroSlider() {
 
   /* ── Live search dropdown ── */
   useEffect(() => {
-    if (query.trim().length < 2) { setLiveResults({ tests: [], labs: [] }); setShowDrop(false); return; }
+    if (query.trim().length < 2) {
+      setLiveResults({ tests: [], labs: [] });
+      // keep dropdown open if focused (shows popular tests)
+      return;
+    }
     const t = setTimeout(async () => {
       setSearching(true);
       try {
@@ -99,6 +117,9 @@ export default function HeroSlider() {
     return () => clearTimeout(t);
   }, [query, city]);
 
+  const showPopular = inputFocused && query.trim().length < 2;
+  const hasResults  = liveResults.tests.length > 0 || liveResults.labs.length > 0;
+
   /* ── Measure city + search button widths for dropdown positioning ── */
   useEffect(() => {
     const measure = () => {
@@ -113,7 +134,10 @@ export default function HeroSlider() {
   /* ── Close dropdown on outside click ── */
   useEffect(() => {
     const handler = (e) => {
-      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) setShowDrop(false);
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) {
+        setShowDrop(false);
+        setInputFocused(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -129,9 +153,7 @@ export default function HeroSlider() {
     );
   };
 
-  const goTo = (href) => { setShowDrop(false); setQuery(''); router.push(href); };
-
-  const hasResults = liveResults.tests.length > 0 || liveResults.labs.length > 0;
+  const goTo = (href) => { setShowDrop(false); setInputFocused(false); setQuery(''); router.push(href); };
 
   const fmtPrice = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
   const priceRange = (min, max) =>
@@ -194,8 +216,8 @@ export default function HeroSlider() {
                 }
                 <input type="text" value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Escape' && setShowDrop(false)}
-                  onFocus={() => hasResults && setShowDrop(true)}
+                  onKeyDown={(e) => e.key === 'Escape' && (setShowDrop(false), setInputFocused(false))}
+                  onFocus={() => { setInputFocused(true); setShowDrop(true); }}
                   placeholder={placeholder}
                   className="flex-1 py-5 text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
                   autoComplete="off"
@@ -214,27 +236,22 @@ export default function HeroSlider() {
               </button>
             </form>
 
-            {/* ── Live results dropdown ── */}
-            {showDrop && (
-              <div className="absolute top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden"
+            {/* ── Dropdown: popular on focus OR live results on type ── */}
+            {showDrop && (showPopular || hasResults || searching) && (
+              <div className="absolute top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden max-h-[420px] overflow-y-auto"
                 style={{ left: dropLeft, right: dropRight }}>
 
-                {!hasResults && !searching && (
-                  <div className="px-4 py-5 text-center text-sm text-gray-400">
-                    No results for &ldquo;{query}&rdquo;{city ? ` in ${city}` : ''}
-                  </div>
-                )}
-
-                {/* Tests — grouped by name */}
-                {liveResults.tests.length > 0 && (
-                  <div>
+                {/* Popular tests — shown when query is empty */}
+                {showPopular && (
+                  <>
                     <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
-                      Tests &amp; Packages{city ? ` in ${city}` : ''}
+                      Popular Tests
                     </p>
-                    {liveResults.tests.map((t) => (
+                    {POPULAR_TESTS.map((t) => (
                       <button
                         key={t.name}
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => goTo(`/search?q=${encodeURIComponent(t.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`)}
                         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left"
                       >
@@ -242,52 +259,83 @@ export default function HeroSlider() {
                           <MdOutlineScience className="text-sky-600 text-base" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{t.name}</p>
-                          <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
-                            <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded font-medium">
-                              {t.labCount} lab{t.labCount !== 1 ? 's' : ''}
-                            </span>
-                            <span>·</span>
-                            <span className="font-medium text-gray-600">{priceRange(t.minPrice, t.maxPrice)}</span>
-                            {t.reportTime && <><span>·</span><span>{t.reportTime}</span></>}
-                          </p>
-                        </div>
-                        <FiChevronRight size={14} className="text-gray-300 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Labs */}
-                {liveResults.labs.length > 0 && (
-                  <div className={liveResults.tests.length > 0 ? 'border-t border-gray-50' : ''}>
-                    <p className="px-4 pt-3 pb-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
-                      Labs
-                    </p>
-                    {liveResults.labs.map((lab) => (
-                      <button key={lab._id || lab.objectID} type="button"
-                        onClick={() => goTo(`/labs/${lab.slug || lab._id}`)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left">
-                        <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
-                          <FiMapPin className="text-primary-600 text-sm" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{lab.name}</p>
-                          <p className="text-xs text-gray-400">{lab.city}{lab.ratingAvg ? ` · ★ ${lab.ratingAvg}` : ''}</p>
+                          <p className="text-sm font-medium text-gray-800 uppercase tracking-wide">{t.name}</p>
+                          <p className="text-xs text-gray-400 truncate mt-0.5">Also known as :- {t.alsoKnown}</p>
                         </div>
                       </button>
                     ))}
-                  </div>
+                  </>
                 )}
 
-                {/* See all */}
-                {hasResults && (
-                  <Link href={`/search?q=${encodeURIComponent(query)}${city ? `&city=${encodeURIComponent(city)}` : ''}`}
-                    onClick={() => setShowDrop(false)}
-                    className="flex items-center justify-center gap-1.5 px-4 py-3 border-t border-gray-100 text-sm font-medium text-sky-600 hover:bg-sky-50 transition">
-                    <FiSearch size={13} />
-                    See all results for &ldquo;{query}&rdquo;{city ? ` in ${city}` : ''}
-                  </Link>
+                {/* Live results — shown when typing */}
+                {!showPopular && (
+                  <>
+                    {!hasResults && !searching && (
+                      <div className="px-4 py-5 text-center text-sm text-gray-400">
+                        No results for &ldquo;{query}&rdquo;{city ? ` in ${city}` : ''}
+                      </div>
+                    )}
+
+                    {liveResults.tests.length > 0 && (
+                      <div>
+                        <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                          Tests &amp; Packages{city ? ` in ${city}` : ''}
+                        </p>
+                        {liveResults.tests.map((t) => (
+                          <button key={t.name} type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => goTo(`/search?q=${encodeURIComponent(t.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`)}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left">
+                            <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
+                              <MdOutlineScience className="text-sky-600 text-base" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">{t.name}</p>
+                              <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
+                                <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded font-medium">
+                                  {t.labCount} lab{t.labCount !== 1 ? 's' : ''}
+                                </span>
+                                <span>·</span>
+                                <span className="font-medium text-gray-600">{priceRange(t.minPrice, t.maxPrice)}</span>
+                                {t.reportTime && <><span>·</span><span>{t.reportTime}</span></>}
+                              </p>
+                            </div>
+                            <FiChevronRight size={14} className="text-gray-300 shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {liveResults.labs.length > 0 && (
+                      <div className={liveResults.tests.length > 0 ? 'border-t border-gray-50' : ''}>
+                        <p className="px-4 pt-3 pb-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Labs</p>
+                        {liveResults.labs.map((lab) => (
+                          <button key={lab._id || lab.objectID} type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => goTo(`/labs/${lab.slug || lab._id}`)}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left">
+                            <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
+                              <FiMapPin className="text-primary-600 text-sm" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">{lab.name}</p>
+                              <p className="text-xs text-gray-400">{lab.city}{lab.ratingAvg ? ` · ★ ${lab.ratingAvg}` : ''}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {hasResults && (
+                      <Link href={`/search?q=${encodeURIComponent(query)}${city ? `&city=${encodeURIComponent(city)}` : ''}`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => { setShowDrop(false); setInputFocused(false); }}
+                        className="flex items-center justify-center gap-1.5 px-4 py-3 border-t border-gray-100 text-sm font-medium text-sky-600 hover:bg-sky-50 transition">
+                        <FiSearch size={13} />
+                        See all results for &ldquo;{query}&rdquo;{city ? ` in ${city}` : ''}
+                      </Link>
+                    )}
+                  </>
                 )}
               </div>
             )}
