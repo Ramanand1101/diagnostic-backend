@@ -294,17 +294,34 @@ function SearchContent() {
     setCity(searchParams.get('city') || '');
   }, [searchParams]);
 
-  const runSearch = useCallback(async (q, c) => {
-    if (!q.trim()) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
+  // Search each test separately and merge unique products
+  const runSearch = useCallback(async (q, c, tests = []) => {
+    const queries = tests.length > 0 ? tests : (q.trim() ? [q.trim()] : []);
+    if (queries.length === 0) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
     setLoading(true);
     setSelectedLabs(new Set());
     setSelectedLocations(new Set());
     setActiveProduct(null);
     try {
-      const res = await searchApi.search({ q: q.trim(), city: c.trim() });
-      const data = res.data || { labs: [], products: [], pages: [] };
-      setResults(data);
-      if (data.products?.length > 0) setActiveProduct(data.products[0]);
+      // Run all queries in parallel, merge unique products by _id
+      const responses = await Promise.all(
+        queries.map((term) => searchApi.search({ q: term.trim(), city: c.trim() }).catch(() => ({ data: {} })))
+      );
+      const seen = new Set();
+      const mergedProducts = [];
+      const mergedLabs = [];
+      responses.forEach((res) => {
+        const data = res.data || {};
+        (data.products || []).forEach((p) => {
+          if (!seen.has(p._id)) { seen.add(p._id); mergedProducts.push(p); }
+        });
+        (data.labs || []).forEach((l) => {
+          if (!mergedLabs.find((x) => x._id === l._id)) mergedLabs.push(l);
+        });
+      });
+      const merged = { products: mergedProducts, labs: mergedLabs, pages: [] };
+      setResults(merged);
+      if (mergedProducts.length > 0) setActiveProduct(mergedProducts[0]);
     } catch {
       setResults({ labs: [], products: [], pages: [] });
     } finally {
@@ -312,17 +329,19 @@ function SearchContent() {
     }
   }, []);
 
-  // Run search for multi-test or single q
+  // effective query label for display
+  const effectiveQuery = multiTests.length > 0 ? multiTests.join(', ') : inputVal;
+
+  // Run search on multiTests or inputVal change
   useEffect(() => {
     clearTimeout(debounceRef.current);
-    const tests = multiTests.length > 0 ? multiTests : [];
-    const q = tests.length > 0 ? tests.join(', ') : inputVal;
-    if (!q.trim()) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
+    const hasQuery = multiTests.length > 0 || inputVal.trim();
+    if (!hasQuery) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
     debounceRef.current = setTimeout(() => {
-      runSearch(q, city);
+      runSearch(inputVal, city, multiTests);
       isOwnNavRef.current = true;
       const params = new URLSearchParams();
-      if (tests.length > 0) tests.forEach((t) => params.append('test', t));
+      if (multiTests.length > 0) multiTests.forEach((t) => params.append('test', t));
       else if (inputVal.trim()) params.set('q', inputVal.trim());
       if (city.trim()) params.set('city', city.trim());
       router.replace(`/search?${params.toString()}`, { scroll: false });
@@ -331,10 +350,11 @@ function SearchContent() {
   }, [inputVal, multiTests]);
 
   const applyCity = () => {
-    runSearch(inputVal, city);
+    runSearch(inputVal, city, multiTests);
     isOwnNavRef.current = true;
     const params = new URLSearchParams();
-    if (inputVal.trim()) params.set('q', inputVal.trim());
+    if (multiTests.length > 0) multiTests.forEach((t) => params.append('test', t));
+    else if (inputVal.trim()) params.set('q', inputVal.trim());
     if (city.trim()) params.set('city', city.trim());
     router.replace(`/search?${params.toString()}`, { scroll: false });
   };
@@ -466,7 +486,7 @@ function SearchContent() {
             </div>
           ) : !hasResults ? (
             <div className="text-center py-24 text-gray-500">
-              <p className="text-lg font-semibold">No results for &ldquo;{inputVal}&rdquo;{city.trim() ? ` in ${city}` : ''}</p>
+              <p className="text-lg font-semibold">No results for &ldquo;{effectiveQuery}&rdquo;{city.trim() ? ` in ${city}` : ''}</p>
               <p className="text-sm text-gray-400 mt-1">Try a different search term or city</p>
               {city.trim() && (
                 <button onClick={() => { setCity(''); runSearch(inputVal, ''); }}
@@ -504,7 +524,7 @@ function SearchContent() {
                 {/* Summary */}
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <p className="text-sm text-gray-500">
-                    <span className="font-bold text-gray-900">{totalFiltered}</span> result{totalFiltered !== 1 ? 's' : ''} for &ldquo;{inputVal}&rdquo;
+                    <span className="font-bold text-gray-900">{totalFiltered}</span> result{totalFiltered !== 1 ? 's' : ''} for &ldquo;{effectiveQuery}&rdquo;
                     {city.trim() && (
                       <span className="inline-flex items-center gap-1 ml-2 bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full text-xs font-medium">
                         <FiMapPin className="text-[10px]" />{city}
