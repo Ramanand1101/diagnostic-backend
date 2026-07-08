@@ -272,6 +272,9 @@ function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  // multi-test: read all `test` params from URL
+  const testParams = searchParams.getAll('test');
+  const [multiTests, setMultiTests] = useState(() => testParams);
   const [inputVal, setInputVal] = useState(() => searchParams.get('q') || '');
   const [city, setCity] = useState(() => searchParams.get('city') || '');
   const [results, setResults] = useState({ labs: [], products: [], pages: [] });
@@ -285,6 +288,8 @@ function SearchContent() {
 
   useEffect(() => {
     if (isOwnNavRef.current) { isOwnNavRef.current = false; return; }
+    const tp = searchParams.getAll('test');
+    setMultiTests(tp);
     setInputVal(searchParams.get('q') || '');
     setCity(searchParams.get('city') || '');
   }, [searchParams]);
@@ -299,7 +304,6 @@ function SearchContent() {
       const res = await searchApi.search({ q: q.trim(), city: c.trim() });
       const data = res.data || { labs: [], products: [], pages: [] };
       setResults(data);
-      // Auto-select first product
       if (data.products?.length > 0) setActiveProduct(data.products[0]);
     } catch {
       setResults({ labs: [], products: [], pages: [] });
@@ -308,19 +312,23 @@ function SearchContent() {
     }
   }, []);
 
+  // Run search for multi-test or single q
   useEffect(() => {
     clearTimeout(debounceRef.current);
-    if (!inputVal.trim()) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
+    const tests = multiTests.length > 0 ? multiTests : [];
+    const q = tests.length > 0 ? tests.join(', ') : inputVal;
+    if (!q.trim()) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
     debounceRef.current = setTimeout(() => {
-      runSearch(inputVal, city);
+      runSearch(q, city);
       isOwnNavRef.current = true;
       const params = new URLSearchParams();
-      params.set('q', inputVal.trim());
+      if (tests.length > 0) tests.forEach((t) => params.append('test', t));
+      else if (inputVal.trim()) params.set('q', inputVal.trim());
       if (city.trim()) params.set('city', city.trim());
       router.replace(`/search?${params.toString()}`, { scroll: false });
     }, 400);
     return () => clearTimeout(debounceRef.current);
-  }, [inputVal]);
+  }, [inputVal, multiTests]);
 
   const applyCity = () => {
     runSearch(inputVal, city);
@@ -425,7 +433,27 @@ function SearchContent() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 py-6">
-          {!inputVal.trim() ? (
+          {/* Multi-test chips */}
+          {multiTests.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Searching for:</span>
+              {multiTests.map((t) => (
+                <span key={t} className="inline-flex items-center gap-1.5 bg-sky-100 text-sky-800 text-xs font-semibold px-3 py-1.5 rounded-full">
+                  {t}
+                  <button type="button"
+                    onClick={() => {
+                      const updated = multiTests.filter((x) => x !== t);
+                      setMultiTests(updated);
+                    }}
+                    className="text-sky-500 hover:text-red-500 transition">
+                    <FiX size={11} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {!inputVal.trim() && multiTests.length === 0 ? (
             <div className="text-center py-24 text-gray-400">
               <FiSearch className="text-5xl mx-auto mb-4 opacity-20" />
               <p className="text-base font-medium">Search for tests, packages or labs</p>
