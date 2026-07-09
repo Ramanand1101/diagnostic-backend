@@ -25,11 +25,13 @@ export default function HeroSlider() {
   // search bar
   const [query, setQuery] = useState('');
   const [popularTests, setPopularTests] = useState([]);
+  const [selectedTests, setSelectedTests] = useState([]); // chip array
   const [liveResults, setLiveResults] = useState({ tests: [], labs: [] });
   const [showDrop, setShowDrop] = useState(false);
   const [searching, setSearching] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const searchWrapRef = useRef(null);
+  const inputRef = useRef(null);
   const cityBtnRef = useRef(null);
   const searchBtnRef = useRef(null);
   const [dropLeft, setDropLeft] = useState(0);
@@ -146,14 +148,36 @@ export default function HeroSlider() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Add chip — test name comes from DB so it's the exact search term
+  const addTest = (name) => {
+    if (!selectedTests.includes(name)) setSelectedTests((p) => [...p, name]);
+    setQuery('');
+    setLiveResults({ tests: [], labs: [] });
+    setShowDrop(true);
+    setInputFocused(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const removeTest = (name) => setSelectedTests((p) => p.filter((t) => t !== name));
+
   const handleSearch = (e) => {
     e.preventDefault();
     setShowDrop(false);
+    setInputFocused(false);
     const q = query.trim();
-    router.push(
-      q ? `/search?q=${encodeURIComponent(q)}&city=${encodeURIComponent(city)}`
-        : `/labs${city ? `?city=${encodeURIComponent(city)}` : ''}`
-    );
+    // If chips selected, search with test params; else single query
+    if (selectedTests.length > 0) {
+      const params = new URLSearchParams();
+      selectedTests.forEach((t) => params.append('test', t));
+      if (q) params.append('test', q);
+      if (city) params.set('city', city);
+      router.push(`/search?${params.toString()}`);
+    } else {
+      router.push(
+        q ? `/search?q=${encodeURIComponent(q)}&city=${encodeURIComponent(city)}`
+          : `/labs${city ? `?city=${encodeURIComponent(city)}` : ''}`
+      );
+    }
   };
 
   const goTo = (href) => { setShowDrop(false); setInputFocused(false); setQuery(''); router.push(href); };
@@ -211,31 +235,63 @@ export default function HeroSlider() {
                 </button>
               </div>
 
-              {/* Search input */}
-              <div className="flex items-center flex-1 px-3 relative">
+              {/* Search area: chips + input */}
+              <div
+                className="flex flex-wrap items-center flex-1 px-3 py-1.5 gap-1.5 min-h-[56px] cursor-text"
+                onClick={() => inputRef.current?.focus()}
+              >
                 {searching
-                  ? <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin shrink-0 mr-2" />
-                  : <FiSearch size={16} className="text-gray-400 shrink-0 mr-2" />
+                  ? <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                  : <FiSearch size={16} className="text-gray-400 shrink-0" />
                 }
-                <input type="text" value={query}
+
+                {/* Selected test chips */}
+                {selectedTests.map((t) => (
+                  <span key={t}
+                    className="inline-flex items-center gap-1 bg-sky-100 text-sky-800 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+                    {t}
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => removeTest(t)}
+                      className="ml-0.5 text-sky-500 hover:text-red-500 transition">
+                      <FiX size={10} />
+                    </button>
+                  </span>
+                ))}
+
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Escape' && (setShowDrop(false), setInputFocused(false))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { setShowDrop(false); setInputFocused(false); }
+                    if (e.key === 'Backspace' && !query && selectedTests.length > 0)
+                      removeTest(selectedTests[selectedTests.length - 1]);
+                    if (e.key === 'Enter' && query.trim() && !hasResults) {
+                      addTest(query.trim()); e.preventDefault();
+                    }
+                  }}
                   onFocus={() => { setInputFocused(true); setShowDrop(true); }}
-                  placeholder={placeholder}
-                  className="flex-1 py-5 text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
+                  placeholder={selectedTests.length === 0 ? placeholder : 'Add another test...'}
+                  className="flex-1 min-w-[120px] py-2 text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
                   autoComplete="off"
                 />
-                {query && (
-                  <button type="button" onClick={() => { setQuery(''); setShowDrop(false); }}
-                    className="text-gray-300 hover:text-gray-500 shrink-0 ml-1">
+                {(query || selectedTests.length > 0) && (
+                  <button type="button"
+                    onClick={() => { setQuery(''); setSelectedTests([]); setShowDrop(false); }}
+                    className="text-gray-300 hover:text-gray-500 shrink-0">
                     <FiX size={14} />
                   </button>
                 )}
               </div>
 
               <button ref={searchBtnRef} type="submit"
-                className="bg-sky-500 hover:bg-sky-600 active:bg-sky-700 text-white font-semibold text-sm px-6 transition shrink-0">
-                Search
+                className="bg-sky-500 hover:bg-sky-600 active:bg-sky-700 text-white font-bold text-sm px-5 transition shrink-0 flex flex-col items-center justify-center min-w-[90px]">
+                {selectedTests.length > 0 ? (
+                  <><FiSearch size={15} /><span className="text-[11px] mt-0.5">Get Prices</span></>
+                ) : 'Search'}
               </button>
             </form>
 
@@ -248,33 +304,39 @@ export default function HeroSlider() {
                 {showPopular && popularTests.length > 0 && (
                   <>
                     <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
-                      Popular Tests{city ? ` in ${city}` : ''}
+                      Popular Tests{city ? ` in ${city}` : ''}{selectedTests.length > 0 ? ' — tap to add' : ''}
                     </p>
-                    {popularTests.map((t) => (
-                      <button
-                        key={t.name}
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => goTo(`/search?q=${encodeURIComponent(t.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left"
-                      >
-                        <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
-                          <MdOutlineScience className="text-sky-600 text-base" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 uppercase tracking-wide">{t.name}</p>
-                          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
-                            <span className="bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded font-medium">{t.labCount} lab{t.labCount !== 1 ? 's' : ''}</span>
-                            {t.minPrice && <span>from ₹{t.minPrice.toLocaleString('en-IN')}</span>}
-                            {t.reportTime && <span>· {t.reportTime}</span>}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                    {popularTests.map((t) => {
+                      const already = selectedTests.includes(t.name);
+                      return (
+                        <button
+                          key={t.name}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => already ? removeTest(t.name) : addTest(t.name)}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 transition text-left ${already ? 'bg-sky-50 opacity-60' : 'hover:bg-sky-50'}`}
+                        >
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${already ? 'bg-sky-500' : 'bg-sky-100'}`}>
+                            {already
+                              ? <FiX className="text-white text-sm" />
+                              : <MdOutlineScience className="text-sky-600 text-base" />
+                            }
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 uppercase tracking-wide">{t.name}</p>
+                            <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+                              <span className="bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded font-medium">{t.labCount} lab{t.labCount !== 1 ? 's' : ''}</span>
+                              {t.minPrice && <span>from ₹{t.minPrice.toLocaleString('en-IN')}</span>}
+                              {t.reportTime && <span>· {t.reportTime}</span>}
+                            </p>
+                          </div>
+                          {already && <span className="text-[10px] text-sky-500 font-semibold shrink-0">Added ✓</span>}
+                        </button>
+                      );
+                    })}
                   </>
                 )}
 
-                {/* Loading state for popular */}
                 {showPopular && popularTests.length === 0 && (
                   <div className="px-4 py-4 text-center text-xs text-gray-400">Loading popular tests…</div>
                 )}
@@ -293,28 +355,34 @@ export default function HeroSlider() {
                         <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
                           Tests &amp; Packages{city ? ` in ${city}` : ''}
                         </p>
-                        {liveResults.tests.map((t) => (
-                          <button key={t.name} type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => goTo(`/search?q=${encodeURIComponent(t.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`)}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left">
-                            <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
-                              <MdOutlineScience className="text-sky-600 text-base" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-800 truncate">{t.name}</p>
-                              <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
-                                <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded font-medium">
-                                  {t.labCount} lab{t.labCount !== 1 ? 's' : ''}
-                                </span>
-                                <span>·</span>
-                                <span className="font-medium text-gray-600">{priceRange(t.minPrice, t.maxPrice)}</span>
-                                {t.reportTime && <><span>·</span><span>{t.reportTime}</span></>}
-                              </p>
-                            </div>
-                            <FiChevronRight size={14} className="text-gray-300 shrink-0" />
-                          </button>
-                        ))}
+                        {liveResults.tests.map((t) => {
+                          const already = selectedTests.includes(t.name);
+                          return (
+                            <button key={t.name} type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => already ? removeTest(t.name) : addTest(t.name)}
+                              className={`w-full flex items-center gap-3 px-4 py-2.5 transition text-left ${already ? 'bg-sky-50' : 'hover:bg-sky-50'}`}>
+                              <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
+                                <MdOutlineScience className="text-sky-600 text-base" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-800 truncate">{t.name}</p>
+                                <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
+                                  <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded font-medium">
+                                    {t.labCount} lab{t.labCount !== 1 ? 's' : ''}
+                                  </span>
+                                  <span>·</span>
+                                  <span className="font-medium text-gray-600">{priceRange(t.minPrice, t.maxPrice)}</span>
+                                  {t.reportTime && <><span>·</span><span>{t.reportTime}</span></>}
+                                </p>
+                              </div>
+                              {already
+                                ? <span className="text-[10px] text-sky-500 font-semibold shrink-0">Added ✓</span>
+                                : <FiChevronRight size={14} className="text-gray-300 shrink-0" />
+                              }
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
 
