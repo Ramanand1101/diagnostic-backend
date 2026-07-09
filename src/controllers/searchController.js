@@ -182,6 +182,49 @@ function expandQuery(q) {
   return [...new Set([lower, ...extra])];
 }
 
+// ─── Popular tests — top tests sorted by how many labs offer them ─────────────
+
+exports.popular = asyncHandler(async (req, res) => {
+  const city  = String(req.query.city  || '').trim();
+  const limit = Math.min(Number(req.query.limit || 10), 20);
+
+  let cityLabIds = null;
+  if (city) {
+    const cityLabs = await Lab.find({ city: new RegExp(city, 'i'), approved: true }).select('_id').lean();
+    cityLabIds = cityLabs.map((l) => l._id);
+    if (!cityLabIds.length) return res.json({ tests: [] });
+  }
+
+  const matchStage = { isActive: true };
+  if (cityLabIds) matchStage.lab = { $in: cityLabIds };
+
+  const grouped = await Product.aggregate([
+    { $match: matchStage },
+    { $group: {
+      _id: '$name',
+      minPrice:   { $min: { $ifNull: ['$salePrice', '$price'] } },
+      maxPrice:   { $max: { $ifNull: ['$salePrice', '$price'] } },
+      labCount:   { $sum: 1 },
+      sampleType: { $first: '$sampleType' },
+      reportTime: { $first: '$reportTime' },
+      tags:       { $first: '$tags' },
+    }},
+    { $sort: { labCount: -1 } },
+    { $limit: limit },
+  ]);
+
+  res.json({
+    tests: grouped.map((g) => ({
+      name:       g._id,
+      minPrice:   g.minPrice,
+      maxPrice:   g.maxPrice,
+      labCount:   g.labCount,
+      sampleType: g.sampleType || 'Blood',
+      reportTime: g.reportTime || '',
+    })),
+  });
+});
+
 // ─── Grouped autocomplete suggest ────────────────────────────────────────────
 
 exports.suggest = asyncHandler(async (req, res) => {

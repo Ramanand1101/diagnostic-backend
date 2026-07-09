@@ -156,6 +156,7 @@ export const dashboardApi = {
 export const searchApi = {
   search: (params) => api.get('/search', { params }),
   suggest: (params) => api.get('/search/suggest', { params }),
+  popular: (params) => api.get('/search/popular', { params }),
   reindexLabs: () => api.post('/search/reindex/labs'),
   reindexProducts: () => api.post('/search/reindex/products'),
 };

@@ -13,19 +13,6 @@ import CityPickerModal from '@/components/layout/CityPickerModal';
 
 const TYPEWRITER = ['CBC Test', 'Thyroid Panel', 'Vitamin D', 'HbA1c', 'Full Body Checkup', 'Lipid Profile'];
 
-const POPULAR_TESTS = [
-  { name: 'CBC Complete Blood Count',       alsoKnown: 'CBP, Complete Blood Count, Haemogram' },
-  { name: 'HbA1c Glycosylated Hemoglobin',  alsoKnown: 'Glycosylated Haemoglobin, Serum HbA1c, HBA1C' },
-  { name: 'Kidney Function Test',            alsoKnown: 'KFT, RFT, Renal Function Test' },
-  { name: 'Thyroid Profile Total',           alsoKnown: 'TFT, TSH, T3, T4, Thyroid Panel' },
-  { name: 'Vitamin D Total',                 alsoKnown: '25-OH Vitamin D, Vitamin D3' },
-  { name: 'Lipid Profile',                   alsoKnown: 'Cholesterol Test, Lipid Panel, Triglycerides' },
-  { name: 'Liver Function Test',             alsoKnown: 'LFT, SGPT, SGOT, Bilirubin' },
-  { name: 'Blood Sugar Fasting',             alsoKnown: 'FBS, Fasting Glucose, Blood Glucose' },
-  { name: 'Vitamin B12',                     alsoKnown: 'Cyanocobalamin, Cobalamin, B12' },
-  { name: 'Full Body Checkup',               alsoKnown: 'Complete Health Package, Master Health Checkup' },
-];
-
 export default function HeroSlider() {
   const { city: contextCity } = useCity();
   const city = contextCity || '';
@@ -37,6 +24,7 @@ export default function HeroSlider() {
 
   // search bar
   const [query, setQuery] = useState('');
+  const [popularTests, setPopularTests] = useState([]);
   const [liveResults, setLiveResults] = useState({ tests: [], labs: [] });
   const [showDrop, setShowDrop] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -78,6 +66,21 @@ export default function HeroSlider() {
     }, pause || speed);
     return () => clearTimeout(t);
   }, [swChar, swDel, swIdx, query]);
+
+  /* ── Fetch popular tests from DB on mount ── */
+  useEffect(() => {
+    searchApi.popular({ limit: 10 })
+      .then((res) => setPopularTests(res.data.tests || []))
+      .catch(() => {});
+  }, []);
+
+  /* ── Re-fetch when city changes ── */
+  useEffect(() => {
+    if (!city) return;
+    searchApi.popular({ city, limit: 10 })
+      .then((res) => setPopularTests(res.data.tests || []))
+      .catch(() => {});
+  }, [city]);
 
   /* ── Auto-play ── */
   const nextSlide = useCallback(() => {
@@ -241,13 +244,13 @@ export default function HeroSlider() {
               <div className="absolute top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden max-h-[420px] overflow-y-auto"
                 style={{ left: dropLeft, right: dropRight }}>
 
-                {/* Popular tests — shown when query is empty */}
-                {showPopular && (
+                {/* Popular tests from DB — shown when query is empty */}
+                {showPopular && popularTests.length > 0 && (
                   <>
                     <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
-                      Popular Tests
+                      Popular Tests{city ? ` in ${city}` : ''}
                     </p>
-                    {POPULAR_TESTS.map((t) => (
+                    {popularTests.map((t) => (
                       <button
                         key={t.name}
                         type="button"
@@ -260,11 +263,20 @@ export default function HeroSlider() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-800 uppercase tracking-wide">{t.name}</p>
-                          <p className="text-xs text-gray-400 truncate mt-0.5">Also known as :- {t.alsoKnown}</p>
+                          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+                            <span className="bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded font-medium">{t.labCount} lab{t.labCount !== 1 ? 's' : ''}</span>
+                            {t.minPrice && <span>from ₹{t.minPrice.toLocaleString('en-IN')}</span>}
+                            {t.reportTime && <span>· {t.reportTime}</span>}
+                          </p>
                         </div>
                       </button>
                     ))}
                   </>
+                )}
+
+                {/* Loading state for popular */}
+                {showPopular && popularTests.length === 0 && (
+                  <div className="px-4 py-4 text-center text-xs text-gray-400">Loading popular tests…</div>
                 )}
 
                 {/* Live results — shown when typing */}
