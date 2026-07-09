@@ -143,125 +143,6 @@ function DescriptionPanel({ product }) {
   );
 }
 
-// ── BookMeriLab-style: Lab group card (shown when multiTests > 0) ────────────
-function LabGroupCard({ lab, products, totalSelected }) {
-  const { addItem, items } = useCart();
-  const initial = (lab.name || '?')[0].toUpperCase();
-
-  const totalMrp  = products.reduce((s, p) => s + (p.price || 0), 0);
-  const totalSale = products.reduce((s, p) => s + (p.salePrice || p.price || 0), 0);
-  const savings   = totalMrp - totalSale;
-  const discountPct = totalMrp > 0 ? Math.round((savings / totalMrp) * 100) : 0;
-  const hasHome   = products.some((p) => p.homeCollection || lab.homeCollection);
-  const matchCount = products.length;
-  const allInCart = products.every((p) => items.some((i) => i._id === p._id));
-
-  const handleBookAll = (e) => {
-    e.stopPropagation();
-    products.forEach((p) => { if (!items.some((i) => i._id === p._id)) addItem(p); });
-    toast.success(`${matchCount} test${matchCount > 1 ? 's' : ''} added to cart!`, { icon: '🛒' });
-  };
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden">
-
-      {/* Header */}
-      <div className="p-5 pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className={`w-12 h-12 ${labColor(lab.name)} rounded-xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0`}>
-              {initial}
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-bold text-gray-900 text-base truncate">{lab.name || 'Unknown Lab'}</h3>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {lab.accreditation?.slice(0, 2).map((a) => (
-                  <span key={a} className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 font-semibold">{a}</span>
-                ))}
-                {hasHome && (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 font-semibold flex items-center gap-1">
-                    <FiHome className="text-[10px]" /> Home Collection
-                  </span>
-                )}
-                {lab.verificationStatus === 'verified' && (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100 font-semibold">✓ Verified</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-            {discountPct > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">{discountPct}% OFF</span>
-            )}
-            {totalSelected > 1 && (
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                matchCount === totalSelected
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-amber-50 text-amber-700'
-              }`}>
-                {matchCount}/{totalSelected} tests available
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Meta */}
-        <div className="flex flex-wrap gap-4 mt-2.5 text-[11px] text-gray-400">
-          {products[0]?.reportTime && <span className="flex items-center gap-1"><FiClock className="text-[10px]" /> Report in {products[0].reportTime}</span>}
-          {(lab.city || lab.state) && <span className="flex items-center gap-1"><FiMapPin className="text-[10px]" />{[lab.city, lab.state].filter(Boolean).join(', ')}</span>}
-          {lab.ratingAvg > 0 && <span>★ {lab.ratingAvg.toFixed(1)} ({lab.reviewCount || 0} reviews)</span>}
-        </div>
-      </div>
-
-      {/* Tests breakdown */}
-      <div className="px-5 pb-3 divide-y divide-gray-50">
-        {products.map((p) => {
-          const saleP = p.salePrice || p.price;
-          const hasDis = p.salePrice && p.salePrice < p.price;
-          const dis = hasDis ? Math.round(((p.price - p.salePrice) / p.price) * 100) : null;
-          return (
-            <div key={p._id} className="flex items-center justify-between py-3">
-              <div className="flex-1 min-w-0 pr-4">
-                <div className="flex flex-wrap gap-1 mb-0.5">
-                  {p.type && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[p.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>{p.type}</span>}
-                  {p.fastingRequired && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100 font-medium">Fasting</span>}
-                  {p.sampleType && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200 font-medium">{p.sampleType}</span>}
-                </div>
-                <p className="text-sm font-semibold text-gray-800">{p.name}</p>
-                {p.description && <p className="text-[11px] text-gray-400 truncate">{p.description}</p>}
-              </div>
-              <div className="text-right flex-shrink-0">
-                {dis && <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full block mb-0.5">{dis}% OFF</span>}
-                <p className="text-base font-extrabold text-gray-900">₹{saleP?.toLocaleString('en-IN')}</p>
-                {hasDis && <p className="text-[11px] text-gray-400 line-through">₹{p.price?.toLocaleString('en-IN')}</p>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Total + CTA */}
-      <div className="flex items-center justify-between px-5 py-4 bg-gray-50 border-t border-gray-100">
-        <div>
-          <p className="text-xs text-gray-400">Total payable</p>
-          <p className="text-xl font-extrabold text-gray-900">₹{totalSale.toLocaleString('en-IN')}</p>
-          {savings > 0 && <p className="text-xs text-green-600 font-medium mt-0.5">You save ₹{savings.toLocaleString('en-IN')}</p>}
-        </div>
-        {allInCart ? (
-          <Link href="/cart" className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-2.5 rounded-xl transition-colors">
-            <FiCheck /> View Cart
-          </Link>
-        ) : (
-          <button onClick={handleBookAll} className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold px-5 py-2.5 rounded-xl transition-colors">
-            <FiShoppingCart /> Book Now
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ── Compact product row ───────────────────────────────────────────────────────
 function ProductRow({ product, isActive, onHover }) {
   const { addItem, items } = useCart();
@@ -655,42 +536,16 @@ function SearchContent() {
                 </div>
 
                 {filteredProducts.length > 0 && (
-                  <div className="space-y-3">
-                    {multiTests.length > 1 ? (
-                      // ── Multi-test: group by lab (BookMeriLab style) ──
-                      (() => {
-                        const grouped = filteredProducts.reduce((acc, p) => {
-                          const lid = p.lab?._id || 'unknown';
-                          if (!acc[lid]) acc[lid] = { lab: p.lab || {}, products: [] };
-                          acc[lid].products.push(p);
-                          return acc;
-                        }, {});
-                        // Sort: labs with most matching tests first
-                        return Object.entries(grouped)
-                          .sort(([, a], [, b]) => b.products.length - a.products.length)
-                          .map(([lid, { lab, products: lps }]) => (
-                            <LabGroupCard
-                              key={lid}
-                              lab={lab}
-                              products={lps}
-                              totalSelected={multiTests.length}
-                            />
-                          ));
-                      })()
-                    ) : (
-                      // ── Single test: individual product rows ──
-                      <>
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tests &amp; Packages</h3>
-                        {filteredProducts.map((p) => (
-                          <ProductRow
-                            key={p._id || p.objectID}
-                            product={p}
-                            isActive={activeProduct?._id === p._id}
-                            onHover={setActiveProduct}
-                          />
-                        ))}
-                      </>
-                    )}
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tests &amp; Packages</h3>
+                    {filteredProducts.map((p) => (
+                      <ProductRow
+                        key={p._id || p.objectID}
+                        product={p}
+                        isActive={activeProduct?._id === p._id}
+                        onHover={setActiveProduct}
+                      />
+                    ))}
                   </div>
                 )}
 
@@ -709,8 +564,8 @@ function SearchContent() {
                 )}
               </div>
 
-              {/* ── Right: Description panel — only for single test search ── */}
-              {filteredProducts.length > 0 && multiTests.length <= 1 && (
+              {/* ── Right: Description panel (desktop only) ── */}
+              {filteredProducts.length > 0 && (
                 <aside className="w-72 flex-shrink-0 hidden lg:block sticky top-36 self-start">
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">About this test</p>
                   <DescriptionPanel product={activeProduct} />

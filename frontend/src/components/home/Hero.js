@@ -37,13 +37,11 @@ export default function HeroSlider() {
 
   // search bar
   const [query, setQuery] = useState('');
-  const [selectedTests, setSelectedTests] = useState([]); // multi-select chips
   const [liveResults, setLiveResults] = useState({ tests: [], labs: [] });
   const [showDrop, setShowDrop] = useState(false);
   const [searching, setSearching] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const searchWrapRef = useRef(null);
-  const inputRef = useRef(null);
   const cityBtnRef = useRef(null);
   const searchBtnRef = useRef(null);
   const [dropLeft, setDropLeft] = useState(0);
@@ -145,30 +143,14 @@ export default function HeroSlider() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Add test chip — prevent duplicates
-  const addTest = (name) => {
-    if (!selectedTests.includes(name)) setSelectedTests((p) => [...p, name]);
-    setQuery('');
-    setShowDrop(true);
-    setInputFocused(true);
-    inputRef.current?.focus();
-  };
-
-  const removeTest = (name) => setSelectedTests((p) => p.filter((t) => t !== name));
-
   const handleSearch = (e) => {
     e.preventDefault();
     setShowDrop(false);
-    setInputFocused(false);
-    const tests = selectedTests.length > 0 ? selectedTests : (query.trim() ? [query.trim()] : []);
-    if (tests.length === 0) {
-      router.push(`/labs${city ? `?city=${encodeURIComponent(city)}` : ''}`);
-      return;
-    }
-    const params = new URLSearchParams();
-    tests.forEach((t) => params.append('test', t));
-    if (city) params.set('city', city);
-    router.push(`/search?${params.toString()}`);
+    const q = query.trim();
+    router.push(
+      q ? `/search?q=${encodeURIComponent(q)}&city=${encodeURIComponent(city)}`
+        : `/labs${city ? `?city=${encodeURIComponent(city)}` : ''}`
+    );
   };
 
   const goTo = (href) => { setShowDrop(false); setInputFocused(false); setQuery(''); router.push(href); };
@@ -212,12 +194,12 @@ export default function HeroSlider() {
           {/* Form + live dropdown wrapper */}
           <div className="relative w-full max-w-3xl pointer-events-auto" ref={searchWrapRef}>
             <form onSubmit={handleSearch}
-              className="flex items-stretch bg-white rounded-2xl shadow-2xl overflow-hidden">
+              className="flex items-stretch bg-white rounded-full shadow-2xl overflow-hidden">
 
               {/* City button — LEFT side */}
-              <div ref={cityBtnRef} className="border-r border-gray-200 flex-shrink-0 self-stretch flex items-center">
+              <div ref={cityBtnRef} className="border-r border-gray-200 flex-shrink-0">
                 <button type="button" onClick={() => setCityModalOpen(true)}
-                  className="flex items-center gap-1.5 px-4 py-4 text-sm font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap h-full">
+                  className="flex items-center gap-1.5 px-4 py-5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap h-full">
                   <FiMapPin size={15} className="text-sky-500 shrink-0" />
                   <span className="max-w-[90px] truncate">{city || 'Select City'}</span>
                   <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -226,60 +208,31 @@ export default function HeroSlider() {
                 </button>
               </div>
 
-              {/* Search input area with chips */}
-              <div className="flex flex-wrap items-center flex-1 px-3 py-2 gap-1.5 min-h-[56px] cursor-text"
-                onClick={() => inputRef.current?.focus()}>
-                <FiSearch size={16} className="text-gray-400 shrink-0" />
-
-                {/* Selected test chips */}
-                {selectedTests.map((t) => (
-                  <span key={t}
-                    className="inline-flex items-center gap-1 bg-sky-100 text-sky-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                    {t}
-                    <button type="button" onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => removeTest(t)}
-                      className="ml-0.5 text-sky-500 hover:text-red-500 transition">
-                      <FiX size={11} />
-                    </button>
-                  </span>
-                ))}
-
-                {/* Text input */}
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={query}
+              {/* Search input */}
+              <div className="flex items-center flex-1 px-3 relative">
+                {searching
+                  ? <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin shrink-0 mr-2" />
+                  : <FiSearch size={16} className="text-gray-400 shrink-0 mr-2" />
+                }
+                <input type="text" value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') { setShowDrop(false); setInputFocused(false); }
-                    if (e.key === 'Backspace' && !query && selectedTests.length > 0) {
-                      removeTest(selectedTests[selectedTests.length - 1]);
-                    }
-                  }}
+                  onKeyDown={(e) => e.key === 'Escape' && (setShowDrop(false), setInputFocused(false))}
                   onFocus={() => { setInputFocused(true); setShowDrop(true); }}
-                  placeholder={selectedTests.length === 0 ? placeholder : 'Add more tests...'}
-                  className="flex-1 min-w-[120px] py-1 text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
+                  placeholder={placeholder}
+                  className="flex-1 py-5 text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
                   autoComplete="off"
                 />
-                {(query || selectedTests.length > 0) && (
-                  <button type="button"
-                    onClick={() => { setQuery(''); setSelectedTests([]); setShowDrop(false); }}
-                    className="text-gray-300 hover:text-gray-500 shrink-0">
+                {query && (
+                  <button type="button" onClick={() => { setQuery(''); setShowDrop(false); }}
+                    className="text-gray-300 hover:text-gray-500 shrink-0 ml-1">
                     <FiX size={14} />
                   </button>
                 )}
               </div>
 
               <button ref={searchBtnRef} type="submit"
-                className="bg-sky-500 hover:bg-sky-600 active:bg-sky-700 text-white font-bold text-sm px-5 transition shrink-0 flex flex-col items-center justify-center gap-0.5 min-w-[100px]">
-                {selectedTests.length > 0 ? (
-                  <>
-                    <FiSearch size={16} />
-                    <span className="text-[11px]">Get Test Prices</span>
-                  </>
-                ) : (
-                  <span>Search</span>
-                )}
+                className="bg-sky-500 hover:bg-sky-600 active:bg-sky-700 text-white font-semibold text-sm px-6 transition shrink-0">
+                Search
               </button>
             </form>
 
@@ -299,8 +252,8 @@ export default function HeroSlider() {
                         key={t.name}
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => addTest(t.name)}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left ${selectedTests.includes(t.name) ? 'bg-sky-50 opacity-50 pointer-events-none' : ''}`}
+                        onClick={() => goTo(`/search?q=${encodeURIComponent(t.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left"
                       >
                         <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
                           <MdOutlineScience className="text-sky-600 text-base" />
@@ -331,8 +284,8 @@ export default function HeroSlider() {
                         {liveResults.tests.map((t) => (
                           <button key={t.name} type="button"
                             onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => addTest(t.name)}
-                            className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left ${selectedTests.includes(t.name) ? 'bg-sky-50 opacity-50 pointer-events-none' : ''}`}>
+                            onClick={() => goTo(`/search?q=${encodeURIComponent(t.name)}${city ? `&city=${encodeURIComponent(city)}` : ''}`)}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sky-50 transition text-left">
                             <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
                               <MdOutlineScience className="text-sky-600 text-base" />
                             </div>
