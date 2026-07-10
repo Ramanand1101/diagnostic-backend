@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
-import { FiMenu, FiX, FiUser, FiLogOut, FiPhone, FiShoppingCart } from 'react-icons/fi';
+import { FiMenu, FiX, FiUser, FiLogOut, FiPhone, FiShoppingCart, FiMail } from 'react-icons/fi';
 import { MdBiotech } from 'react-icons/md';
 
-const PHONE_NUMBER = '+91-70900 02002';
+const PHONE_NUMBER = '+91 70900 02002';
+const EMAIL = 'info@healthontime.in';
 
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth();
@@ -63,6 +64,16 @@ export default function Navbar() {
               >
                 <FiPhone className="text-base" />
                 <span className="font-medium">{PHONE_NUMBER}</span>
+              </a>
+
+              <div className="w-px h-5 bg-gray-200" />
+
+              <a
+                href={`mailto:${EMAIL}`}
+                className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-primary-600 transition-colors"
+              >
+                <FiMail className="text-base" />
+                <span className="font-medium">{EMAIL}</span>
               </a>
 
               <div className="w-px h-5 bg-gray-200" />
@@ -131,6 +142,9 @@ export default function Navbar() {
             <Link href="/about" className="block text-gray-700 font-medium py-1" onClick={() => setMenuOpen(false)}>About Us</Link>
             <a href={`tel:${PHONE_NUMBER.replace(/[^+\d]/g, '')}`} className="flex items-center gap-2 text-gray-700 font-medium py-1">
               <FiPhone /> {PHONE_NUMBER}
+            </a>
+            <a href={`mailto:${EMAIL}`} className="flex items-center gap-2 text-gray-700 font-medium py-1">
+              <FiMail /> {EMAIL}
             </a>
             <div className="border-t border-gray-100 pt-3">
               {user ? (
