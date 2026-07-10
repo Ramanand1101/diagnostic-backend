@@ -5,7 +5,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { FiMenu, FiX, FiUser, FiLogOut, FiPhone, FiShoppingCart, FiMail } from 'react-icons/fi';
-import { MdBiotech } from 'react-icons/md';
 
 const PHONE_NUMBER = '+91 70900 02002';
 const EMAIL = 'info@healthontime.in';
@@ -38,9 +37,14 @@ export default function Navbar() {
           <div className="flex items-center h-16 gap-4">
 
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 text-primary-600 font-bold text-xl flex-shrink-0">
-              <MdBiotech className="text-2xl" />
-              <span className="hidden sm:inline">DiagnosticHub</span>
+            <Link href="/" className="flex items-center flex-shrink-0 font-bold text-xl tracking-tight leading-none">
+              <span style={{ color: '#1a2b6d' }}>Health</span>
+              <span className="inline-flex items-center justify-center rounded-full border-[2.5px] mx-[1px]"
+                style={{ color: '#2d8c3e', borderColor: '#2d8c3e', width: '1.15em', height: '1.15em', fontSize: '0.65em', marginTop: '1px' }}>
+                ✓
+              </span>
+              <span style={{ color: '#2d8c3e' }}>N</span>
+              <span style={{ color: '#1a2b6d' }}>Time</span>
             </Link>
 
             {/* Nav links */}
