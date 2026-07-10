@@ -7,7 +7,7 @@ import { useCart } from '@/context/CartContext';
 import { FiMenu, FiX, FiUser, FiLogOut, FiPhone, FiShoppingCart } from 'react-icons/fi';
 import { MdBiotech } from 'react-icons/md';
 
-const PHONE_NUMBER = '+91-98765-43210';
+const PHONE_NUMBER = '+91-70900 02002';
 
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth();
