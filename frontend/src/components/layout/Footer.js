@@ -9,11 +9,8 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <div className="mb-3">
-              <HealthOnTimeLogo dark size="text-lg" />
+              <HealthOnTimeLogo dark size="text-lg" showTagline />
             </div>
-            <p className="text-sm leading-relaxed">
-              Your trusted platform for booking diagnostic lab tests and health checkup packages.
-            </p>
             <div className="flex gap-3 mt-4">
               <a href="#" className="hover:text-white transition-colors"><FiFacebook /></a>
               <a href="#" className="hover:text-white transition-colors"><FiTwitter /></a>

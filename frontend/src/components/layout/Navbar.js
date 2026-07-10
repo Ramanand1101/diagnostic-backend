@@ -6,8 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { FiMenu, FiX, FiUser, FiLogOut, FiPhone, FiShoppingCart, FiMail } from 'react-icons/fi';
 
-const PHONE_NUMBER = '+91 70900 02002';
-const EMAIL = 'info@healthontime.in';
+import { CONTACT_PHONE, CONTACT_EMAIL } from '@/config/contact';
 
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth();
@@ -63,21 +62,21 @@ export default function Navbar() {
             {/* Right: Phone + Auth */}
             <div className="hidden md:flex items-center gap-4 flex-shrink-0 ml-auto">
               <a
-                href={`tel:${PHONE_NUMBER.replace(/[^+\d]/g, '')}`}
+                href={`tel:${CONTACT_PHONE.replace(/[^+\d]/g, '')}`}
                 className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-primary-600 transition-colors"
               >
                 <FiPhone className="text-base" />
-                <span className="font-medium">{PHONE_NUMBER}</span>
+                <span className="font-medium">{CONTACT_PHONE}</span>
               </a>
 
               <div className="w-px h-5 bg-gray-200" />
 
               <a
-                href={`mailto:${EMAIL}`}
+                href={`mailto:${CONTACT_EMAIL}`}
                 className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-primary-600 transition-colors"
               >
                 <FiMail className="text-base" />
-                <span className="font-medium">{EMAIL}</span>
+                <span className="font-medium">{CONTACT_EMAIL}</span>
               </a>
 
               <div className="w-px h-5 bg-gray-200" />
@@ -144,11 +143,11 @@ export default function Navbar() {
             <Link href="/labs" className="block text-gray-700 font-medium py-1" onClick={() => setMenuOpen(false)}>Labs</Link>
             <Link href="/products" className="block text-gray-700 font-medium py-1" onClick={() => setMenuOpen(false)}>Tests &amp; Packages</Link>
             <Link href="/about" className="block text-gray-700 font-medium py-1" onClick={() => setMenuOpen(false)}>About Us</Link>
-            <a href={`tel:${PHONE_NUMBER.replace(/[^+\d]/g, '')}`} className="flex items-center gap-2 text-gray-700 font-medium py-1">
-              <FiPhone /> {PHONE_NUMBER}
+            <a href={`tel:${CONTACT_PHONE.replace(/[^+\d]/g, '')}`} className="flex items-center gap-2 text-gray-700 font-medium py-1">
+              <FiPhone /> {CONTACT_PHONE}
             </a>
-            <a href={`mailto:${EMAIL}`} className="flex items-center gap-2 text-gray-700 font-medium py-1">
-              <FiMail /> {EMAIL}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="flex items-center gap-2 text-gray-700 font-medium py-1">
+              <FiMail /> {CONTACT_EMAIL}
             </a>
             <div className="border-t border-gray-100 pt-3">
               {user ? (

@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 import Spinner from '@/components/ui/Spinner';
 import { FiMail, FiPhone, FiMapPin, FiMessageSquare } from 'react-icons/fi';
+import { CONTACT_PHONE, CONTACT_EMAIL, CONTACT_ADDRESS } from '@/config/contact';
 
 export default function ContactPage() {
   const { user } = useAuth();
@@ -40,9 +41,9 @@ export default function ContactPage() {
   };
 
   const contactInfo = [
-    { icon: FiMail, label: 'Email', value: 'support@diagnostichub.com' },
-    { icon: FiPhone, label: 'Phone', value: '+91 98765 43210' },
-    { icon: FiMapPin, label: 'Address', value: 'Mumbai, Maharashtra, India' },
+    { icon: FiMail, label: 'Email', value: CONTACT_EMAIL },
+    { icon: FiPhone, label: 'Phone', value: CONTACT_PHONE },
+    { icon: FiMapPin, label: 'Address', value: CONTACT_ADDRESS },
   ];
 
   return (

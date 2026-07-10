@@ -140,7 +140,7 @@ export default function RegisterPage() {
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
         <div className="text-center mb-6">
           <Link href="/" className="inline-flex mb-4">
-            <HealthOnTimeLogo />
+            <HealthOnTimeLogo showTagline />
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Create account</h1>
           <p className="text-gray-500 text-sm mt-1">Join thousands of health-conscious users</p>
