@@ -6,7 +6,7 @@ import { CartProvider } from '@/context/CartContext';
 import GoogleAuthProvider from '@/components/layout/GoogleAuthProvider';
 
 export const metadata = {
-  title: 'DiagnosticHub - Book Lab Tests & Health Packages',
+  title: 'HealthOnTime - Book Lab Tests & Health Packages',
   description: 'Find and book diagnostic lab tests, health checkup packages near you.',
 };
 

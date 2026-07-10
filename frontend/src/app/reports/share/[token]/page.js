@@ -5,7 +5,7 @@ import { reportApi } from '@/lib/api';
 import { formatDate } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import { FiDownload, FiFileText, FiShield } from 'react-icons/fi';
-import { MdBiotech } from 'react-icons/md';
+import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 
 export default function SharedReportPage() {
   const { token } = useParams();
@@ -40,9 +40,7 @@ export default function SharedReportPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-primary-600 font-bold">
-          <MdBiotech className="text-xl" /> DiagnosticHub
-        </div>
+        <HealthOnTimeLogo />
         <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 px-3 py-1.5 rounded-full">
           <FiShield /> Verified Report
         </div>
@@ -92,7 +90,7 @@ export default function SharedReportPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400">
-          This is a securely shared diagnostic report from DiagnosticHub.
+          This is a securely shared diagnostic report from HealthOnTime.
           Do not share this link publicly.
         </p>
       </main>

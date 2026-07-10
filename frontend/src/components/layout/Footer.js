@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { MdBiotech } from 'react-icons/md';
 import { FiFacebook, FiTwitter, FiInstagram } from 'react-icons/fi';
+import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 
 export default function Footer() {
   return (
@@ -8,9 +8,8 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <div className="flex items-center gap-2 text-white font-bold text-lg mb-3">
-              <MdBiotech className="text-xl text-primary-400" />
-              DiagnosticHub
+            <div className="mb-3">
+              <HealthOnTimeLogo dark size="text-lg" />
             </div>
             <p className="text-sm leading-relaxed">
               Your trusted platform for booking diagnostic lab tests and health checkup packages.
@@ -53,7 +52,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="border-t border-gray-800 mt-10 pt-6 text-center text-sm text-gray-500">
-          &copy; {new Date().getFullYear()} DiagnosticHub. All rights reserved.
+          &copy; {new Date().getFullYear()} HealthOnTime. All rights reserved.
         </div>
       </div>
     </footer>

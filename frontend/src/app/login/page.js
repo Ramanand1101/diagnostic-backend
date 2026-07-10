@@ -7,7 +7,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import { authApi, userApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage } from '@/utils/helpers';
-import { MdBiotech } from 'react-icons/md';
+import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 import { FiPhone, FiX, FiSmartphone } from 'react-icons/fi';
 import { RiWhatsappLine } from 'react-icons/ri';
 import Spinner from '@/components/ui/Spinner';
@@ -221,8 +221,8 @@ export default function LoginPage() {
 
           {/* Logo */}
           <div className="text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-2 text-primary-600 font-bold text-xl mb-4">
-              <MdBiotech className="text-2xl" /> DiagnosticHub
+            <Link href="/" className="inline-flex mb-4">
+              <HealthOnTimeLogo />
             </Link>
             <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
             <p className="text-gray-500 text-sm mt-1">Sign in to your account</p>

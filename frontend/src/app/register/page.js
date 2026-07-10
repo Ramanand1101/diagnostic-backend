@@ -7,7 +7,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import { authApi, userApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage } from '@/utils/helpers';
-import { MdBiotech } from 'react-icons/md';
+import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 import { FiPhone, FiX } from 'react-icons/fi';
 import Spinner from '@/components/ui/Spinner';
 
@@ -139,8 +139,8 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
         <div className="text-center mb-6">
-          <Link href="/" className="inline-flex items-center gap-2 text-primary-600 font-bold text-xl mb-4">
-            <MdBiotech className="text-2xl" /> DiagnosticHub
+          <Link href="/" className="inline-flex mb-4">
+            <HealthOnTimeLogo />
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Create account</h1>
           <p className="text-gray-500 text-sm mt-1">Join thousands of health-conscious users</p>

@@ -6,7 +6,7 @@ import {
   FiFileText, FiPercent, FiStar, FiBook, FiFile, FiMail,
   FiSettings, FiHelpCircle, FiImage, FiUploadCloud,
 } from 'react-icons/fi';
-import { MdBiotech } from 'react-icons/md';
+import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: FiGrid },
@@ -33,9 +33,8 @@ export default function AdminSidebar() {
   return (
     <aside className="w-64 bg-gray-900 min-h-screen flex flex-col">
       <div className="p-6 border-b border-gray-800">
-        <Link href="/" className="flex items-center gap-2 text-white font-bold text-lg">
-          <MdBiotech className="text-primary-400 text-xl" />
-          DiagnosticHub
+        <Link href="/">
+          <HealthOnTimeLogo dark size="text-lg" />
         </Link>
         <p className="text-xs text-gray-500 mt-1">Admin Panel</p>
       </div>
