@@ -80,7 +80,6 @@ function DescriptionPanel({ product }) {
 
   return (
     <div className="bg-white rounded-xl border border-primary-100 shadow-sm p-5 transition-all">
-      {/* Type badges */}
       <div className="flex flex-wrap gap-1.5 mb-3">
         {product.type && (
           <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
@@ -98,18 +97,12 @@ function DescriptionPanel({ product }) {
           </span>
         )}
       </div>
-
-      {/* Test name */}
       <h3 className="font-bold text-gray-900 text-base leading-snug mb-3">{product.name}</h3>
-
-      {/* Description */}
       {product.description ? (
         <p className="text-sm text-gray-600 leading-relaxed mb-4">{product.description}</p>
       ) : (
         <p className="text-sm text-gray-300 italic mb-4">No description available for this test.</p>
       )}
-
-      {/* Key info */}
       <div className="space-y-1.5 mb-4">
         {product.reportTime && (
           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -130,8 +123,6 @@ function DescriptionPanel({ product }) {
           </div>
         )}
       </div>
-
-      {/* Tags */}
       {product.tags?.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-3 border-t border-gray-100">
           {product.tags.map((tag) => (
@@ -143,94 +134,157 @@ function DescriptionPanel({ product }) {
   );
 }
 
-// ── Compact product row ───────────────────────────────────────────────────────
-function ProductRow({ product, isActive, onHover }) {
+// ── Lab Group Card (all matching tests under one lab) ─────────────────────────
+function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, activeProductId }) {
   const { addItem, items } = useCart();
-  const lab = product.lab || {};
-  const initial = (lab.name || '?')[0].toUpperCase();
-  const price = product.salePrice || product.price;
-  const discount = product.salePrice && product.salePrice < product.price
-    ? Math.round(((product.price - product.salePrice) / product.price) * 100)
-    : null;
-  const inCart = items.some((i) => i._id === product._id);
+  const initial = (labInfo.name || '?')[0].toUpperCase();
+  const total = products.reduce((sum, p) => sum + (p.salePrice || p.price || 0), 0);
+  const allInCart = products.every((p) => items.some((i) => i._id === p._id));
+  const hasAll = totalSearched > 1 && products.length === totalSearched;
+  const coverage = totalSearched > 1 ? `${products.length}/${totalSearched} tests` : null;
 
-  const handleAddToCart = () => {
-    addItem(product);
-    toast.success(`${product.name} added to cart!`, { icon: '🛒' });
+  const handleAddAll = (e) => {
+    e.stopPropagation();
+    const toAdd = products.filter((p) => !items.some((i) => i._id === p._id));
+    toAdd.forEach((p) => addItem(p));
+    if (toAdd.length > 0) toast.success(`${toAdd.length} test${toAdd.length > 1 ? 's' : ''} from ${labInfo.name} added!`, { icon: '🛒' });
   };
 
   return (
-    <div
-      onMouseEnter={() => onHover(product)}
-      onClick={() => onHover(product)}
-      className={`bg-white rounded-xl border p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${
-        isActive ? 'border-primary-300 shadow-sm ring-1 ring-primary-100' : 'border-gray-100'
-      }`}
-    >
-      <div className="flex items-center gap-4">
+    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition-all">
 
-        {/* Lab avatar */}
-        <div className={`w-10 h-10 ${labColor(lab.name)} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm`}>
+      {/* ── Lab header ── */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50/60 border-b border-gray-100">
+        <div className={`w-10 h-10 ${labColor(labInfo.name)} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm`}>
           {initial}
         </div>
-
-        {/* Test info */}
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-            {product.type && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                {product.type}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="font-bold text-gray-900 text-sm">{labInfo.name}</p>
+            {labInfo.verificationStatus === 'verified' && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 font-semibold">✓ Verified</span>
+            )}
+            {labInfo.accreditation?.slice(0, 1).map((a) => (
+              <span key={a} className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100 font-semibold">{a}</span>
+            ))}
+            {coverage && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${
+                hasAll ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>
+                {coverage} available
               </span>
             )}
-            {product.fastingRequired && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-orange-50 text-orange-600 border border-orange-100">Fasting</span>
-            )}
           </div>
-          <p className="font-semibold text-gray-900 text-sm leading-tight truncate">{product.name}</p>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-gray-400">
-            <span className="truncate">{lab.name || '—'}</span>
-            {product.homeCollection && <span className="text-green-600">🏠 Home</span>}
-            {product.reportTime && <span>· {product.reportTime}</span>}
-            {(lab.city || lab.state) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-[11px] text-gray-400">
+            {(labInfo.city || labInfo.state) && (
               <span className="flex items-center gap-0.5">
                 <FiMapPin className="text-[10px]" />
-                {[lab.city, lab.state].filter(Boolean).join(', ')}
+                {[labInfo.city, labInfo.state].filter(Boolean).join(', ')}
               </span>
             )}
+            {labInfo.homeCollection && <span className="text-green-600">🏠 Home Collection</span>}
+            {labInfo.ratingAvg > 0 && <span>★ {labInfo.ratingAvg.toFixed(1)} ({labInfo.reviewCount})</span>}
+            {labInfo.openingHours && <span className="flex items-center gap-0.5"><FiClock className="text-[10px]" /> {labInfo.openingHours}</span>}
           </div>
         </div>
+        <Link
+          href={`/labs/${labInfo.slug}`}
+          className="flex-shrink-0 text-primary-600 hover:text-primary-800 text-xs font-semibold border border-primary-200 hover:border-primary-400 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          View Lab
+        </Link>
+      </div>
 
-        {/* Price + button */}
-        <div className="flex flex-col items-end gap-2 flex-shrink-0">
-          <div className="text-right">
-            {discount && (
-              <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">
-                {discount}% OFF
-              </span>
-            )}
-            <p className="text-base font-extrabold text-gray-900">₹{price?.toLocaleString('en-IN')}</p>
-            {discount && (
-              <p className="text-[11px] text-gray-400 line-through">₹{product.price?.toLocaleString('en-IN')}</p>
-            )}
+      {/* ── Tests list ── */}
+      <div className="divide-y divide-gray-50">
+        {products.map((p) => {
+          const price = p.salePrice || p.price;
+          const discount = p.salePrice && p.salePrice < p.price
+            ? Math.round(((p.price - p.salePrice) / p.price) * 100)
+            : null;
+          const inCart = items.some((i) => i._id === p._id);
+
+          return (
+            <div
+              key={p._id}
+              onMouseEnter={() => onHoverProduct(p)}
+              onClick={() => onHoverProduct(p)}
+              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
+                activeProductId === p._id ? 'bg-primary-50/40' : 'hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                  {p.type && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[p.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                      {p.type}
+                    </span>
+                  )}
+                  {p.fastingRequired && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-orange-50 text-orange-600 border border-orange-100">Fasting</span>
+                  )}
+                  {p.homeCollection && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-green-50 text-green-600 border border-green-100">🏠 Home</span>
+                  )}
+                </div>
+                <p className="text-sm font-semibold text-gray-900 truncate">{p.name}</p>
+                {p.reportTime && (
+                  <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-0.5">
+                    <FiClock className="text-[10px]" /> {p.reportTime}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="text-right">
+                  {discount && (
+                    <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full block mb-0.5 text-center">{discount}% OFF</span>
+                  )}
+                  <p className="text-sm font-extrabold text-gray-900">₹{price?.toLocaleString('en-IN')}</p>
+                  {discount && <p className="text-[10px] text-gray-400 line-through text-right">₹{p.price?.toLocaleString('en-IN')}</p>}
+                </div>
+                {inCart ? (
+                  <Link href="/cart" onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                    <FiCheck className="text-[10px]" /> In Cart
+                  </Link>
+                ) : (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); addItem(p); toast.success(`${p.name} added!`, { icon: '🛒' }); }}
+                    className="flex items-center gap-1 bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                    <FiShoppingCart className="text-[10px]" /> Add
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Footer: total + Add All ── */}
+      {products.length > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+          <div>
+            <p className="text-[11px] text-gray-400">Total ({products.length} tests)</p>
+            <p className="text-base font-extrabold text-gray-900">₹{total.toLocaleString('en-IN')}</p>
           </div>
-          {inCart ? (
+          {allInCart ? (
             <Link href="/cart"
-              className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-              <FiCheck className="text-xs" /> View Cart
+              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+              <FiCheck /> View Cart
             </Link>
           ) : (
-            <button onClick={(e) => { e.stopPropagation(); handleAddToCart(); }}
-              className="flex items-center gap-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-              <FiShoppingCart className="text-xs" /> Add to Cart
+            <button onClick={handleAddAll}
+              className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+              <FiShoppingCart /> Add All to Cart
             </button>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
-// ── Lab result row ────────────────────────────────────────────────────────────
+// ── Lab result row (pure lab search result) ───────────────────────────────────
 function LabRow({ lab }) {
   const initial = (lab.name || '?')[0].toUpperCase();
   return (
@@ -267,12 +321,22 @@ function LabRow({ lab }) {
   );
 }
 
+// ── Group products by lab ─────────────────────────────────────────────────────
+function groupByLab(products) {
+  const map = new Map();
+  products.forEach((p) => {
+    const labId = p.lab?._id || p.lab?.slug || p.lab?.name || 'unknown';
+    if (!map.has(labId)) map.set(labId, { labInfo: p.lab || {}, products: [] });
+    map.get(labId).products.push(p);
+  });
+  return Array.from(map.values());
+}
+
 // ── Main search page ──────────────────────────────────────────────────────────
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // multi-test: read all `test` params from URL
   const testParams = searchParams.getAll('test');
   const [multiTests, setMultiTests] = useState(() => testParams);
   const [inputVal, setInputVal] = useState(() => searchParams.get('q') || '');
@@ -294,7 +358,6 @@ function SearchContent() {
     setCity(searchParams.get('city') || '');
   }, [searchParams]);
 
-  // Search each test separately and merge unique products
   const runSearch = useCallback(async (q, c, tests = []) => {
     const queries = tests.length > 0 ? tests : (q.trim() ? [q.trim()] : []);
     if (queries.length === 0) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
@@ -303,7 +366,6 @@ function SearchContent() {
     setSelectedLocations(new Set());
     setActiveProduct(null);
     try {
-      // Run all queries in parallel, merge unique products by _id
       const responses = await Promise.all(
         queries.map((term) => searchApi.search({ q: term.trim(), city: c.trim() }).catch(() => ({ data: {} })))
       );
@@ -319,8 +381,7 @@ function SearchContent() {
           if (!mergedLabs.find((x) => x._id === l._id)) mergedLabs.push(l);
         });
       });
-      const merged = { products: mergedProducts, labs: mergedLabs, pages: [] };
-      setResults(merged);
+      setResults({ products: mergedProducts, labs: mergedLabs, pages: [] });
       if (mergedProducts.length > 0) setActiveProduct(mergedProducts[0]);
     } catch {
       setResults({ labs: [], products: [], pages: [] });
@@ -329,10 +390,8 @@ function SearchContent() {
     }
   }, []);
 
-  // effective query label for display
   const effectiveQuery = multiTests.length > 0 ? multiTests.join(', ') : inputVal;
 
-  // Run search on multiTests or inputVal change
   useEffect(() => {
     clearTimeout(debounceRef.current);
     const hasQuery = multiTests.length > 0 || inputVal.trim();
@@ -382,7 +441,13 @@ function SearchContent() {
     selectedLocations.size === 0 || selectedLocations.has(l.city)
   );
 
-  const totalFiltered = filteredProducts.length + filteredLabs.length;
+  // Group products by lab and sort: most tests first, then alphabetically
+  const labGroups = groupByLab(filteredProducts).sort((a, b) => b.products.length - a.products.length);
+
+  // How many distinct tests were searched (for coverage badge)
+  const totalSearched = multiTests.length > 0 ? multiTests.length : 1;
+
+  const totalGroupCount = labGroups.length + filteredLabs.length;
   const hasFilters = selectedLabs.size > 0 || selectedLocations.size > 0;
   const hasResults = products.length > 0 || labs.length > 0;
   const clearFilters = () => { setSelectedLabs(new Set()); setSelectedLocations(new Set()); };
@@ -461,10 +526,7 @@ function SearchContent() {
                 <span key={t} className="inline-flex items-center gap-1.5 bg-sky-100 text-sky-800 text-xs font-semibold px-3 py-1.5 rounded-full">
                   {t}
                   <button type="button"
-                    onClick={() => {
-                      const updated = multiTests.filter((x) => x !== t);
-                      setMultiTests(updated);
-                    }}
+                    onClick={() => setMultiTests(multiTests.filter((x) => x !== t))}
                     className="text-sky-500 hover:text-red-500 transition">
                     <FiX size={11} />
                   </button>
@@ -477,7 +539,7 @@ function SearchContent() {
             <div className="text-center py-24 text-gray-400">
               <FiSearch className="text-5xl mx-auto mb-4 opacity-20" />
               <p className="text-base font-medium">Search for tests, packages or labs</p>
-              <p className="text-sm mt-1">e.g. "CBC Test", "Full Body Checkup", "Apollo Labs"</p>
+              <p className="text-sm mt-1">e.g. &ldquo;CBC Test&rdquo;, &ldquo;Full Body Checkup&rdquo;, &ldquo;Apollo Labs&rdquo;</p>
             </div>
           ) : loading ? (
             <div className="flex items-center justify-center gap-2 py-24 text-gray-400">
@@ -519,12 +581,12 @@ function SearchContent() {
                 </div>
               )}
 
-              {/* ── Middle: Compact results list ── */}
+              {/* ── Middle: Lab-grouped results ── */}
               <div className="flex-1 min-w-0 space-y-4">
                 {/* Summary */}
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <p className="text-sm text-gray-500">
-                    <span className="font-bold text-gray-900">{totalFiltered}</span> result{totalFiltered !== 1 ? 's' : ''} for &ldquo;{effectiveQuery}&rdquo;
+                    <span className="font-bold text-gray-900">{totalGroupCount}</span> lab{totalGroupCount !== 1 ? 's' : ''} found for &ldquo;{effectiveQuery}&rdquo;
                     {city.trim() && (
                       <span className="inline-flex items-center gap-1 ml-2 bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full text-xs font-medium">
                         <FiMapPin className="text-[10px]" />{city}
@@ -533,22 +595,33 @@ function SearchContent() {
                     )}
                     {hasFilters && <span className="text-primary-600 ml-1 text-xs">(filtered)</span>}
                   </p>
+                  {multiTests.length > 1 && labGroups.some(g => g.products.length === totalSearched) && (
+                    <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full font-medium">
+                      ✓ {labGroups.filter(g => g.products.length === totalSearched).length} lab{labGroups.filter(g => g.products.length === totalSearched).length > 1 ? 's have' : ' has'} all {totalSearched} tests
+                    </span>
+                  )}
                 </div>
 
-                {filteredProducts.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tests &amp; Packages</h3>
-                    {filteredProducts.map((p) => (
-                      <ProductRow
-                        key={p._id || p.objectID}
-                        product={p}
-                        isActive={activeProduct?._id === p._id}
-                        onHover={setActiveProduct}
+                {/* Lab groups (products) */}
+                {labGroups.length > 0 && (
+                  <div className="space-y-3">
+                    {multiTests.length > 1 && (
+                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tests &amp; Packages — grouped by lab</h3>
+                    )}
+                    {labGroups.map((group, idx) => (
+                      <LabGroupCard
+                        key={group.labInfo._id || group.labInfo.slug || idx}
+                        labInfo={group.labInfo}
+                        products={group.products}
+                        totalSearched={totalSearched}
+                        onHoverProduct={setActiveProduct}
+                        activeProductId={activeProduct?._id}
                       />
                     ))}
                   </div>
                 )}
 
+                {/* Pure lab results */}
                 {filteredLabs.length > 0 && (
                   <div className="space-y-2">
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Labs</h3>
@@ -556,7 +629,7 @@ function SearchContent() {
                   </div>
                 )}
 
-                {totalFiltered === 0 && hasFilters && (
+                {totalGroupCount === 0 && hasFilters && (
                   <div className="text-center py-12 text-gray-400">
                     <p className="text-sm">No results match the selected filters.</p>
                     <button onClick={clearFilters} className="mt-2 text-sm text-primary-600 hover:underline">Clear filters</button>
