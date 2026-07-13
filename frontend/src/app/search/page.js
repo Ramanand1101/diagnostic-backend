@@ -10,7 +10,7 @@ import { useCart } from '@/context/CartContext';
 import {
   FiSearch, FiX, FiMapPin, FiClock,
   FiChevronDown, FiChevronUp, FiFilter, FiShoppingCart, FiCheck,
-  FiDroplet, FiHome, FiAlertCircle, FiInfo,
+  FiDroplet, FiHome, FiAlertCircle, FiInfo, FiExternalLink,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -77,7 +77,6 @@ function DescriptionPanel({ product }) {
   }
 
   const lab = product.lab || {};
-
   return (
     <div className="bg-white rounded-xl border border-primary-100 shadow-sm p-5 transition-all">
       <div className="flex flex-wrap gap-1.5 mb-3">
@@ -134,7 +133,7 @@ function DescriptionPanel({ product }) {
   );
 }
 
-// ── Lab Group Card (all matching tests under one lab) ─────────────────────────
+// ── Lab Group Card ─────────────────────────────────────────────────────────────
 function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, activeProductId }) {
   const { addItem, items } = useCart();
   const initial = (labInfo.name || '?')[0].toUpperCase();
@@ -154,13 +153,16 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition-all">
 
       {/* ── Lab header ── */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50/60 border-b border-gray-100">
-        <div className={`w-10 h-10 ${labColor(labInfo.name)} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm`}>
+      <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 px-3 py-3 sm:px-4 bg-gray-50/60 border-b border-gray-100">
+        {/* Avatar */}
+        <div className={`w-9 h-9 sm:w-10 sm:h-10 ${labColor(labInfo.name)} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm mt-0.5 sm:mt-0`}>
           {initial}
         </div>
+
+        {/* Lab info */}
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
-            <p className="font-bold text-gray-900 text-sm">{labInfo.name}</p>
+            <p className="font-bold text-gray-900 text-sm leading-tight">{labInfo.name}</p>
             {labInfo.verificationStatus === 'verified' && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 font-semibold">✓ Verified</span>
             )}
@@ -171,27 +173,34 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${
                 hasAll ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}>
-                {coverage} available
+                {coverage}
               </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-[11px] text-gray-400">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-0.5 text-[11px] text-gray-400">
             {(labInfo.city || labInfo.state) && (
               <span className="flex items-center gap-0.5">
                 <FiMapPin className="text-[10px]" />
                 {[labInfo.city, labInfo.state].filter(Boolean).join(', ')}
               </span>
             )}
-            {labInfo.homeCollection && <span className="text-green-600">🏠 Home Collection</span>}
-            {labInfo.ratingAvg > 0 && <span>★ {labInfo.ratingAvg.toFixed(1)} ({labInfo.reviewCount})</span>}
-            {labInfo.openingHours && <span className="flex items-center gap-0.5"><FiClock className="text-[10px]" /> {labInfo.openingHours}</span>}
+            {labInfo.homeCollection && <span className="text-green-600">🏠 Home</span>}
+            {labInfo.ratingAvg > 0 && <span>★ {labInfo.ratingAvg.toFixed(1)}</span>}
+            {labInfo.openingHours && (
+              <span className="hidden sm:flex items-center gap-0.5">
+                <FiClock className="text-[10px]" /> {labInfo.openingHours}
+              </span>
+            )}
           </div>
         </div>
+
+        {/* View Lab button */}
         <Link
           href={`/labs/${labInfo.slug}`}
-          className="flex-shrink-0 text-primary-600 hover:text-primary-800 text-xs font-semibold border border-primary-200 hover:border-primary-400 px-3 py-1.5 rounded-lg transition-colors"
+          className="flex-shrink-0 flex items-center gap-1 text-primary-600 hover:text-primary-800 text-xs font-semibold border border-primary-200 hover:border-primary-400 px-2 py-1.5 sm:px-3 rounded-lg transition-colors mt-0.5 sm:mt-0"
         >
-          View Lab
+          <span className="hidden sm:inline">View Lab</span>
+          <FiExternalLink className="text-xs sm:hidden" />
         </Link>
       </div>
 
@@ -209,12 +218,13 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
               key={p._id}
               onMouseEnter={() => onHoverProduct(p)}
               onClick={() => onHoverProduct(p)}
-              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
+              className={`flex items-center gap-2 sm:gap-3 px-3 py-2.5 sm:px-4 sm:py-3 cursor-pointer transition-colors ${
                 activeProductId === p._id ? 'bg-primary-50/40' : 'hover:bg-gray-50'
               }`}
             >
+              {/* Test info */}
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mb-0.5">
                   {p.type && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[p.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
                       {p.type}
@@ -224,34 +234,38 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-orange-50 text-orange-600 border border-orange-100">Fasting</span>
                   )}
                   {p.homeCollection && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-green-50 text-green-600 border border-green-100">🏠 Home</span>
+                    <span className="hidden sm:inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-green-50 text-green-600 border border-green-100">🏠 Home</span>
                   )}
                 </div>
-                <p className="text-sm font-semibold text-gray-900 truncate">{p.name}</p>
+                <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{p.name}</p>
                 {p.reportTime && (
-                  <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-0.5">
+                  <p className="hidden sm:flex text-[11px] text-gray-400 mt-0.5 items-center gap-0.5">
                     <FiClock className="text-[10px]" /> {p.reportTime}
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
+
+              {/* Price + action */}
+              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                 <div className="text-right">
                   {discount && (
-                    <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full block mb-0.5 text-center">{discount}% OFF</span>
+                    <span className="text-[9px] sm:text-[10px] font-bold bg-red-500 text-white px-1 sm:px-1.5 py-0.5 rounded-full block mb-0.5 text-center">{discount}%</span>
                   )}
-                  <p className="text-sm font-extrabold text-gray-900">₹{price?.toLocaleString('en-IN')}</p>
-                  {discount && <p className="text-[10px] text-gray-400 line-through text-right">₹{p.price?.toLocaleString('en-IN')}</p>}
+                  <p className="text-xs sm:text-sm font-extrabold text-gray-900">₹{price?.toLocaleString('en-IN')}</p>
+                  {discount && <p className="text-[10px] text-gray-400 line-through">₹{p.price?.toLocaleString('en-IN')}</p>}
                 </div>
                 {inCart ? (
                   <Link href="/cart" onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-                    <FiCheck className="text-[10px]" /> In Cart
+                    className="flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 text-white text-[11px] font-semibold px-2 py-1.5 sm:px-2.5 rounded-lg transition-colors whitespace-nowrap min-w-[32px]">
+                    <FiCheck className="text-[10px]" />
+                    <span className="hidden sm:inline">In Cart</span>
                   </Link>
                 ) : (
                   <button
                     onClick={(e) => { e.stopPropagation(); addItem(p); toast.success(`${p.name} added!`, { icon: '🛒' }); }}
-                    className="flex items-center gap-1 bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-                    <FiShoppingCart className="text-[10px]" /> Add
+                    className="flex items-center justify-center gap-1 bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-semibold px-2 py-1.5 sm:px-2.5 rounded-lg transition-colors whitespace-nowrap min-w-[32px]">
+                    <FiShoppingCart className="text-[10px]" />
+                    <span className="hidden sm:inline">Add</span>
                   </button>
                 )}
               </div>
@@ -262,20 +276,23 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
 
       {/* ── Footer: total + Add All ── */}
       {products.length > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+        <div className="flex items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-50 border-t border-gray-100">
           <div>
             <p className="text-[11px] text-gray-400">Total ({products.length} tests)</p>
-            <p className="text-base font-extrabold text-gray-900">₹{total.toLocaleString('en-IN')}</p>
+            <p className="text-sm sm:text-base font-extrabold text-gray-900">₹{total.toLocaleString('en-IN')}</p>
           </div>
           {allInCart ? (
             <Link href="/cart"
-              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
-              <FiCheck /> View Cart
+              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors">
+              <FiCheck /> <span className="hidden xs:inline sm:inline">View Cart</span>
+              <span className="sm:hidden">Cart</span>
             </Link>
           ) : (
             <button onClick={handleAddAll}
-              className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
-              <FiShoppingCart /> Add All to Cart
+              className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors">
+              <FiShoppingCart />
+              <span className="hidden sm:inline">Add All to Cart</span>
+              <span className="sm:hidden">Add All</span>
             </button>
           )}
         </div>
@@ -284,37 +301,39 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
   );
 }
 
-// ── Lab result row (pure lab search result) ───────────────────────────────────
+// ── Lab result row (pure lab search) ─────────────────────────────────────────
 function LabRow({ lab }) {
   const initial = (lab.name || '?')[0].toUpperCase();
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4 hover:shadow-md transition-all hover:-translate-y-0.5">
-      <div className={`w-12 h-12 ${labColor(lab.name)} rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm`}>
+    <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-all">
+      <div className={`w-10 h-10 sm:w-12 sm:h-12 ${labColor(lab.name)} rounded-full flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0 shadow-sm`}>
         {initial}
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-900 text-sm">{lab.name}</p>
-        <div className="flex flex-wrap gap-1.5 mt-1">
+        <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-1">
           {lab.homeCollection && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 font-medium">🏠 Home Collection</span>
+            <span className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 font-medium">🏠 Home</span>
           )}
           {lab.verificationStatus === 'verified' && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 font-medium">✓ Verified</span>
+            <span className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 font-medium">✓ Verified</span>
           )}
           {lab.accreditation?.slice(0, 2).map((a) => (
-            <span key={a} className="text-[11px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100 font-medium">{a}</span>
+            <span key={a} className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100 font-medium">{a}</span>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-gray-400">
-          {lab.openingHours && <span className="flex items-center gap-1"><FiClock className="text-[10px]" /> {lab.openingHours}</span>}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1 text-[11px] text-gray-400">
           {(lab.city || lab.state) && (
-            <span className="flex items-center gap-1"><FiMapPin className="text-[10px]" />{[lab.city, lab.state].filter(Boolean).join(', ')}</span>
+            <span className="flex items-center gap-0.5"><FiMapPin className="text-[10px]" />{[lab.city, lab.state].filter(Boolean).join(', ')}</span>
           )}
-          {lab.ratingAvg > 0 && <span>★ {lab.ratingAvg.toFixed(1)} ({lab.reviewCount} reviews)</span>}
+          {lab.ratingAvg > 0 && <span>★ {lab.ratingAvg.toFixed(1)}</span>}
+          {lab.openingHours && (
+            <span className="hidden sm:flex items-center gap-1"><FiClock className="text-[10px]" /> {lab.openingHours}</span>
+          )}
         </div>
       </div>
       <Link href={`/labs/${lab.slug}`}
-        className="flex-shrink-0 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-colors">
+        className="flex-shrink-0 bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl transition-colors">
         View Lab
       </Link>
     </div>
@@ -441,12 +460,8 @@ function SearchContent() {
     selectedLocations.size === 0 || selectedLocations.has(l.city)
   );
 
-  // Group products by lab and sort: most tests first, then alphabetically
   const labGroups = groupByLab(filteredProducts).sort((a, b) => b.products.length - a.products.length);
-
-  // How many distinct tests were searched (for coverage badge)
   const totalSearched = multiTests.length > 0 ? multiTests.length : 1;
-
   const totalGroupCount = labGroups.length + filteredLabs.length;
   const hasFilters = selectedLabs.size > 0 || selectedLocations.size > 0;
   const hasResults = products.length > 0 || labs.length > 0;
@@ -476,54 +491,76 @@ function SearchContent() {
       <Navbar />
       <main className="min-h-screen bg-gray-50">
 
-        {/* Top search bar */}
-        <div className="bg-white border-b border-gray-100 px-4 py-4 sticky top-16 z-30">
-          <div className="max-w-7xl mx-auto flex gap-3 flex-wrap sm:flex-nowrap">
-            <div className="flex gap-2 flex-shrink-0">
-              <div className="relative">
-                <FiMapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-                <input type="text" value={city} onChange={(e) => setCity(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && applyCity()}
-                  placeholder="City" className="input pl-8 w-36" />
-              </div>
-              {city && (
-                <button onClick={() => { setCity(''); runSearch(inputVal, ''); }}
-                  className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-500 transition-colors">
-                  <FiX />
-                </button>
-              )}
-            </div>
-            <div className="flex-1 relative min-w-0">
+        {/* ── Top search bar ── */}
+        <div className="bg-white border-b border-gray-100 px-3 sm:px-4 py-3 sticky top-14 sm:top-16 z-30">
+          <div className="max-w-7xl mx-auto space-y-2 sm:space-y-0 sm:flex sm:gap-3">
+
+            {/* Search input — full width on mobile, flex-1 on sm+ */}
+            <div className="relative min-w-0 sm:flex-1">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" value={inputVal} onChange={(e) => setInputVal(e.target.value)}
+              <input
+                type="text"
+                value={inputVal}
+                onChange={(e) => setInputVal(e.target.value)}
                 placeholder="Search tests, packages, labs..."
-                className="input pl-9 pr-9 w-full" autoFocus autoComplete="off" />
+                className="input pl-9 pr-9 w-full"
+                autoFocus
+                autoComplete="off"
+              />
               {inputVal && (
-                <button onClick={() => { setInputVal(''); setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); }}
+                <button
+                  onClick={() => { setInputVal(''); setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <FiX className="text-sm" />
                 </button>
               )}
             </div>
-            <div className="flex gap-2 flex-shrink-0">
+
+            {/* City + Filter button row (below search on mobile, beside on sm+) */}
+            <div className="flex gap-2 sm:flex-shrink-0">
+              <div className="relative flex-1 sm:flex-none">
+                <FiMapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && applyCity()}
+                  placeholder="City"
+                  className="input pl-8 w-full sm:w-32"
+                />
+              </div>
+              {city && (
+                <button
+                  onClick={() => { setCity(''); runSearch(inputVal, ''); }}
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-500 transition-colors flex-shrink-0">
+                  <FiX />
+                </button>
+              )}
               {hasResults && (
-                <button onClick={() => setMobileSidebar((v) => !v)}
-                  className="md:hidden px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 flex items-center gap-1.5">
-                  <FiFilter /> Filters
-                  {hasFilters && <span className="w-4 h-4 bg-primary-600 text-white text-[10px] rounded-full flex items-center justify-center">{selectedLabs.size + selectedLocations.size}</span>}
+                <button
+                  onClick={() => setMobileSidebar((v) => !v)}
+                  className="md:hidden flex-shrink-0 px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 flex items-center gap-1.5">
+                  <FiFilter />
+                  <span className="text-xs">Filters</span>
+                  {hasFilters && (
+                    <span className="w-4 h-4 bg-primary-600 text-white text-[10px] rounded-full flex items-center justify-center">
+                      {selectedLabs.size + selectedLocations.size}
+                    </span>
+                  )}
                 </button>
               )}
             </div>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+
           {/* Multi-test chips */}
           {multiTests.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Searching for:</span>
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Searching:</span>
               {multiTests.map((t) => (
-                <span key={t} className="inline-flex items-center gap-1.5 bg-sky-100 text-sky-800 text-xs font-semibold px-3 py-1.5 rounded-full">
+                <span key={t} className="inline-flex items-center gap-1.5 bg-sky-100 text-sky-800 text-xs font-semibold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full">
                   {t}
                   <button type="button"
                     onClick={() => setMultiTests(multiTests.filter((x) => x !== t))}
@@ -536,20 +573,22 @@ function SearchContent() {
           )}
 
           {!inputVal.trim() && multiTests.length === 0 ? (
-            <div className="text-center py-24 text-gray-400">
-              <FiSearch className="text-5xl mx-auto mb-4 opacity-20" />
-              <p className="text-base font-medium">Search for tests, packages or labs</p>
-              <p className="text-sm mt-1">e.g. &ldquo;CBC Test&rdquo;, &ldquo;Full Body Checkup&rdquo;, &ldquo;Apollo Labs&rdquo;</p>
+            <div className="text-center py-20 sm:py-24 text-gray-400">
+              <FiSearch className="text-4xl sm:text-5xl mx-auto mb-4 opacity-20" />
+              <p className="text-sm sm:text-base font-medium">Search for tests, packages or labs</p>
+              <p className="text-xs sm:text-sm mt-1 px-4">e.g. &ldquo;CBC Test&rdquo;, &ldquo;Full Body Checkup&rdquo;, &ldquo;Apollo Labs&rdquo;</p>
             </div>
+
           ) : loading ? (
-            <div className="flex items-center justify-center gap-2 py-24 text-gray-400">
+            <div className="flex items-center justify-center gap-2 py-20 sm:py-24 text-gray-400">
               <div className="w-5 h-5 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Searching{city.trim() ? ` in ${city}` : ''}…</span>
             </div>
+
           ) : !hasResults ? (
-            <div className="text-center py-24 text-gray-500">
-              <p className="text-lg font-semibold">No results for &ldquo;{effectiveQuery}&rdquo;{city.trim() ? ` in ${city}` : ''}</p>
-              <p className="text-sm text-gray-400 mt-1">Try a different search term or city</p>
+            <div className="text-center py-20 sm:py-24 text-gray-500 px-4">
+              <p className="text-base sm:text-lg font-semibold">No results for &ldquo;{effectiveQuery}&rdquo;{city.trim() ? ` in ${city}` : ''}</p>
+              <p className="text-xs sm:text-sm text-gray-400 mt-1">Try a different search term or city</p>
               {city.trim() && (
                 <button onClick={() => { setCity(''); runSearch(inputVal, ''); }}
                   className="mt-3 text-sm text-primary-600 hover:underline">
@@ -557,12 +596,13 @@ function SearchContent() {
                 </button>
               )}
             </div>
-          ) : (
-            <div className="flex gap-5">
 
-              {/* ── Left: Filters sidebar ── */}
-              <aside className="w-52 flex-shrink-0 hidden md:block sticky top-36 self-start">
-                <div className="bg-white rounded-xl border border-gray-100 p-4 max-h-[calc(100vh-10rem)] overflow-y-auto">
+          ) : (
+            <div className="flex gap-4 lg:gap-5">
+
+              {/* ── Left: Filters sidebar (desktop) ── */}
+              <aside className="w-48 lg:w-52 flex-shrink-0 hidden md:block sticky top-32 self-start">
+                <div className="bg-white rounded-xl border border-gray-100 p-4 max-h-[calc(100vh-9rem)] overflow-y-auto">
                   {sidebar}
                 </div>
               </aside>
@@ -571,10 +611,11 @@ function SearchContent() {
               {mobileSidebar && (
                 <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMobileSidebar(false)}>
                   <div className="absolute inset-0 bg-black/40" />
-                  <div className="absolute left-0 top-0 bottom-0 w-72 bg-white p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                  <div className="absolute left-0 top-0 bottom-0 w-72 bg-white p-5 overflow-y-auto shadow-xl"
+                    onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="font-bold text-gray-900">Filters</h2>
-                      <button onClick={() => setMobileSidebar(false)} className="text-gray-400 hover:text-gray-600"><FiX /></button>
+                      <button onClick={() => setMobileSidebar(false)} className="text-gray-400 hover:text-gray-600 p-1"><FiX /></button>
                     </div>
                     {sidebar}
                   </div>
@@ -582,31 +623,32 @@ function SearchContent() {
               )}
 
               {/* ── Middle: Lab-grouped results ── */}
-              <div className="flex-1 min-w-0 space-y-4">
+              <div className="flex-1 min-w-0 space-y-3 sm:space-y-4">
+
                 {/* Summary */}
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <p className="text-sm text-gray-500">
-                    <span className="font-bold text-gray-900">{totalGroupCount}</span> lab{totalGroupCount !== 1 ? 's' : ''} found for &ldquo;{effectiveQuery}&rdquo;
+                <div className="flex items-start sm:items-center justify-between flex-wrap gap-2">
+                  <p className="text-xs sm:text-sm text-gray-500">
+                    <span className="font-bold text-gray-900">{totalGroupCount}</span> lab{totalGroupCount !== 1 ? 's' : ''} for &ldquo;{effectiveQuery}&rdquo;
                     {city.trim() && (
-                      <span className="inline-flex items-center gap-1 ml-2 bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                      <span className="inline-flex items-center gap-1 ml-1.5 bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full text-xs font-medium">
                         <FiMapPin className="text-[10px]" />{city}
                         <button onClick={() => { setCity(''); runSearch(inputVal, ''); }} className="ml-0.5 hover:text-primary-900"><FiX className="text-[10px]" /></button>
                       </span>
                     )}
                     {hasFilters && <span className="text-primary-600 ml-1 text-xs">(filtered)</span>}
                   </p>
-                  {multiTests.length > 1 && labGroups.some(g => g.products.length === totalSearched) && (
-                    <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full font-medium">
-                      ✓ {labGroups.filter(g => g.products.length === totalSearched).length} lab{labGroups.filter(g => g.products.length === totalSearched).length > 1 ? 's have' : ' has'} all {totalSearched} tests
+                  {multiTests.length > 1 && labGroups.some((g) => g.products.length === totalSearched) && (
+                    <span className="text-[11px] sm:text-xs text-green-700 bg-green-50 border border-green-200 px-2 sm:px-2.5 py-1 rounded-full font-medium">
+                      ✓ {labGroups.filter((g) => g.products.length === totalSearched).length} lab{labGroups.filter((g) => g.products.length === totalSearched).length > 1 ? 's' : ''} have all {totalSearched} tests
                     </span>
                   )}
                 </div>
 
-                {/* Lab groups (products) */}
+                {/* Lab groups */}
                 {labGroups.length > 0 && (
-                  <div className="space-y-3">
+                  <div className="space-y-2.5 sm:space-y-3">
                     {multiTests.length > 1 && (
-                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tests &amp; Packages — grouped by lab</h3>
+                      <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Tests &amp; Packages — grouped by lab</h3>
                     )}
                     {labGroups.map((group, idx) => (
                       <LabGroupCard
@@ -624,7 +666,7 @@ function SearchContent() {
                 {/* Pure lab results */}
                 {filteredLabs.length > 0 && (
                   <div className="space-y-2">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Labs</h3>
+                    <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Labs</h3>
                     {filteredLabs.map((lab) => <LabRow key={lab._id || lab.objectID} lab={lab} />)}
                   </div>
                 )}
@@ -637,10 +679,10 @@ function SearchContent() {
                 )}
               </div>
 
-              {/* ── Right: Description panel (desktop only) ── */}
+              {/* ── Right: Description panel (lg+ only) ── */}
               {filteredProducts.length > 0 && (
-                <aside className="w-72 flex-shrink-0 hidden lg:block sticky top-36 self-start">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">About this test</p>
+                <aside className="w-64 xl:w-72 flex-shrink-0 hidden lg:block sticky top-32 self-start">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">About this test</p>
                   <DescriptionPanel product={activeProduct} />
                 </aside>
               )}
