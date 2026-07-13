@@ -32,10 +32,6 @@ export default function HeroSlider() {
   const [inputFocused, setInputFocused] = useState(false);
   const searchWrapRef = useRef(null);
   const inputRef = useRef(null);
-  const cityBtnRef = useRef(null);
-  const searchBtnRef = useRef(null);
-  const [dropLeft, setDropLeft] = useState(0);
-  const [dropRight, setDropRight] = useState(0);
 
   // typewriter
   const [placeholder, setPlaceholder] = useState('Search for CBC Test...');
@@ -125,17 +121,6 @@ export default function HeroSlider() {
   const showPopular = inputFocused && query.trim().length < 2;
   const hasResults  = liveResults.tests.length > 0 || liveResults.labs.length > 0;
 
-  /* ── Measure city + search button widths for dropdown positioning ── */
-  useEffect(() => {
-    const measure = () => {
-      if (cityBtnRef.current) setDropLeft(cityBtnRef.current.offsetWidth);
-      if (searchBtnRef.current) setDropRight(searchBtnRef.current.offsetWidth);
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [city]);
-
   /* ── Close dropdown on outside click ── */
   useEffect(() => {
     const handler = (e) => {
@@ -190,7 +175,7 @@ export default function HeroSlider() {
     <div>
       {/* Padded wrapper — gives space on both sides */}
       <div className="px-3 sm:px-6 lg:px-10 pt-3 pb-1 bg-gray-50">
-      <div className="relative w-full bg-sky-900 aspect-[16/5] min-h-[320px] rounded-2xl shadow-xl">
+      <div className="relative w-full bg-sky-900 aspect-[16/5] min-h-[260px] sm:min-h-[320px] rounded-2xl shadow-xl">
 
         {/* Slide strip */}
         <div className="absolute inset-0 overflow-hidden rounded-2xl">
@@ -210,11 +195,11 @@ export default function HeroSlider() {
         </div>
 
         {/* Overlay — pointer-events-none except form */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-20 px-8 sm:px-16 lg:px-24 pointer-events-none">
-          <h1 className="text-white font-bold text-2xl md:text-4xl text-center drop-shadow-lg mb-2">
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-20 px-4 sm:px-12 lg:px-24 pointer-events-none">
+          <h1 className="text-white font-bold text-xl sm:text-2xl md:text-4xl text-center drop-shadow-lg mb-1 sm:mb-2">
             Book Lab Tests at Home
           </h1>
-          <p className="text-slate-200 text-sm md:text-base text-center mb-5 drop-shadow">
+          <p className="text-slate-200 text-[11px] sm:text-sm md:text-base text-center mb-3 sm:mb-5 drop-shadow">
             NABL certified labs · Reports in 6 hours · Free sample collection
           </p>
 
@@ -224,12 +209,12 @@ export default function HeroSlider() {
               className="flex items-stretch bg-white rounded-full shadow-2xl overflow-hidden">
 
               {/* City button — LEFT side */}
-              <div ref={cityBtnRef} className="border-r border-gray-200 flex-shrink-0">
+              <div className="border-r border-gray-200 flex-shrink-0">
                 <button type="button" onClick={() => setCityModalOpen(true)}
-                  className="flex items-center gap-1.5 px-4 py-5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap h-full">
-                  <FiMapPin size={15} className="text-sky-500 shrink-0" />
-                  <span className="max-w-[90px] truncate">{city || 'Select City'}</span>
-                  <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-4 sm:py-5 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap h-full">
+                  <FiMapPin size={14} className="text-sky-500 shrink-0" />
+                  <span className="max-w-[56px] sm:max-w-[90px] truncate">{city || 'City'}</span>
+                  <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
@@ -274,8 +259,8 @@ export default function HeroSlider() {
                     }
                   }}
                   onFocus={() => { setInputFocused(true); setShowDrop(true); }}
-                  placeholder={selectedTests.length === 0 ? placeholder : 'Add another test...'}
-                  className="flex-1 min-w-[120px] py-2 text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
+                  placeholder={selectedTests.length === 0 ? placeholder : 'Add test...'}
+                  className="flex-1 min-w-[60px] sm:min-w-[120px] py-2 text-xs sm:text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
                   autoComplete="off"
                 />
                 {(query || selectedTests.length > 0) && (
@@ -287,8 +272,8 @@ export default function HeroSlider() {
                 )}
               </div>
 
-              <button ref={searchBtnRef} type="submit"
-                className="bg-sky-500 hover:bg-sky-600 active:bg-sky-700 text-white font-bold text-sm px-5 transition shrink-0 flex flex-col items-center justify-center min-w-[90px]">
+              <button type="submit"
+                className="bg-sky-500 hover:bg-sky-600 active:bg-sky-700 text-white font-bold text-xs sm:text-sm px-3 sm:px-5 transition shrink-0 flex flex-col items-center justify-center min-w-[60px] sm:min-w-[90px]">
                 {selectedTests.length > 0 ? (
                   <><FiSearch size={15} /><span className="text-[11px] mt-0.5">Get Prices</span></>
                 ) : 'Search'}
@@ -297,8 +282,7 @@ export default function HeroSlider() {
 
             {/* ── Dropdown: popular on focus OR live results on type ── */}
             {showDrop && (showPopular || hasResults || searching) && (
-              <div className="absolute top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden max-h-[420px] overflow-y-auto"
-                style={{ left: dropLeft, right: dropRight }}>
+              <div className="absolute top-full mt-1.5 left-0 right-0 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden max-h-[340px] sm:max-h-[420px] overflow-y-auto">
 
                 {/* Popular tests from DB — shown when query is empty */}
                 {showPopular && popularTests.length > 0 && (
@@ -449,11 +433,12 @@ export default function HeroSlider() {
       </div>{/* end padded wrapper */}
 
       {/* Promo bar */}
-      <div className="bg-white border-y border-gray-100 py-2.5">
-        <p className="text-center text-sm text-gray-600">
+      <div className="bg-white border-y border-gray-100 py-2">
+        <p className="text-center text-[11px] sm:text-sm text-gray-600 leading-relaxed px-4">
           Get <span className="text-secondary-600 font-bold">10% OFF*</span>
-          {' '}on orders above ₹500 &nbsp;|&nbsp; Use:{' '}
-          <span className="font-bold text-gray-900 tracking-wide">WELCOME10</span>
+          {' '}on orders above ₹500
+          <span className="mx-1.5 text-gray-300">|</span>
+          Use: <span className="font-bold text-gray-900 tracking-wide">WELCOME10</span>
         </p>
       </div>
 

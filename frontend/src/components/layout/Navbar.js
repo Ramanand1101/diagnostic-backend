@@ -69,11 +69,11 @@ export default function Navbar() {
                 <span className="font-medium">{CONTACT_PHONE}</span>
               </a>
 
-              <div className="w-px h-5 bg-gray-200" />
+              <div className="hidden lg:block w-px h-5 bg-gray-200" />
 
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
-                className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-primary-600 transition-colors"
+                className="hidden lg:flex items-center gap-1.5 text-sm text-gray-600 hover:text-primary-600 transition-colors"
               >
                 <FiMail className="text-base" />
                 <span className="font-medium">{CONTACT_EMAIL}</span>
