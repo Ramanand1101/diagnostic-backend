@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FiChevronLeft, FiChevronRight, FiSearch, FiMapPin, FiX } from 'react-icons/fi';
+import { FiChevronRight, FiSearch, FiMapPin, FiX } from 'react-icons/fi';
 import { MdOutlineScience } from 'react-icons/md';
 import { heroSlideApi, searchApi } from '@/lib/api';
 import { useCity } from '@/context/CityContext';
@@ -84,9 +84,6 @@ export default function HeroSlider() {
   const nextSlide = useCallback(() => {
     if (slides.length > 1) setCurrent(c => (c + 1) % slides.length);
   }, [slides.length]);
-  const prevSlide = () => {
-    if (slides.length > 1) setCurrent(c => (c - 1 + slides.length) % slides.length);
-  };
   useEffect(() => {
     if (slides.length <= 1) return;
     const t = setInterval(nextSlide, 4500);
@@ -470,29 +467,6 @@ export default function HeroSlider() {
           </div>
         </div>
 
-        {/* Arrows — z-30 */}
-        {slides.length > 1 && (
-          <>
-            <button onClick={prevSlide} aria-label="Previous slide"
-              className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full w-9 h-9 flex items-center justify-center shadow-lg z-30 transition">
-              <FiChevronLeft size={18} />
-            </button>
-            <button onClick={nextSlide} aria-label="Next slide"
-              className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full w-9 h-9 flex items-center justify-center shadow-lg z-30 transition">
-              <FiChevronRight size={18} />
-            </button>
-          </>
-        )}
-
-        {/* Dots — z-30 */}
-        {slides.length > 1 && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-30">
-            {slides.map((_, i) => (
-              <button key={i} onClick={() => setCurrent(i)} aria-label={`Slide ${i + 1}`}
-                className={`w-2 h-2 rounded-full transition-all ${i === current ? 'bg-white scale-125' : 'bg-white/50 hover:bg-white/80'}`} />
-            ))}
-          </div>
-        )}
       </div>
       </div>{/* end padded wrapper */}
 
