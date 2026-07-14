@@ -16,7 +16,7 @@ export default function HealthOnTimeLogo({ dark = false, size = 'text-xl', showT
         <span style={{ color: textColor }}>Time</span>
       </span>
       {showTagline && (
-        <span className="inline-flex items-center gap-2 text-xs tracking-wide" style={{ color: taglineColor }}>
+        <span className="inline-flex items-center gap-2 text-xs tracking-wide whitespace-nowrap" style={{ color: taglineColor }}>
           <span className="inline-block w-6 h-px" style={{ backgroundColor: lineColor }} />
           Your Health. Our Priority. On Time.
           <span className="inline-block w-6 h-px" style={{ backgroundColor: lineColor }} />

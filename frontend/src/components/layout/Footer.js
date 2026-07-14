@@ -7,11 +7,11 @@ export default function Footer() {
     <footer className="bg-gray-900 text-gray-300 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
-          <div className="sm:col-span-2 md:col-span-1">
-            <div className="mb-3">
+          <div className="sm:col-span-2 md:col-span-1 flex flex-col items-center text-center">
+            <div className="mb-4">
               <HealthOnTimeLogo dark size="text-lg" showTagline />
             </div>
-            <div className="flex gap-3 mt-4">
+            <div className="flex gap-4 text-lg">
               <a href="#" className="hover:text-white transition-colors"><FiFacebook /></a>
               <a href="#" className="hover:text-white transition-colors"><FiTwitter /></a>
               <a href="#" className="hover:text-white transition-colors"><FiInstagram /></a>
