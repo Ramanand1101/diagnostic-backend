@@ -205,46 +205,42 @@ export default function HeroSlider() {
 
           {/* Form + live dropdown wrapper */}
           <div className="relative w-full max-w-3xl pointer-events-auto" ref={searchWrapRef}>
-            <form onSubmit={handleSearch}
-              className="flex items-stretch bg-white rounded-full shadow-2xl overflow-hidden">
 
-              {/* City button — LEFT side */}
-              <div className="border-r border-gray-200 flex-shrink-0">
-                <button type="button" onClick={() => setCityModalOpen(true)}
-                  className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-4 sm:py-5 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap h-full">
-                  <FiMapPin size={14} className="text-sky-500 shrink-0" />
-                  <span className="max-w-[56px] sm:max-w-[90px] truncate">{city || 'City'}</span>
-                  <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
+            {/* ════════════════════════════════════════
+                MOBILE: Card-style stacked layout
+                ════════════════════════════════════════ */}
+            <form onSubmit={handleSearch} className="sm:hidden bg-white rounded-2xl shadow-2xl overflow-hidden">
 
-              {/* Search area: chips + input */}
-              <div
-                className="flex flex-wrap items-center flex-1 px-3 py-1.5 gap-1.5 min-h-[56px] cursor-text"
-                onClick={() => inputRef.current?.focus()}
-              >
+              {/* Row 1 — City selector */}
+              <button type="button" onClick={() => setCityModalOpen(true)}
+                className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 text-left hover:bg-gray-50 transition-colors">
+                <div className="w-8 h-8 bg-sky-50 rounded-lg flex items-center justify-center shrink-0">
+                  <FiMapPin size={15} className="text-sky-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide leading-none mb-0.5">Your City</p>
+                  <p className="text-sm font-semibold text-gray-800 truncate">{city || 'Select city'}</p>
+                </div>
+                <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Row 2 — Search input + chips */}
+              <div className="flex flex-wrap items-center gap-1.5 px-4 py-3 border-b border-gray-100 min-h-[56px] cursor-text"
+                onClick={() => inputRef.current?.focus()}>
                 {searching
                   ? <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin shrink-0" />
-                  : <FiSearch size={16} className="text-gray-400 shrink-0" />
+                  : <FiSearch size={15} className="text-gray-400 shrink-0" />
                 }
-
-                {/* Selected test chips */}
                 {selectedTests.map((t) => (
                   <span key={t}
                     className="inline-flex items-center gap-1 bg-sky-100 text-sky-800 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
                     {t}
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => removeTest(t)}
-                      className="ml-0.5 text-sky-500 hover:text-red-500 transition">
-                      <FiX size={10} />
-                    </button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => removeTest(t)}
+                      className="ml-0.5 text-sky-500 hover:text-red-500 transition"><FiX size={10} /></button>
                   </span>
                 ))}
-
                 <input
                   ref={inputRef}
                   type="text"
@@ -259,24 +255,92 @@ export default function HeroSlider() {
                     }
                   }}
                   onFocus={() => { setInputFocused(true); setShowDrop(true); }}
-                  placeholder={selectedTests.length === 0 ? placeholder : 'Add test...'}
-                  className="flex-1 min-w-[60px] sm:min-w-[120px] py-2 text-xs sm:text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
+                  placeholder={selectedTests.length === 0 ? placeholder : 'Add another test...'}
+                  className="flex-1 min-w-[120px] py-1 text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
                   autoComplete="off"
                 />
                 {(query || selectedTests.length > 0) && (
                   <button type="button"
                     onClick={() => { setQuery(''); setSelectedTests([]); setShowDrop(false); }}
-                    className="text-gray-300 hover:text-gray-500 shrink-0">
-                    <FiX size={14} />
-                  </button>
+                    className="text-gray-300 hover:text-gray-500 shrink-0"><FiX size={14} /></button>
+                )}
+              </div>
+
+              {/* Row 3 — Search button */}
+              <div className="px-3 py-3">
+                <button type="submit"
+                  className="w-full bg-sky-500 hover:bg-sky-600 active:bg-sky-700 text-white font-bold text-sm py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+                  <FiSearch size={15} />
+                  {selectedTests.length > 0
+                    ? `Get Prices · ${selectedTests.length} test${selectedTests.length > 1 ? 's' : ''}`
+                    : 'Search Tests & Labs'}
+                </button>
+              </div>
+            </form>
+
+            {/* ════════════════════════════════════════
+                DESKTOP: Pill layout (hidden on mobile)
+                ════════════════════════════════════════ */}
+            <form onSubmit={handleSearch}
+              className="hidden sm:flex items-stretch bg-white rounded-full shadow-2xl overflow-hidden">
+
+              {/* City button */}
+              <div className="border-r border-gray-200 flex-shrink-0">
+                <button type="button" onClick={() => setCityModalOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap h-full">
+                  <FiMapPin size={15} className="text-sky-500 shrink-0" />
+                  <span className="max-w-[90px] truncate">{city || 'Select City'}</span>
+                  <svg className="w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Search area: chips + input */}
+              <div className="flex flex-wrap items-center flex-1 px-3 py-1.5 gap-1.5 min-h-[56px] cursor-text"
+                onClick={() => inputRef.current?.focus()}>
+                {searching
+                  ? <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                  : <FiSearch size={16} className="text-gray-400 shrink-0" />
+                }
+                {selectedTests.map((t) => (
+                  <span key={t}
+                    className="inline-flex items-center gap-1 bg-sky-100 text-sky-800 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+                    {t}
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => removeTest(t)}
+                      className="ml-0.5 text-sky-500 hover:text-red-500 transition"><FiX size={10} /></button>
+                  </span>
+                ))}
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { setShowDrop(false); setInputFocused(false); }
+                    if (e.key === 'Backspace' && !query && selectedTests.length > 0)
+                      removeTest(selectedTests[selectedTests.length - 1]);
+                    if (e.key === 'Enter' && query.trim() && !hasResults) {
+                      addTest(query.trim()); e.preventDefault();
+                    }
+                  }}
+                  onFocus={() => { setInputFocused(true); setShowDrop(true); }}
+                  placeholder={selectedTests.length === 0 ? placeholder : 'Add another test...'}
+                  className="flex-1 min-w-[120px] py-2 text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
+                  autoComplete="off"
+                />
+                {(query || selectedTests.length > 0) && (
+                  <button type="button"
+                    onClick={() => { setQuery(''); setSelectedTests([]); setShowDrop(false); }}
+                    className="text-gray-300 hover:text-gray-500 shrink-0"><FiX size={14} /></button>
                 )}
               </div>
 
               <button type="submit"
-                className="bg-sky-500 hover:bg-sky-600 active:bg-sky-700 text-white font-bold text-xs sm:text-sm px-3 sm:px-5 transition shrink-0 flex flex-col items-center justify-center min-w-[60px] sm:min-w-[90px]">
-                {selectedTests.length > 0 ? (
-                  <><FiSearch size={15} /><span className="text-[11px] mt-0.5">Get Prices</span></>
-                ) : 'Search'}
+                className="bg-sky-500 hover:bg-sky-600 active:bg-sky-700 text-white font-bold text-sm px-6 transition shrink-0 flex flex-col items-center justify-center min-w-[90px]">
+                {selectedTests.length > 0
+                  ? <><FiSearch size={15} /><span className="text-[11px] mt-0.5">Get Prices</span></>
+                  : 'Search'}
               </button>
             </form>
 
