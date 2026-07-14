@@ -6,7 +6,7 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { bookingApi } from '@/lib/api';
+import { bookingApi, userApi } from '@/lib/api';
 import { getErrorMessage } from '@/utils/helpers';
 import {
   FiTrash2, FiShoppingCart, FiMapPin, FiArrowLeft,
@@ -213,35 +213,44 @@ function PincodeField({ pincode, onChange, groups, onValidated }) {
 }
 
 // ── Booking form ──────────────────────────────────────────────────────────────
+const FORM_KEY = (uid) => `cart_form_${uid || 'guest'}`;
+const DEFAULT_FORM = {
+  patientName: '', patientAge: '', patientGender: 'male',
+  phone: '', email: '', pincode: '', slotDate: '', slotTime: '',
+  visitType: 'lab', address: '',
+};
+
 function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
 
-  const [form, setForm] = useState({
-    patientName: '',
-    patientAge: '',
-    patientGender: 'male',
-    phone: '',
-    email: '',
-    pincode: '',
-    slotDate: '',
-    slotTime: '',
-    visitType: 'lab',
-    address: '',
-  });
+  const [form, setForm] = useState(DEFAULT_FORM);
   const [pincodeValid, setPincodeValid] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
-  // Pre-fill from user profile
+  // Load saved form from sessionStorage, then merge profile data on top
   useEffect(() => {
-    if (user) {
-      setForm((f) => ({
-        ...f,
-        patientName: f.patientName || user.name || '',
-        phone: f.phone || user.mobile || '',
-        email: f.email || user.email || '',
-      }));
-    }
-  }, [user]);
+    if (!user || initialized) return;
+    const key = FORM_KEY(user._id);
+    let saved = {};
+    try { saved = JSON.parse(sessionStorage.getItem(key) || '{}'); } catch {}
+
+    setForm({
+      ...DEFAULT_FORM,
+      ...saved,
+      // Profile data always wins for name/phone/email if profile has them
+      patientName: saved.patientName || user.name || '',
+      phone: user.mobile || saved.phone || '',
+      email: user.email || saved.email || '',
+    });
+    setInitialized(true);
+  }, [user, initialized]);
+
+  // Persist form to sessionStorage on every change
+  useEffect(() => {
+    if (!user || !initialized) return;
+    try { sessionStorage.setItem(FORM_KEY(user._id), JSON.stringify(form)); } catch {}
+  }, [form, user, initialized]);
 
   const F = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const today = new Date().toISOString().split('T')[0];
@@ -250,6 +259,9 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) { router.push('/login'); return; }
+    if (!form.phone || form.phone.length < 10) {
+      toast.error('Please enter a valid 10-digit phone number'); return;
+    }
     if (!pincodeValid) { toast.error('Please enter a valid pincode first'); return; }
 
     setSubmitting(true);
@@ -282,6 +294,17 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
           paymentMethod: 'cash',
         });
       }
+      // Save phone to profile if not already set
+      if (!user.mobile && form.phone) {
+        try {
+          await userApi.updateMe({ mobile: form.phone });
+          await refreshUser();
+        } catch {}
+      }
+
+      // Clear persisted form
+      try { sessionStorage.removeItem(FORM_KEY(user._id)); } catch {}
+
       toast.success('Booking confirmed! Check your dashboard.');
       onSuccess();
       router.push('/dashboard/bookings');
@@ -295,6 +318,16 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
   return (
     <form id="booking-form" onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-100 p-5 md:p-6 space-y-4">
       <h2 className="font-bold text-gray-800 text-base">Patient &amp; Slot Details</h2>
+
+      {/* Phone missing warning */}
+      {user && !user.mobile && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+          <FiAlertCircle className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800">
+            Your profile doesn&apos;t have a phone number. Please fill it below — it will be saved to your profile automatically.
+          </p>
+        </div>
+      )}
 
       {/* Row 1: Name | Age | Phone | Email */}
       <div className="grid grid-cols-2 gap-3">
