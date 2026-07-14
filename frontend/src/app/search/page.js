@@ -150,7 +150,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg shadow-sm transition-all">
+    <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-md hover:shadow-xl transition-all">
 
       {/* ── Lab header ── */}
       <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 px-3 py-3 sm:px-4 bg-gray-50 border-b border-gray-200">
@@ -305,7 +305,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
 function LabRow({ lab }) {
   const initial = (lab.name || '?')[0].toUpperCase();
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-lg transition-all">
+    <div className="bg-white rounded-xl border border-gray-300 shadow-md p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-xl transition-all">
       <div className={`w-10 h-10 sm:w-12 sm:h-12 ${labColor(lab.name)} rounded-full flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0 shadow-sm`}>
         {initial}
       </div>
@@ -489,10 +489,10 @@ function SearchContent() {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-gray-50">
+      <main className="min-h-screen bg-gray-200">
 
         {/* ── Top search bar ── */}
-        <div className="bg-white border-b border-gray-100 px-3 sm:px-4 py-3 sticky top-14 sm:top-16 z-30">
+        <div className="bg-white border-b border-gray-300 px-3 sm:px-4 py-3 sticky top-14 sm:top-16 z-30">
           <div className="max-w-7xl mx-auto space-y-2 sm:space-y-0 sm:flex sm:gap-3">
 
             {/* Search input — full width on mobile, flex-1 on sm+ */}
@@ -602,7 +602,7 @@ function SearchContent() {
 
               {/* ── Left: Filters sidebar (desktop) ── */}
               <aside className="w-48 lg:w-52 flex-shrink-0 hidden md:block sticky top-32 self-start">
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 max-h-[calc(100vh-9rem)] overflow-y-auto">
+                <div className="bg-white rounded-xl border border-gray-300 shadow-md p-4 max-h-[calc(100vh-9rem)] overflow-y-auto">
                   {sidebar}
                 </div>
               </aside>
