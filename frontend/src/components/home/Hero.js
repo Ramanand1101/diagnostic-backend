@@ -200,7 +200,7 @@ export default function HeroSlider() {
             Book Lab Tests at Home
           </h1>
           <p className="text-slate-200 text-[11px] sm:text-sm md:text-base text-center mb-3 sm:mb-5 drop-shadow">
-            NABL certified labs · Reports in 6 hours · Free sample collection
+            Fast &amp; Accurate Reports
           </p>
 
           {/* Form + live dropdown wrapper */}

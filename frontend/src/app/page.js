@@ -79,10 +79,10 @@ const steps = [
 ];
 
 const stats = [
-  { value: '500+', label: 'Tests & Packages' },
-  { value: '100+', label: 'Partner Labs' },
-  { value: '20+', label: 'Cities Covered' },
-  { value: '50K+', label: 'Happy Patients' },
+  { value: '2000+', label: 'Tests & Packages' },
+  { value: '1000+', label: 'Partner Labs' },
+  { value: '100+', label: 'Cities Covered' },
+  { value: '30K+', label: 'Happy Patients' },
 ];
 
 const popularTests = [
