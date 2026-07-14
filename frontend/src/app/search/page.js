@@ -150,10 +150,10 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition-all">
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg shadow-sm transition-all">
 
       {/* ── Lab header ── */}
-      <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 px-3 py-3 sm:px-4 bg-gray-50/60 border-b border-gray-100">
+      <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 px-3 py-3 sm:px-4 bg-gray-50 border-b border-gray-200">
         {/* Avatar */}
         <div className={`w-9 h-9 sm:w-10 sm:h-10 ${labColor(labInfo.name)} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm mt-0.5 sm:mt-0`}>
           {initial}
@@ -205,7 +205,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
       </div>
 
       {/* ── Tests list ── */}
-      <div className="divide-y divide-gray-50">
+      <div className="divide-y divide-gray-200">
         {products.map((p) => {
           const price = p.salePrice || p.price;
           const discount = p.salePrice && p.salePrice < p.price
@@ -276,7 +276,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
 
       {/* ── Footer: total + Add All ── */}
       {products.length > 1 && (
-        <div className="flex items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-50 border-t border-gray-100">
+        <div className="flex items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-50 border-t border-gray-200">
           <div>
             <p className="text-[11px] text-gray-400">Total ({products.length} tests)</p>
             <p className="text-sm sm:text-base font-extrabold text-gray-900">₹{total.toLocaleString('en-IN')}</p>
@@ -305,7 +305,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
 function LabRow({ lab }) {
   const initial = (lab.name || '?')[0].toUpperCase();
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-all">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-lg transition-all">
       <div className={`w-10 h-10 sm:w-12 sm:h-12 ${labColor(lab.name)} rounded-full flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0 shadow-sm`}>
         {initial}
       </div>
@@ -602,7 +602,7 @@ function SearchContent() {
 
               {/* ── Left: Filters sidebar (desktop) ── */}
               <aside className="w-48 lg:w-52 flex-shrink-0 hidden md:block sticky top-32 self-start">
-                <div className="bg-white rounded-xl border border-gray-100 p-4 max-h-[calc(100vh-9rem)] overflow-y-auto">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 max-h-[calc(100vh-9rem)] overflow-y-auto">
                   {sidebar}
                 </div>
               </aside>
