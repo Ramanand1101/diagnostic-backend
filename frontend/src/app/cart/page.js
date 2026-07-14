@@ -14,6 +14,79 @@ import {
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
+// ── Time slot picker ──────────────────────────────────────────────────────────
+const MORNING_SLOTS = [
+  '06:00 AM – 07:00 AM', '07:00 AM – 08:00 AM', '08:00 AM – 09:00 AM',
+  '09:00 AM – 10:00 AM', '10:00 AM – 11:00 AM', '11:00 AM – 12:00 PM',
+];
+const AFTERNOON_SLOTS = [
+  '12:00 PM – 01:00 PM', '01:00 PM – 02:00 PM', '02:00 PM – 03:00 PM',
+  '03:00 PM – 04:00 PM', '04:00 PM – 05:00 PM', '05:00 PM – 06:00 PM',
+  '06:00 PM – 07:00 PM', '07:00 PM – 08:00 PM', '08:00 PM – 09:00 PM',
+];
+
+function TimeSlotPicker({ value, onChange }) {
+  return (
+    <div className="space-y-3">
+      <label className="block text-xs font-medium text-gray-700">
+        Preferred Time <span className="text-red-500">*</span>
+      </label>
+
+      {/* Morning */}
+      <div>
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 mb-2">
+          <span>☀️</span> Morning Slots (AM)
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {MORNING_SLOTS.map((slot) => (
+            <button
+              key={slot}
+              type="button"
+              onClick={() => onChange(slot)}
+              className={`text-xs px-2 py-2 rounded-lg border font-medium transition-all text-center ${
+                value === slot
+                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600'
+              }`}
+            >
+              {slot}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Afternoon */}
+      <div>
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 mb-2">
+          <span>🌤️</span> Afternoon Slots (PM)
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {AFTERNOON_SLOTS.map((slot) => (
+            <button
+              key={slot}
+              type="button"
+              onClick={() => onChange(slot)}
+              className={`text-xs px-2 py-2 rounded-lg border font-medium transition-all text-center ${
+                value === slot
+                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600'
+              }`}
+            >
+              {slot}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {value && (
+        <p className="text-xs text-primary-600 font-medium flex items-center gap-1">
+          ✓ Selected: <span className="font-bold">{value}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 const TYPE_COLOR = {
   test:     'bg-blue-50 text-blue-700 border-blue-100',
   package:  'bg-purple-50 text-purple-700 border-purple-100',
@@ -269,7 +342,7 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
         </div>
       </div>
 
-      {/* Row 2: Gender | Visit Type | Pincode | Date | Time */}
+      {/* Row 2: Gender | Visit Type | Pincode | Date */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
@@ -298,10 +371,24 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
           <label className="block text-xs font-medium text-gray-700 mb-1">Preferred Date <span className="text-red-500">*</span></label>
           <input required type="date" min={today} value={form.slotDate} onChange={F('slotDate')} className="input text-sm" />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Preferred Time <span className="text-red-500">*</span></label>
-          <input required type="time" value={form.slotTime} onChange={F('slotTime')} className="input text-sm" />
-        </div>
+      </div>
+
+      {/* Row 3: Time slot picker (full width) */}
+      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+        <TimeSlotPicker
+          value={form.slotTime}
+          onChange={(v) => setForm((f) => ({ ...f, slotTime: v }))}
+        />
+        {/* hidden required field so form validation still works */}
+        <input
+          type="text"
+          required
+          value={form.slotTime}
+          readOnly
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+        />
       </div>
 
       {/* Address for home collection */}
