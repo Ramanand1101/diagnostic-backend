@@ -134,7 +134,7 @@ function DescriptionPanel({ product }) {
 }
 
 // ── Lab Group Card ─────────────────────────────────────────────────────────────
-function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, activeProductId }) {
+function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapProduct, activeProductId }) {
   const { addItem, items } = useCart();
   const initial = (labInfo.name || '?')[0].toUpperCase();
   const total = products.reduce((sum, p) => sum + (p.salePrice || p.price || 0), 0);
@@ -217,7 +217,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, active
             <div
               key={p._id}
               onMouseEnter={() => onHoverProduct(p)}
-              onClick={() => onHoverProduct(p)}
+              onClick={() => { onHoverProduct(p); onTapProduct?.(p); }}
               className={`flex items-center gap-2 sm:gap-3 px-3 py-2.5 sm:px-4 sm:py-3 cursor-pointer transition-colors ${
                 activeProductId === p._id ? 'bg-primary-50/40' : 'hover:bg-gray-50'
               }`}
@@ -366,6 +366,7 @@ function SearchContent() {
   const [selectedLocations, setSelectedLocations] = useState(new Set());
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [activeProduct, setActiveProduct] = useState(null);
+  const [mobileSheet, setMobileSheet] = useState(false);
   const debounceRef = useRef(null);
   const isOwnNavRef = useRef(false);
 
@@ -657,6 +658,7 @@ function SearchContent() {
                         products={group.products}
                         totalSearched={totalSearched}
                         onHoverProduct={setActiveProduct}
+                        onTapProduct={() => setMobileSheet(true)}
                         activeProductId={activeProduct?._id}
                       />
                     ))}
@@ -690,6 +692,39 @@ function SearchContent() {
           )}
         </div>
       </main>
+
+      {/* ── Mobile: About This Test bottom sheet ── */}
+      {mobileSheet && activeProduct && (
+        <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setMobileSheet(false)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div
+            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle bar */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">About This Test</p>
+              <button
+                onClick={() => setMobileSheet(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors"
+              >
+                <FiX className="text-sm" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-5 py-4">
+              <DescriptionPanel product={activeProduct} />
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </>
   );
