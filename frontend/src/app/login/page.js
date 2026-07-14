@@ -1,7 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { GoogleLogin } from '@react-oauth/google';
 import { authApi, userApi } from '@/lib/api';
@@ -82,7 +82,8 @@ function PhoneModal({ onSave, onSkip }) {
   );
 }
 
-function redirectAfterLogin(role, router) {
+function redirectAfterLogin(role, router, redirectTo) {
+  if (redirectTo && redirectTo.startsWith('/')) { router.push(redirectTo); return; }
   router.push(role === 'superadmin' || role === 'subadmin' ? '/admin' : '/dashboard');
 }
 
@@ -103,7 +104,7 @@ function ChannelBtn({ active, onClick, icon: Icon, label, color }) {
   );
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const [mode, setMode] = useState('password'); // 'password' | 'otp'
   const [channel, setChannel] = useState('sms'); // 'sms' | 'whatsapp'
   const [step, setStep] = useState(1);
@@ -112,6 +113,8 @@ export default function LoginPage() {
   const [phoneModal, setPhoneModal] = useState(null);
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || '';
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -129,7 +132,7 @@ export default function LoginPage() {
       const res = await authApi.login({ emailOrMobile: form.emailOrMobile, password: form.password });
       login(res.data.token, res.data.user);
       toast.success('Welcome back!');
-      redirectAfterLogin(res.data.user?.role, router);
+      redirectAfterLogin(res.data.user?.role, router, redirectTo);
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -166,7 +169,7 @@ export default function LoginPage() {
       const res = await authApi.verifyOtp({ emailOrMobile: form.emailOrMobile, otp: form.otp, purpose: 'login' });
       login(res.data.token, res.data.user);
       toast.success('Login successful!');
-      redirectAfterLogin(res.data.user?.role, router);
+      redirectAfterLogin(res.data.user?.role, router, redirectTo);
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -197,7 +200,7 @@ export default function LoginPage() {
       if (!res.data.user?.mobile) {
         setPhoneModal({ role: res.data.user?.role });
       } else {
-        redirectAfterLogin(res.data.user?.role, router);
+        redirectAfterLogin(res.data.user?.role, router, redirectTo);
       }
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -207,7 +210,7 @@ export default function LoginPage() {
   };
 
   const finishGoogleLogin = () => {
-    redirectAfterLogin(phoneModal?.role, router);
+    redirectAfterLogin(phoneModal?.role, router, redirectTo);
     setPhoneModal(null);
   };
 
@@ -427,5 +430,13 @@ export default function LoginPage() {
         </div>
       </div>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }

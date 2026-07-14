@@ -228,28 +228,37 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
   const [pincodeValid, setPincodeValid] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  // Load saved form from sessionStorage, then merge profile data on top
+  // Load saved form — works for both guests and logged-in users
   useEffect(() => {
-    if (!user || initialized) return;
-    const key = FORM_KEY(user._id);
+    if (initialized) return;
     let saved = {};
-    try { saved = JSON.parse(sessionStorage.getItem(key) || '{}'); } catch {}
+    try {
+      // For logged-in users: try user-specific key first, then fall back to guest key
+      const userKey = user ? FORM_KEY(user._id) : 'cart_form_guest';
+      saved = JSON.parse(sessionStorage.getItem(userKey) || '{}');
+      if (user && !Object.keys(saved).length) {
+        saved = JSON.parse(sessionStorage.getItem('cart_form_guest') || '{}');
+        if (Object.keys(saved).length) sessionStorage.removeItem('cart_form_guest');
+      }
+    } catch {}
 
     setForm({
       ...DEFAULT_FORM,
       ...saved,
-      // Profile data always wins for name/phone/email if profile has them
-      patientName: saved.patientName || user.name || '',
-      phone: user.mobile || saved.phone || '',
-      email: user.email || saved.email || '',
+      ...(user ? {
+        patientName: saved.patientName || user.name || '',
+        phone: user.mobile || saved.phone || '',
+        email: user.email || saved.email || '',
+      } : {}),
     });
     setInitialized(true);
   }, [user, initialized]);
 
-  // Persist form to sessionStorage on every change
+  // Persist form on every change (guests use 'cart_form_guest' key)
   useEffect(() => {
-    if (!user || !initialized) return;
-    try { sessionStorage.setItem(FORM_KEY(user._id), JSON.stringify(form)); } catch {}
+    if (!initialized) return;
+    const key = user ? FORM_KEY(user._id) : 'cart_form_guest';
+    try { sessionStorage.setItem(key, JSON.stringify(form)); } catch {}
   }, [form, user, initialized]);
 
   const F = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -258,7 +267,7 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user) { router.push('/login'); return; }
+    if (!user) { router.push('/login?redirect=/cart'); return; }
     if (!form.phone || form.phone.length < 10) {
       toast.error('Please enter a valid 10-digit phone number'); return;
     }
