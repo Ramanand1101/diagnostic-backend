@@ -21,62 +21,49 @@ const MORNING_SLOTS = [
 ];
 const AFTERNOON_SLOTS = [
   '12:00 PM – 01:00 PM', '01:00 PM – 02:00 PM', '02:00 PM – 03:00 PM',
-  '03:00 PM – 04:00 PM', '04:00 PM – 05:00 PM', '05:00 PM – 06:00 PM',
-  '06:00 PM – 07:00 PM', '07:00 PM – 08:00 PM', '08:00 PM – 09:00 PM',
+  '03:00 PM – 04:00 PM',
+];
+const EVENING_SLOTS = [
+  '04:00 PM – 05:00 PM', '05:00 PM – 06:00 PM', '06:00 PM – 07:00 PM',
+  '07:00 PM – 08:00 PM', '08:00 PM – 09:00 PM',
+];
+
+const SLOT_GROUPS = [
+  { label: 'Morning Slots (AM)', emoji: '☀️', color: 'text-amber-600', slots: MORNING_SLOTS },
+  { label: 'Afternoon Slots (PM)', emoji: '🌤️', color: 'text-blue-600', slots: AFTERNOON_SLOTS },
+  { label: 'Evening Slots', emoji: '🌙', color: 'text-indigo-600', slots: EVENING_SLOTS },
 ];
 
 function TimeSlotPicker({ value, onChange }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <label className="block text-xs font-medium text-gray-700">
         Preferred Time <span className="text-red-500">*</span>
       </label>
 
-      {/* Morning */}
-      <div>
-        <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 mb-2">
-          <span>☀️</span> Morning Slots (AM)
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {MORNING_SLOTS.map((slot) => (
-            <button
-              key={slot}
-              type="button"
-              onClick={() => onChange(slot)}
-              className={`text-xs px-2 py-2 rounded-lg border font-medium transition-all text-center ${
-                value === slot
-                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                  : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600'
-              }`}
-            >
-              {slot}
-            </button>
-          ))}
+      {SLOT_GROUPS.map(({ label, emoji, color, slots }) => (
+        <div key={label}>
+          <p className={`flex items-center gap-1.5 text-xs font-semibold ${color} mb-2`}>
+            <span>{emoji}</span> {label}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {slots.map((slot) => (
+              <button
+                key={slot}
+                type="button"
+                onClick={() => onChange(slot)}
+                className={`text-xs px-2 py-2 rounded-lg border font-medium transition-all text-center ${
+                  value === slot
+                    ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600'
+                }`}
+              >
+                {slot}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* Afternoon */}
-      <div>
-        <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 mb-2">
-          <span>🌤️</span> Afternoon Slots (PM)
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {AFTERNOON_SLOTS.map((slot) => (
-            <button
-              key={slot}
-              type="button"
-              onClick={() => onChange(slot)}
-              className={`text-xs px-2 py-2 rounded-lg border font-medium transition-all text-center ${
-                value === slot
-                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                  : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600'
-              }`}
-            >
-              {slot}
-            </button>
-          ))}
-        </div>
-      </div>
+      ))}
 
       {value && (
         <p className="text-xs text-primary-600 font-medium flex items-center gap-1">
