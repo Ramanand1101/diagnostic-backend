@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema({
-  type: { type: String, enum: ['pathology', 'radiology', 'package'], required: true },
+  type: { type: String, default: 'test' },
   name: { type: String, required: true },
   slug: { type: String, unique: true, index: true },
   category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
+  subcategory: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
   lab: { type: mongoose.Schema.Types.ObjectId, ref: 'Lab' },
   description: String,
   price: { type: Number, required: true },

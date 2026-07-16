@@ -65,6 +65,9 @@ export const labApi = {
 // Categories
 export const categoryApi = {
   getAll: (params) => api.get('/categories', { params }),
+  getTree: () => api.get('/categories/tree'),
+  getTopLevel: () => api.get('/categories', { params: { parent: 'null', limit: 200 } }),
+  getSubcategories: (parentId) => api.get('/categories', { params: { parent: parentId, limit: 200 } }),
   getBySlug: (slug) => api.get(`/categories/${slug}`),
   create: (data) => api.post('/categories', data),
   update: (id, data) => api.put(`/categories/${id}`, data),

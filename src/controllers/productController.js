@@ -234,7 +234,7 @@ exports.adminListProducts = asyncHandler(async (req, res) => {
 
   const skip = (Number(page) - 1) * safeLimit;
   const [items, total] = await Promise.all([
-    Product.find(filter).populate('lab', 'name city').populate('category', 'name').sort(sort).skip(skip).limit(safeLimit),
+    Product.find(filter).populate('lab', 'name city').populate('category', 'name').populate('subcategory', 'name').sort(sort).skip(skip).limit(safeLimit),
     Product.countDocuments(filter),
   ]);
   res.json({ items, page: Number(page), limit: safeLimit, total });

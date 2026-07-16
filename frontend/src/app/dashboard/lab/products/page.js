@@ -7,16 +7,17 @@ import Spinner, { PageLoader } from '@/components/ui/Spinner';
 import { FiPlus, FiEdit2, FiTrash2, FiX, FiSave, FiPackage } from 'react-icons/fi';
 
 const EMPTY_PRODUCT = {
-  name: '', type: 'test', price: '', salePrice: '',
+  name: '', price: '', salePrice: '',
   description: '', reportTime: '', sampleType: '',
   fastingRequired: false, homeCollection: false, isActive: true,
-  category: '', tags: '',
+  category: '', subcategory: '', tags: '',
 };
 
 export default function LabProductsPage() {
   const [lab, setLab] = useState(null);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null); // product being edited
@@ -32,10 +33,10 @@ export default function LabProductsPage() {
         setLab(labRes.data);
         const [prodRes, catRes] = await Promise.all([
           productApi.getAll({ lab: labRes.data._id, limit: 100 }),
-          categoryApi.getAll({ limit: 100 }),
+          categoryApi.getTopLevel(),
         ]);
         setProducts(prodRes.data.items || []);
-        setCategories(catRes.data.items || catRes.data || []);
+        setCategories(catRes.data.items || []);
       } catch (err) {
         toast.error(getErrorMessage(err));
       } finally {
@@ -52,9 +53,12 @@ export default function LabProductsPage() {
 
   const openAdd = () => { setForm(EMPTY_PRODUCT); setEditing(null); setShowForm(true); };
   const openEdit = (p) => {
+    const catId = p.category?._id || p.category || '';
+    if (catId) {
+      categoryApi.getSubcategories(catId).then((r) => setSubcategories(r.data.items || []));
+    }
     setForm({
       name: p.name || '',
-      type: p.type || 'test',
       price: p.price || '',
       salePrice: p.salePrice || '',
       description: p.description || '',
@@ -63,7 +67,8 @@ export default function LabProductsPage() {
       fastingRequired: p.fastingRequired || false,
       homeCollection: p.homeCollection || false,
       isActive: p.isActive !== false,
-      category: p.category?._id || p.category || '',
+      category: catId,
+      subcategory: p.subcategory?._id || p.subcategory || '',
       tags: (p.tags || []).join(', '),
     });
     setEditing(p);
@@ -83,6 +88,7 @@ export default function LabProductsPage() {
         salePrice: form.salePrice ? Number(form.salePrice) : undefined,
         tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
         category: form.category || undefined,
+        subcategory: form.subcategory || null,
       };
       let res;
       if (editing) {
@@ -149,24 +155,46 @@ export default function LabProductsPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Type pills */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-              <div className="flex gap-2">
-                {['test', 'package', 'medicine'].map((t) => (
-                  <button key={t} type="button"
-                    onClick={() => setForm((f) => ({ ...f, type: t }))}
-                    className={`px-4 py-1.5 text-sm rounded-full border font-medium capitalize transition-colors ${
-                      form.type === t ? 'bg-primary-600 text-white border-primary-600' : 'bg-white border-gray-200 text-gray-600 hover:border-primary-300'
-                    }`}
-                  >{t}</button>
-                ))}
-              </div>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Name <span className="text-accent-500">*</span></label>
               <input name="name" required value={form.name} onChange={handle} className="input" placeholder="e.g. Complete Blood Count (CBC)" />
+            </div>
+
+            {/* Category + Subcategory */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select
+                  name="category"
+                  value={form.category}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm((f) => ({ ...f, category: val, subcategory: '' }));
+                    if (val) {
+                      categoryApi.getSubcategories(val).then((r) => setSubcategories(r.data.items || []));
+                    } else {
+                      setSubcategories([]);
+                    }
+                  }}
+                  className="input"
+                >
+                  <option value="">Select category</option>
+                  {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subcategory</label>
+                <select
+                  name="subcategory"
+                  value={form.subcategory}
+                  onChange={handle}
+                  className="input"
+                  disabled={!form.category || subcategories.length === 0}
+                >
+                  <option value="">Select subcategory</option>
+                  {subcategories.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
+                </select>
+              </div>
             </div>
 
             <div>
@@ -229,15 +257,6 @@ export default function LabProductsPage() {
               />
             </div>
 
-            {categories.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select name="category" value={form.category} onChange={handle} className="input">
-                  <option value="">-- Select category --</option>
-                  {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
-                </select>
-              </div>
-            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tags <span className="text-xs text-gray-400">(comma-separated)</span></label>

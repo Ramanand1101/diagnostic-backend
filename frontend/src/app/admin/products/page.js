@@ -43,19 +43,42 @@ function CsvResultModal({ result, onClose }) {
 }
 
 function ProductForm({ initial, categories, labs, onSave, onClose }) {
-  const [form, setForm] = useState(initial || {
-    name: '', type: 'pathology', category: '', lab: '', price: '', salePrice: '',
-    discountPercent: '', description: '', reportTime: '', sampleType: '',
-    homeCollection: false, fastingRequired: false, isActive: true, isFeatured: false,
+  const [form, setForm] = useState({
+    name: initial?.name || '',
+    category: initial?.category?._id || initial?.category || '',
+    subcategory: initial?.subcategory?._id || initial?.subcategory || '',
+    lab: initial?.lab?._id || initial?.lab || '',
+    price: initial?.price || '',
+    salePrice: initial?.salePrice || '',
+    discountPercent: initial?.discountPercent || '',
+    description: initial?.description || '',
+    reportTime: initial?.reportTime || '',
+    sampleType: initial?.sampleType || '',
+    homeCollection: initial?.homeCollection || false,
+    fastingRequired: initial?.fastingRequired || false,
+    isActive: initial?.isActive ?? true,
+    isFeatured: initial?.isFeatured || false,
   });
+  const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (form.category) {
+      categoryApi.getSubcategories(form.category)
+        .then((r) => setSubcategories(r.data.items || []))
+        .catch(() => setSubcategories([]));
+    } else {
+      setSubcategories([]);
+    }
+  }, [form.category]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      if (initial?._id) await productApi.update(initial._id, form);
-      else await productApi.create(form);
+      const payload = { ...form, subcategory: form.subcategory || null };
+      if (initial?._id) await productApi.update(initial._id, payload);
+      else await productApi.create(payload);
       toast.success(initial ? 'Product updated!' : 'Product created!');
       onSave();
     } catch (err) {
@@ -73,18 +96,24 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
           <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input">
-            <option value="pathology">Pathology</option>
-            <option value="radiology">Radiology</option>
-            <option value="package">Packages</option>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value, subcategory: '' })} className="input">
+            <option value="">Select category</option>
+            {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="input">
-            <option value="">Select category</option>
-            {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Subcategory {subcategories.length === 0 && form.category && <span className="text-xs text-gray-400">(none added yet)</span>}
+          </label>
+          <select
+            value={form.subcategory}
+            onChange={(e) => setForm({ ...form, subcategory: e.target.value })}
+            className="input"
+            disabled={!form.category || subcategories.length === 0}
+          >
+            <option value="">Select subcategory</option>
+            {subcategories.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
           </select>
         </div>
         <div>
@@ -191,7 +220,7 @@ export default function AdminProductsPage() {
 
   const fetchProducts = useCallback(() => {
     setLoading(true);
-    productApi.adminGetAll({ page, limit, q: q || undefined, type: typeFilter || undefined })
+    productApi.adminGetAll({ page, limit, q: q || undefined, category: typeFilter || undefined })
       .then((res) => {
         setProducts(res.data.items || []);
         setTotal(res.data.total || 0);
@@ -203,10 +232,10 @@ export default function AdminProductsPage() {
 
   useEffect(() => {
     Promise.all([
-      categoryApi.getAll({ limit: 100 }),
+      categoryApi.getTopLevel(),
       labApi.getAll({ limit: 100 }),
     ]).then(([cRes, lRes]) => {
-      setCategories(cRes.data.items || cRes.data.categories || []);
+      setCategories(cRes.data.items || []);
       setLabs(lRes.data.items || lRes.data.labs || []);
     });
   }, []);
@@ -329,7 +358,7 @@ export default function AdminProductsPage() {
 
       {/* Type filter tabs */}
       <div className="flex flex-wrap gap-2 items-center">
-        {[{ val: '', label: 'All Types' }, { val: 'pathology', label: 'Pathology' }, { val: 'radiology', label: 'Radiology' }, { val: 'package', label: 'Packages' }].map(({ val, label }) => (
+        {[{ val: '', label: 'All' }, ...categories.map((c) => ({ val: c._id, label: c.name }))].map(({ val, label }) => (
           <button key={val} onClick={() => { setTypeFilter(val); setPage(1); }}
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
               typeFilter === val ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-300'

@@ -3,9 +3,9 @@ const mongoose = require('mongoose');
 const Category = require('../models/Category');
 
 const CATEGORIES = [
-  { name: 'Pathology',  slug: 'pathology',  type: 'pathology',  isActive: true },
-  { name: 'Radiology',  slug: 'radiology',  type: 'radiology',  isActive: true },
-  { name: 'Packages',   slug: 'packages',   type: 'package',    isActive: true },
+  { name: 'Pathology', slug: 'pathology', parent: null, isActive: true },
+  { name: 'Radiology', slug: 'radiology', parent: null, isActive: true },
+  { name: 'Packages',  slug: 'packages',  parent: null, isActive: true },
 ];
 
 (async () => {

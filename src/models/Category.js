@@ -3,9 +3,8 @@ const mongoose = require('mongoose');
 const categorySchema = new mongoose.Schema({
   name: { type: String, required: true },
   slug: { type: String, unique: true, index: true },
-  type: { type: String, enum: ['radiology', 'pathology', 'package'], required: true },
-  seoTitle: String,
-  seoDescription: String,
+  parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null, index: true },
+  description: String,
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
