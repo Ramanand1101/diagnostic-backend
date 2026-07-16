@@ -26,7 +26,13 @@ const bookingSchema = new mongoose.Schema({
   slotDate: Date,
   slotTime: String,
   visitType: { type: String, enum: ['home', 'lab'], default: 'lab' },
-  address: String,
+  address: {
+    line1: String,
+    area: String,
+    city: String,
+    state: String,
+    pincode: String,
+  },
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'assigned', 'collected', 'processing', 'completed', 'cancelled', 'refunded'],

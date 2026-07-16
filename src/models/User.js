@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const addressSchema = new mongoose.Schema({
   label: String,
   line1: String,
+  area: String,
   city: String,
   state: String,
   pincode: String,

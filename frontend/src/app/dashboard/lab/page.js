@@ -30,7 +30,7 @@ function fmtTime(t) {
 }
 
 const EMPTY = {
-  name: '', description: '', address: '', city: '', state: '', pincode: '',
+  name: '', description: '', address: '', area: '', city: '', state: '', pincode: '',
   phone: '', email: '', website: '',
   homeCollection: false, lat: '', lng: '',
   accreditation: '',
@@ -63,6 +63,7 @@ export default function MyLabPage() {
             name: res.data.name || '',
             description: res.data.description || '',
             address: res.data.address || '',
+            area: res.data.area || '',
             city: res.data.city || '',
             state: res.data.state || '',
             pincode: res.data.pincode || '',
@@ -242,21 +243,25 @@ export default function MyLabPage() {
             <FiMapPin className="text-primary-500" /> Address
           </h2>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Street / Area <span className="text-accent-500">*</span></label>
-            <input name="address" required value={form.address} onChange={handle} className="input" placeholder="123 MG Road, Near City Hospital" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Street / Building No. <span className="text-accent-500">*</span></label>
+            <input name="address" required value={form.address} onChange={handle} className="input" placeholder="e.g. Shop 12, Civil Lines Road" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Area / Locality</label>
+            <input name="area" value={form.area} onChange={handle} className="input" placeholder="e.g. Gomti Nagar, Hazratganj" />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">City <span className="text-accent-500">*</span></label>
-              <input name="city" required value={form.city} onChange={handle} className="input" placeholder="Mumbai" />
+              <input name="city" required value={form.city} onChange={handle} className="input" placeholder="Lucknow" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-              <input name="state" value={form.state} onChange={handle} className="input" placeholder="Maharashtra" />
+              <input name="state" value={form.state} onChange={handle} className="input" placeholder="Uttar Pradesh" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
-              <input name="pincode" value={form.pincode} onChange={handle} className="input" placeholder="400001" maxLength={6} />
+              <input name="pincode" value={form.pincode} onChange={handle} className="input" placeholder="226010" maxLength={6} />
             </div>
           </div>
           <div className="space-y-2">

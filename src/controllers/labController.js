@@ -4,6 +4,33 @@ const { syncObjects, deleteObject } = require('../services/algoliaSync');
 const makeSlug = require('../utils/slug');
 const { parseCSV } = require('../utils/csvParser');
 
+function labRecord(lab) {
+  return {
+    objectID: String(lab._id),
+    id: String(lab._id),
+    name: lab.name,
+    slug: lab.slug,
+    city: lab.city || '',
+    state: lab.state || '',
+    address: lab.address || '',
+    area: lab.area || '',
+    pincode: lab.pincode || '',
+    phone: lab.phone || '',
+    description: lab.description || '',
+    ratingAvg: lab.ratingAvg || 0,
+    reviewCount: lab.reviewCount || 0,
+    homeCollection: !!lab.homeCollection,
+    approved: !!lab.approved,
+    featured: !!lab.featured,
+    verificationStatus: lab.verificationStatus || 'pending',
+    sampleCollectionTime: lab.sampleCollectionTime || '',
+    reportDeliveryTime: lab.reportDeliveryTime || '',
+    accreditation: lab.accreditation || [],
+    badges: lab.badges || [],
+    _geoloc: (lab.lat && lab.lng) ? { lat: lab.lat, lng: lab.lng } : undefined,
+  };
+}
+
 exports.getCities = asyncHandler(async (req, res) => {
   const cities = await Lab.distinct('city', { approved: true });
   const sorted = cities.filter(Boolean).sort((a, b) => a.localeCompare(b));
@@ -41,25 +68,7 @@ exports.createLab = asyncHandler(async (req, res) => {
   if (req.user.role === 'lab') req.body.owner = req.user._id;
   const lab = await Lab.create(req.body);
   console.log('Created Lab:', lab);
-  await syncObjects('labs', [{
-    objectID: String(lab._id),
-    id: String(lab._id),
-    name: lab.name,
-    slug: lab.slug,
-    city: lab.city,
-    address: lab.address,
-    description: lab.description || '',
-    ratingAvg: lab.ratingAvg || 0,
-    reviewCount: lab.reviewCount || 0,
-    homeCollection: !!lab.homeCollection,
-    approved: !!lab.approved,
-    featured: !!lab.featured,
-    sampleCollectionTime: lab.sampleCollectionTime || '',
-    reportDeliveryTime: lab.reportDeliveryTime || '',
-    accreditation: lab.accreditation || [],
-    badges: lab.badges || [],
-    _geoloc: (lab.lat && lab.lng) ? { lat: lab.lat, lng: lab.lng } : undefined
-  }]);
+  await syncObjects('labs', [labRecord(lab)]);
   res.status(201).json(lab);
 });
 
@@ -74,25 +83,7 @@ exports.updateLab = asyncHandler(async (req, res) => {
 
   const lab = await Lab.findOneAndUpdate(filter, payload, { new: true, runValidators: true });
   if (!lab) return res.status(req.user.role === 'lab' ? 403 : 404).json({ message: req.user.role === 'lab' ? 'Not your lab' : 'Lab not found' });
-  await syncObjects('labs', [{
-    objectID: String(lab._id),
-    id: String(lab._id),
-    name: lab.name,
-    slug: lab.slug,
-    city: lab.city,
-    address: lab.address,
-    description: lab.description || '',
-    ratingAvg: lab.ratingAvg || 0,
-    reviewCount: lab.reviewCount || 0,
-    homeCollection: !!lab.homeCollection,
-    approved: !!lab.approved,
-    featured: !!lab.featured,
-    sampleCollectionTime: lab.sampleCollectionTime || '',
-    reportDeliveryTime: lab.reportDeliveryTime || '',
-    accreditation: lab.accreditation || [],
-    badges: lab.badges || [],
-    _geoloc: (lab.lat && lab.lng) ? { lat: lab.lat, lng: lab.lng } : undefined
-  }]);
+  await syncObjects('labs', [labRecord(lab)]);
   res.json(lab);
 });
 
@@ -102,6 +93,7 @@ exports.approveLab = asyncHandler(async (req, res) => {
     verificationStatus: 'verified'
   }, { new: true });
   if (!lab) return res.status(404).json({ message: 'Lab not found' });
+  await syncObjects('labs', [labRecord(lab)]);
   res.json(lab);
 });
 
@@ -111,25 +103,7 @@ exports.rejectLab = asyncHandler(async (req, res) => {
     verificationStatus: 'rejected'
   }, { new: true });
   if (!lab) return res.status(404).json({ message: 'Lab not found' });
-  await syncObjects('labs', [{
-    objectID: String(lab._id),
-    id: String(lab._id),
-    name: lab.name,
-    slug: lab.slug,
-    city: lab.city,
-    address: lab.address,
-    description: lab.description || '',
-    ratingAvg: lab.ratingAvg || 0,
-    reviewCount: lab.reviewCount || 0,
-    homeCollection: !!lab.homeCollection,
-    approved: !!lab.approved,
-    featured: !!lab.featured,
-    sampleCollectionTime: lab.sampleCollectionTime || '',
-    reportDeliveryTime: lab.reportDeliveryTime || '',
-    accreditation: lab.accreditation || [],
-    badges: lab.badges || [],
-    _geoloc: (lab.lat && lab.lng) ? { lat: lab.lat, lng: lab.lng } : undefined
-  }]);
+  await syncObjects('labs', [labRecord(lab)]);
   res.json(lab);
 });
 
@@ -184,9 +158,11 @@ exports.bulkUploadLabsCsv = asyncHandler(async (req, res) => {
       const slug = makeSlug(`${row.name}-${row.city || ''}-${Date.now()}`);
       const lab = await Lab.create({
         name: row.name,
+        address: row.address || '',
+        area: row.area || row.locality || '',
         city: row.city || '',
         state: row.state || '',
-        address: row.address || '',
+        pincode: row.pincode || '',
         phone: row.phone || '',
         email: row.email || '',
         homeCollection: row.homecollection === 'true' || row.homecollection === '1',
@@ -196,6 +172,7 @@ exports.bulkUploadLabsCsv = asyncHandler(async (req, res) => {
         approved: true,
         verificationStatus: 'verified',
       });
+      await syncObjects('labs', [labRecord(lab)]);
       created.push(lab._id);
     } catch (err) {
       errors.push({ row: i + 2, error: err.message });

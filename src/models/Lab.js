@@ -11,6 +11,7 @@ const labSchema = new mongoose.Schema({
   slug: { type: String, unique: true, index: true },
   description: String,
   address: String,
+  area: String,
   city: { type: String, index: true },
   state: String,
   pincode: String,

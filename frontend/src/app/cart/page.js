@@ -249,8 +249,9 @@ function PincodeField({ pincode, onChange, groups, onValidated }) {
 const FORM_KEY = (uid) => `cart_form_${uid || 'guest'}`;
 const DEFAULT_FORM = {
   patientName: '', patientAge: '', patientGender: 'male',
-  phone: '', email: '', pincode: '', slotDate: '', slotTime: '',
-  visitType: 'lab', address: '',
+  phone: '', email: '', slotDate: '', slotTime: '',
+  visitType: 'lab',
+  addressLine1: '', addressArea: '', addressCity: '', addressState: '', addressPincode: '',
 };
 
 function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
@@ -275,6 +276,7 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
       }
     } catch {}
 
+    const firstAddr = user?.addresses?.[0];
     setForm({
       ...DEFAULT_FORM,
       ...saved,
@@ -282,6 +284,11 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
         patientName: saved.patientName || user.name || '',
         phone: user.mobile || saved.phone || '',
         email: user.email || saved.email || '',
+        addressLine1: saved.addressLine1 || firstAddr?.line1 || '',
+        addressArea: saved.addressArea || firstAddr?.area || '',
+        addressCity: saved.addressCity || firstAddr?.city || '',
+        addressState: saved.addressState || firstAddr?.state || '',
+        addressPincode: saved.addressPincode || firstAddr?.pincode || '',
       } : {}),
     });
     setInitialized(true);
@@ -307,7 +314,8 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
     if (form.email && !EMAIL_RE.test(form.email)) {
       toast.error('Please enter a valid email address.'); return;
     }
-    if (!pincodeValid) { toast.error('Please enter a valid pincode first'); return; }
+    if (form.visitType === 'home' && !form.addressPincode) { toast.error('Please enter pincode for home collection'); return; }
+    if (form.visitType === 'home' && !/^\d{6}$/.test(form.addressPincode)) { toast.error('Please enter a valid 6-digit pincode'); return; }
 
     setSubmitting(true);
 
@@ -361,11 +369,16 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
             phone: form.phone,
             email: form.email,
           }],
-          pincode: form.pincode,
           slotDate: form.slotDate,
           slotTime: form.slotTime,
           visitType: form.visitType,
-          address: form.address,
+          address: form.visitType === 'home' ? {
+            line1: form.addressLine1,
+            area: form.addressArea,
+            city: form.addressCity,
+            state: form.addressState,
+            pincode: form.addressPincode,
+          } : undefined,
           subtotal,
           total: subtotal,
           paymentMethod: 'cash',
@@ -459,14 +472,16 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
             {hasHome && <option value="home">Home Collection</option>}
           </select>
         </div>
-        <div>
-          <PincodeField
-            pincode={form.pincode}
-            onChange={(v) => setForm((f) => ({ ...f, pincode: v }))}
-            groups={groups}
-            onValidated={setPincodeValid}
-          />
-        </div>
+        {form.visitType === 'home' && (
+          <div>
+            <PincodeField
+              pincode={form.addressPincode}
+              onChange={(v) => setForm((f) => ({ ...f, addressPincode: v }))}
+              groups={groups}
+              onValidated={setPincodeValid}
+            />
+          </div>
+        )}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Preferred Date <span className="text-red-500">*</span></label>
           <input required type="date" min={today} value={form.slotDate} onChange={F('slotDate')} className="input text-sm" />
@@ -494,9 +509,26 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
 
       {/* Address for home collection */}
       {form.visitType === 'home' && (
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Collection Address <span className="text-red-500">*</span></label>
-          <textarea required rows={2} value={form.address} onChange={F('address')} className="input text-sm resize-none" placeholder="Full address for sample collection" />
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-gray-700">Collection Address <span className="text-red-500">*</span></p>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Street / Flat No.</label>
+            <input required value={form.addressLine1} onChange={F('addressLine1')} className="input text-sm" placeholder="e.g. Flat 12, MG Road" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Area / Locality</label>
+            <input value={form.addressArea} onChange={F('addressArea')} className="input text-sm" placeholder="e.g. Gomti Nagar" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+              <input required value={form.addressCity} onChange={F('addressCity')} className="input text-sm" placeholder="Lucknow" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+              <input value={form.addressState} onChange={F('addressState')} className="input text-sm" placeholder="Uttar Pradesh" />
+            </div>
+          </div>
         </div>
       )}
 

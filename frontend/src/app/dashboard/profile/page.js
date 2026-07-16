@@ -10,7 +10,7 @@ import {
   FiSave, FiPlus, FiTrash2, FiEdit2, FiCheck, FiX, FiLock, FiEye, FiEyeOff,
 } from 'react-icons/fi';
 
-const EMPTY_ADDRESS = { label: 'Home', line1: '', city: '', state: '', pincode: '' };
+const EMPTY_ADDRESS = { label: 'Home', line1: '', area: '', city: '', state: '', pincode: '' };
 
 export default function ProfilePage() {
   const { user, login } = useAuth();
@@ -287,6 +287,7 @@ export default function ProfilePage() {
                 <div className="space-y-0.5">
                   <span className="badge bg-primary-50 text-primary-700 text-xs">{addr.label || 'Address'}</span>
                   <p className="text-sm font-medium text-gray-800 mt-1">{addr.line1}</p>
+                  {addr.area && <p className="text-xs text-gray-600">{addr.area}</p>}
                   <p className="text-xs text-gray-500">
                     {[addr.city, addr.state, addr.pincode].filter(Boolean).join(', ')}
                   </p>
@@ -432,24 +433,29 @@ function AddressForm({ draft, onChange, onSave, onCancel }) {
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Street / Flat / Area <span className="text-accent-500">*</span></label>
-        <input name="line1" value={draft.line1} onChange={onChange} className="input text-sm" placeholder="e.g. 123 MG Road, Near Bus Stand" />
+        <label className="block text-xs font-medium text-gray-600 mb-1">Street / Flat No. <span className="text-accent-500">*</span></label>
+        <input name="line1" value={draft.line1} onChange={onChange} className="input text-sm" placeholder="e.g. Flat 12, MG Road" />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Area / Locality</label>
+        <input name="area" value={draft.area || ''} onChange={onChange} className="input text-sm" placeholder="e.g. Gomti Nagar, Hazratganj" />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">City <span className="text-accent-500">*</span></label>
-          <input name="city" value={draft.city} onChange={onChange} className="input text-sm" placeholder="Mumbai" />
+          <input name="city" value={draft.city} onChange={onChange} className="input text-sm" placeholder="Lucknow" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
-          <input name="state" value={draft.state} onChange={onChange} className="input text-sm" placeholder="Maharashtra" />
+          <input name="state" value={draft.state} onChange={onChange} className="input text-sm" placeholder="Uttar Pradesh" />
         </div>
       </div>
 
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">Pincode</label>
-        <input name="pincode" value={draft.pincode} onChange={onChange} className="input text-sm" placeholder="400001" maxLength={6} />
+        <input name="pincode" value={draft.pincode} onChange={onChange} className="input text-sm" placeholder="226010" maxLength={6} />
       </div>
 
       <div className="flex gap-2 pt-1">
