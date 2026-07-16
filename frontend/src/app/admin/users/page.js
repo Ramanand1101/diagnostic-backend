@@ -14,8 +14,8 @@ export default function AdminUsersPage() {
   const [total, setTotal] = useState(0);
   const [roleFilter, setRoleFilter] = useState('');
   const [q, setQ] = useState('');
+  const [limit, setLimit] = useState(20);
   const searchTimer = useRef(null);
-  const limit = 20;
 
   const fetchUsers = useCallback(() => {
     setLoading(true);
@@ -27,7 +27,7 @@ export default function AdminUsersPage() {
         setTotal(res.data.total || 0);
       })
       .finally(() => setLoading(false));
-  }, [page, roleFilter, q]);
+  }, [page, limit, roleFilter, q]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
@@ -126,7 +126,7 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
-      <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
+      <Pagination page={page} total={total} limit={limit} onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />
     </div>
   );
 }

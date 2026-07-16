@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
 
 function CategoryForm({ initial, onSave, onClose }) {
-  const [form, setForm] = useState(initial || { name: '', type: 'test', seoTitle: '', seoDescription: '', isActive: true });
+  const [form, setForm] = useState(initial || { name: '', type: 'pathology', seoTitle: '', seoDescription: '', isActive: true });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -31,9 +31,9 @@ function CategoryForm({ initial, onSave, onClose }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
         <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input">
-          <option value="test">Test</option>
-          <option value="package">Package</option>
-          <option value="medicine">Medicine</option>
+          <option value="pathology">Pathology</option>
+          <option value="radiology">Radiology</option>
+          <option value="package">Packages</option>
         </select>
       </div>
       <div>

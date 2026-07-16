@@ -224,6 +224,7 @@ exports.bulkUpdatePrice = asyncHandler(async (req, res) => {
 // GET /api/v1/products/admin — lists ALL products (including inactive) for admin
 exports.adminListProducts = asyncHandler(async (req, res) => {
   const { q, lab, category, type, isActive, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const filter = {};
   if (type) filter.type = type;
   if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }];
@@ -231,12 +232,12 @@ exports.adminListProducts = asyncHandler(async (req, res) => {
   if (lab) filter.lab = lab;
   if (isActive !== undefined) filter.isActive = isActive === 'true';
 
-  const skip = (Number(page) - 1) * Number(limit);
+  const skip = (Number(page) - 1) * safeLimit;
   const [items, total] = await Promise.all([
-    Product.find(filter).populate('lab', 'name city').populate('category', 'name').sort(sort).skip(skip).limit(Number(limit)),
+    Product.find(filter).populate('lab', 'name city').populate('category', 'name').sort(sort).skip(skip).limit(safeLimit),
     Product.countDocuments(filter),
   ]);
-  res.json({ items, page: Number(page), limit: Number(limit), total });
+  res.json({ items, page: Number(page), limit: safeLimit, total });
 });
 
 // GET /api/v1/products/demo-csv — public template download

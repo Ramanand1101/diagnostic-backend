@@ -44,7 +44,7 @@ function CsvResultModal({ result, onClose }) {
 
 function ProductForm({ initial, categories, labs, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
-    name: '', type: 'test', category: '', lab: '', price: '', salePrice: '',
+    name: '', type: 'pathology', category: '', lab: '', price: '', salePrice: '',
     discountPercent: '', description: '', reportTime: '', sampleType: '',
     homeCollection: false, fastingRequired: false, isActive: true, isFeatured: false,
   });
@@ -75,9 +75,9 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
           <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input">
-            <option value="test">Test</option>
-            <option value="package">Package</option>
-            <option value="medicine">Medicine</option>
+            <option value="pathology">Pathology</option>
+            <option value="radiology">Radiology</option>
+            <option value="package">Packages</option>
           </select>
         </div>
         <div>
@@ -185,9 +185,9 @@ export default function AdminProductsPage() {
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
   const [selected, setSelected] = useState(new Set());
+  const [limit, setLimit] = useState(20);
   const csvInputRef = useRef(null);
   const searchTimer = useRef(null);
-  const limit = 20;
 
   const fetchProducts = useCallback(() => {
     setLoading(true);
@@ -197,7 +197,7 @@ export default function AdminProductsPage() {
         setTotal(res.data.total || 0);
       })
       .finally(() => setLoading(false));
-  }, [page, q, typeFilter]);
+  }, [page, limit, q, typeFilter]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
@@ -329,12 +329,12 @@ export default function AdminProductsPage() {
 
       {/* Type filter tabs */}
       <div className="flex flex-wrap gap-2 items-center">
-        {['', 'test', 'package', 'medicine'].map((t) => (
-          <button key={t} onClick={() => { setTypeFilter(t); setPage(1); }}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full capitalize transition-colors ${
-              typeFilter === t ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-300'
+        {[{ val: '', label: 'All Types' }, { val: 'pathology', label: 'Pathology' }, { val: 'radiology', label: 'Radiology' }, { val: 'package', label: 'Packages' }].map(({ val, label }) => (
+          <button key={val} onClick={() => { setTypeFilter(val); setPage(1); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+              typeFilter === val ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-300'
             }`}>
-            {t || 'All Types'}
+            {label}
           </button>
         ))}
         <span className="ml-auto text-xs text-gray-400">{total} total</span>
@@ -388,7 +388,7 @@ export default function AdminProductsPage() {
           </div>
         </div>
       )}
-      <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
+      <Pagination page={page} total={total} limit={limit} onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); setSelected(new Set()); }} />
 
       <Modal open={!!modal && (modal.type === 'add' || modal.type === 'edit')} onClose={() => setModal(null)} title={modal?.type === 'add' ? 'Add Product' : 'Edit Product'} size="lg">
         <ProductForm

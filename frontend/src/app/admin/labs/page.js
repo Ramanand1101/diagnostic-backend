@@ -211,9 +211,9 @@ export default function AdminLabsPage() {
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
   const [selected, setSelected] = useState(new Set());
+  const [limit, setLimit] = useState(20);
   const csvInputRef = useRef(null);
   const searchTimer = useRef(null);
-  const limit = 20;
 
   const fetchLabs = useCallback(() => {
     setLoading(true);
@@ -226,7 +226,7 @@ export default function AdminLabsPage() {
         setTotal(res.data.total || 0);
       })
       .finally(() => setLoading(false));
-  }, [page, filterStatus, filterFeatured, q]);
+  }, [page, limit, filterStatus, filterFeatured, q]);
 
   useEffect(() => { fetchLabs(); }, [fetchLabs]);
 
@@ -417,7 +417,7 @@ export default function AdminLabsPage() {
         </div>
       )}
 
-      <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
+      <Pagination page={page} total={total} limit={limit} onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); setSelected(new Set()); }} />
 
       <Modal open={modal?.type === 'view'} onClose={() => setModal(null)} title="Lab Details" size="md">
         {modal?.lab && (

@@ -39,6 +39,7 @@ exports.getCities = asyncHandler(async (req, res) => {
 
 exports.listLabs = asyncHandler(async (req, res) => {
   const { q, city, approved, featured, homeCollection, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const filter = {};
   if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { city: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }];
   if (city) filter.city = new RegExp(city, 'i');
@@ -46,10 +47,10 @@ exports.listLabs = asyncHandler(async (req, res) => {
   if (featured !== undefined) filter.featured = featured === 'true';
   if (homeCollection !== undefined) filter.homeCollection = homeCollection === 'true';
 
-  const skip = (Number(page) - 1) * Number(limit);
-  const items = await Lab.find(filter).sort(sort).skip(skip).limit(Number(limit));
+  const skip = (Number(page) - 1) * safeLimit;
+  const items = await Lab.find(filter).sort(sort).skip(skip).limit(safeLimit);
   const total = await Lab.countDocuments(filter);
-  res.json({ items, page: Number(page), limit: Number(limit), total });
+  res.json({ items, page: Number(page), limit: safeLimit, total });
 });
 
 exports.getLabBySlug = asyncHandler(async (req, res) => {

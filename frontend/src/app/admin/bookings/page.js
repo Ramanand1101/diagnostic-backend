@@ -79,8 +79,8 @@ export default function AdminBookingsPage() {
   const [viewBooking, setViewBooking] = useState(null);
   const [editBooking, setEditBooking] = useState(null);
   const [newStatus, setNewStatus] = useState('');
+  const [limit, setLimit] = useState(20);
   const searchTimer = useRef(null);
-  const limit = 20;
 
   const fetchBookings = useCallback(() => {
     setLoading(true);
@@ -92,7 +92,7 @@ export default function AdminBookingsPage() {
         setTotal(res.data.total || 0);
       })
       .finally(() => setLoading(false));
-  }, [page, statusFilter, q, showDeleted]);
+  }, [page, limit, statusFilter, q, showDeleted]);
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
@@ -233,7 +233,7 @@ export default function AdminBookingsPage() {
           </div>
         </div>
       )}
-      <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
+      <Pagination page={page} total={total} limit={limit} onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />
 
       {/* View/Status Modal */}
       <Modal open={!!viewBooking} onClose={() => setViewBooking(null)} title={`Booking #${viewBooking?.bookingNo}`}>

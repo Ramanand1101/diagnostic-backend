@@ -74,6 +74,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
 exports.listBookings = asyncHandler(async (req, res) => {
   const { status, lab, q, deleted, page = 1, limit = 20 } = req.query;
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const filter = { isDeleted: deleted === 'true' };
   if (status) filter.status = status;
   if (q) filter.bookingNo = new RegExp(q, 'i');
@@ -88,10 +89,10 @@ exports.listBookings = asyncHandler(async (req, res) => {
     if (lab) filter.lab = lab;
   }
 
-  const skip = (Number(page) - 1) * Number(limit);
-  const items = await Booking.find(filter).populate('user lab items.product').sort('-createdAt').skip(skip).limit(Number(limit));
+  const skip = (Number(page) - 1) * safeLimit;
+  const items = await Booking.find(filter).populate('user lab items.product').sort('-createdAt').skip(skip).limit(safeLimit);
   const total = await Booking.countDocuments(filter);
-  res.json({ items, page: Number(page), limit: Number(limit), total });
+  res.json({ items, page: Number(page), limit: safeLimit, total });
 });
 
 exports.getBooking = asyncHandler(async (req, res) => {
