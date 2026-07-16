@@ -181,6 +181,35 @@ export const settingApi = {
   update: (id, data) => api.put(`/settings/${id}`, data),
 };
 
+// CRM
+export const crmApi = {
+  stats: () => api.get('/crm/stats'),
+  patientList: (params) => api.get('/crm/patients', { params }),
+  patientDetail: (id) => api.get(`/crm/patients/${id}`),
+};
+
+export const leadApi = {
+  getAll: (params) => api.get('/leads', { params }),
+  create: (data) => api.post('/leads', data),
+  update: (id, data) => api.put(`/leads/${id}`, data),
+  convert: (id, data) => api.patch(`/leads/${id}/convert`, data),
+  delete: (id) => api.delete(`/leads/${id}`),
+};
+
+export const referralDoctorApi = {
+  getAll: (params) => api.get('/referral-doctors', { params }),
+  create: (data) => api.post('/referral-doctors', data),
+  update: (id, data) => api.put(`/referral-doctors/${id}`, data),
+  delete: (id) => api.delete(`/referral-doctors/${id}`),
+};
+
+export const followUpApi = {
+  getAll: (params) => api.get('/follow-ups', { params }),
+  create: (data) => api.post('/follow-ups', data),
+  update: (id, data) => api.put(`/follow-ups/${id}`, data),
+  delete: (id) => api.delete(`/follow-ups/${id}`),
+};
+
 // Dashboard
 export const dashboardApi = {
   getStats: () => api.get('/dashboard/stats'),

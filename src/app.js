@@ -27,6 +27,10 @@ const emailRoutes = require('./routes/emailRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const heroSlideRoutes = require('./routes/heroSlideRoutes');
 const brandRoutes = require('./routes/brandRoutes');
+const crmRoutes = require('./routes/crmRoutes');
+const leadRoutes = require('./routes/leadRoutes');
+const referralDoctorRoutes = require('./routes/referralDoctorRoutes');
+const followUpRoutes = require('./routes/followUpRoutes');
 
 const app = express();
 
@@ -66,6 +70,10 @@ app.use('/api/v1/email', emailRoutes);
 app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/hero-slides', heroSlideRoutes);
 app.use('/api/v1/brands', brandRoutes);
+app.use('/api/v1/crm', crmRoutes);
+app.use('/api/v1/leads', leadRoutes);
+app.use('/api/v1/referral-doctors', referralDoctorRoutes);
+app.use('/api/v1/follow-ups', followUpRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
