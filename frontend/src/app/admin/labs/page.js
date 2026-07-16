@@ -14,7 +14,7 @@ import {
 
 function LabForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
-    name: '', address: '', area: '', city: '', state: '', pincode: '',
+    name: '', brand: '', address: '', area: '', city: '', state: '', pincode: '',
     phone: '', email: '', homeCollection: false, featured: false, description: '',
   });
   const [loading, setLoading] = useState(false);
@@ -37,9 +37,18 @@ function LabForm({ initial, onSave, onClose }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Lab Name *</label>
-        <input required value={form.name} onChange={(e) => set('name', e.target.value)} className="input" placeholder="e.g. Apollo Diagnostics" />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Lab Name *</label>
+          <input required value={form.name} onChange={(e) => set('name', e.target.value)} className="input" placeholder="e.g. Apollo Gomti Nagar" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Brand / Chain
+            <span className="text-xs text-gray-400 font-normal ml-1">(for multi-branch)</span>
+          </label>
+          <input value={form.brand || ''} onChange={(e) => set('brand', e.target.value)} className="input" placeholder="e.g. Apollo Diagnostics" />
+        </div>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Street / Building No.</label>
@@ -207,6 +216,7 @@ export default function AdminLabsPage() {
   const [modal, setModal] = useState(null);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterFeatured, setFilterFeatured] = useState(false);
+  const [filterBrand, setFilterBrand] = useState('');
   const [q, setQ] = useState('');
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
@@ -220,13 +230,14 @@ export default function AdminLabsPage() {
     const params = { page, limit, q: q || undefined };
     if (filterStatus) params.approved = filterStatus === 'approved';
     if (filterFeatured) params.featured = 'true';
+    if (filterBrand) params.brand = filterBrand;
     labApi.getAll(params)
       .then((res) => {
         setLabs(res.data.items || res.data.labs || []);
         setTotal(res.data.total || 0);
       })
       .finally(() => setLoading(false));
-  }, [page, limit, filterStatus, filterFeatured, q]);
+  }, [page, limit, filterStatus, filterFeatured, filterBrand, q]);
 
   useEffect(() => { fetchLabs(); }, [fetchLabs]);
 
@@ -356,6 +367,19 @@ export default function AdminLabsPage() {
           }`}>
           <FiStar /> Top Labs Only
         </button>
+        {/* Brand filter */}
+        <div className="flex items-center gap-2 ml-2">
+          <input
+            type="text"
+            placeholder="Filter by brand..."
+            value={filterBrand}
+            onChange={(e) => { setFilterBrand(e.target.value); setPage(1); }}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 w-44"
+          />
+          {filterBrand && (
+            <button onClick={() => { setFilterBrand(''); setPage(1); }} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
+          )}
+        </div>
         <span className="ml-auto text-xs text-gray-400">{total} total</span>
       </div>
 
@@ -369,6 +393,7 @@ export default function AdminLabsPage() {
                     <input type="checkbox" checked={labs.length > 0 && selected.size === labs.length} onChange={toggleAll} className="rounded" />
                   </th>
                   <th className="table-header">Name</th>
+                  <th className="table-header">Brand / Chain</th>
                   <th className="table-header">City</th>
                   <th className="table-header">Status</th>
                   <th className="table-header">Home Collection</th>
@@ -383,7 +408,19 @@ export default function AdminLabsPage() {
                     <td className="table-cell">
                       <input type="checkbox" checked={selected.has(lab._id)} onChange={() => toggleSelect(lab._id)} className="rounded" />
                     </td>
-                    <td className="table-cell font-medium">{lab.name}</td>
+                    <td className="table-cell font-medium">
+                      <div>{lab.name}</div>
+                    </td>
+                    <td className="table-cell">
+                      {lab.brand ? (
+                        <button
+                          onClick={() => { setFilterBrand(lab.brand); setPage(1); }}
+                          className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full hover:bg-primary-100 transition-colors"
+                        >
+                          {lab.brand}
+                        </button>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
                     <td className="table-cell">{lab.city}</td>
                     <td className="table-cell"><Badge status={lab.verificationStatus} /></td>
                     <td className="table-cell">{lab.homeCollection ? 'Yes' : 'No'}</td>
@@ -409,7 +446,7 @@ export default function AdminLabsPage() {
                   </tr>
                 ))}
                 {labs.length === 0 && (
-                  <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-10">No labs found</td></tr>
+                  <tr><td colSpan={9} className="table-cell text-center text-gray-400 py-10">No labs found</td></tr>
                 )}
               </tbody>
             </table>

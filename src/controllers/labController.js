@@ -38,11 +38,12 @@ exports.getCities = asyncHandler(async (req, res) => {
 });
 
 exports.listLabs = asyncHandler(async (req, res) => {
-  const { q, city, approved, featured, homeCollection, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const { q, city, approved, featured, homeCollection, brand, page = 1, limit = 20, sort = '-createdAt' } = req.query;
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const filter = {};
-  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { city: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }];
+  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { city: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }, { brand: new RegExp(q, 'i') }];
   if (city) filter.city = new RegExp(city, 'i');
+  if (brand) filter.brand = new RegExp(brand, 'i');
   if (approved !== undefined) filter.approved = approved === 'true';
   if (featured !== undefined) filter.featured = featured === 'true';
   if (homeCollection !== undefined) filter.homeCollection = homeCollection === 'true';
