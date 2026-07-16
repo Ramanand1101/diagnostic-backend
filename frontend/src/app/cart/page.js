@@ -34,7 +34,33 @@ const SLOT_GROUPS = [
   { label: 'Evening Slots', emoji: '🌙', color: 'text-indigo-600', slots: EVENING_SLOTS },
 ];
 
-function TimeSlotPicker({ value, onChange }) {
+// Returns true if the slot's start time has already passed (only for today's date)
+function isSlotPast(slot, slotDate) {
+  if (!slotDate) return false;
+  const today = new Date().toISOString().split('T')[0];
+  if (slotDate !== today) return false;
+
+  // Parse slot start — e.g. '06:00 AM – 07:00 AM' → '06:00 AM'
+  const startStr = slot.split('–')[0].trim();
+  const [timePart, period] = startStr.split(' ');
+  let [hours, minutes] = timePart.split(':').map(Number);
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  const slotMinutes = hours * 60 + minutes;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  return slotMinutes <= currentMinutes; // disable if start time already passed
+}
+
+function TimeSlotPicker({ value, onChange, slotDate }) {
+  // Clear selected slot if it has become past (e.g. date changed to today)
+  useEffect(() => {
+    if (value && isSlotPast(value, slotDate)) {
+      onChange('');
+    }
+  }, [slotDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="space-y-4">
       <label className="block text-xs font-medium text-gray-700">
@@ -47,20 +73,27 @@ function TimeSlotPicker({ value, onChange }) {
             <span>{emoji}</span> {label}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {slots.map((slot) => (
-              <button
-                key={slot}
-                type="button"
-                onClick={() => onChange(slot)}
-                className={`text-xs px-2 py-2 rounded-lg border font-medium transition-all text-center ${
-                  value === slot
-                    ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                    : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600'
-                }`}
-              >
-                {slot}
-              </button>
-            ))}
+            {slots.map((slot) => {
+              const past = isSlotPast(slot, slotDate);
+              return (
+                <button
+                  key={slot}
+                  type="button"
+                  disabled={past}
+                  onClick={() => onChange(slot)}
+                  title={past ? 'This slot has already passed' : ''}
+                  className={`text-xs px-2 py-2 rounded-lg border font-medium transition-all text-center leading-tight ${
+                    past
+                      ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed line-through'
+                      : value === slot
+                        ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600'
+                  }`}
+                >
+                  {slot}
+                </button>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -441,6 +474,7 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
         <TimeSlotPicker
           value={form.slotTime}
           onChange={(v) => setForm((f) => ({ ...f, slotTime: v }))}
+          slotDate={form.slotDate}
         />
         {/* hidden required field so form validation still works */}
         <input
