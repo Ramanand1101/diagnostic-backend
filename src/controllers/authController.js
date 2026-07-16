@@ -79,13 +79,13 @@ exports.login = asyncHandler(async (req, res) => {
     $or: [{ email: emailOrMobile }, { mobile: emailOrMobile }]
   }).select('+password');
 
-  if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+  if (!user || !user.password) return res.status(401).json({ message: 'Invalid credentials' });
 
   const ok = await user.matchPassword(password);
   if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
 
-  user.lastLoginAt = new Date();
-  await user.save();
+  // Non-blocking — don't let lastLoginAt update cause a 500
+  User.updateOne({ _id: user._id }, { lastLoginAt: new Date() }).catch(() => {});
 
   const token = signToken(user);
   res.json({

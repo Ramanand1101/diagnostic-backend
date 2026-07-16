@@ -33,6 +33,7 @@ export default function ProfilePage() {
   const [manualAddress, setManualAddress] = useState(user?.location?.address || '');
 
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [pwLoading, setPwLoading] = useState(false);
@@ -63,14 +64,29 @@ export default function ProfilePage() {
   const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.(com|co\.in|co|in|net|info|ai)$/i;
   const MOBILE_RE = /^[6-9]\d{9}$/;
 
+  const validateField = (name, value) => {
+    if (!value) return '';
+    if ((name === 'email' || name === 'alternateEmail') && !EMAIL_RE.test(value))
+      return 'Invalid email. Allowed: .com .co .in .co.in .net .info .ai';
+    if ((name === 'mobile' || name === 'alternateMobile') && !MOBILE_RE.test(value))
+      return 'Must be exactly 10 digits and start with 6–9';
+    return '';
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Strip non-digits and cap at 10 for phone fields
-    if (name === 'mobile' || name === 'alternateMobile') {
-      setForm({ ...form, [name]: value.replace(/\D/g, '').slice(0, 10) });
-    } else {
-      setForm({ ...form, [name]: value });
-    }
+    const cleaned = (name === 'mobile' || name === 'alternateMobile')
+      ? value.replace(/\D/g, '').slice(0, 10)
+      : value;
+    setForm({ ...form, [name]: cleaned });
+    // Clear error while user is fixing it
+    if (fieldErrors[name]) setFieldErrors({ ...fieldErrors, [name]: '' });
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    const err = validateField(name, value);
+    setFieldErrors((prev) => ({ ...prev, [name]: err }));
   };
   const handleDraftChange = (e) => setAddressDraft({ ...addressDraft, [e.target.name]: e.target.value });
 
@@ -133,17 +149,16 @@ export default function ProfilePage() {
   // ── Save profile ───────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (form.email && !EMAIL_RE.test(form.email)) {
-      toast.error('Please enter a valid email address.'); return;
-    }
-    if (form.alternateEmail && !EMAIL_RE.test(form.alternateEmail)) {
-      toast.error('Please enter a valid alternate email address.'); return;
-    }
-    if (form.mobile && !MOBILE_RE.test(form.mobile)) {
-      toast.error('Mobile number must be exactly 10 digits and start with 6–9.'); return;
-    }
-    if (form.alternateMobile && !MOBILE_RE.test(form.alternateMobile)) {
-      toast.error('Alternate mobile must be exactly 10 digits and start with 6–9.'); return;
+    // Validate all fields and show ALL inline errors at once
+    const errors = {};
+    ['email', 'alternateEmail', 'mobile', 'alternateMobile'].forEach((name) => {
+      const err = validateField(name, form[name]);
+      if (err) errors[name] = err;
+    });
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      toast.error('Please fix the highlighted fields below.');
+      return;
     }
     setLoading(true);
     try {
@@ -198,16 +213,23 @@ export default function ProfilePage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <div className="relative">
               <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-              <input name="email" type="email" value={form.email} onChange={handleChange} className="input pl-9" placeholder="you@example.com" />
+              <input name="email" type="text" value={form.email} onChange={handleChange} onBlur={handleBlur}
+                className={`input pl-9 ${fieldErrors.email ? 'border-red-400 focus:ring-red-300' : ''}`}
+                placeholder="you@example.com" />
             </div>
+            {fieldErrors.email && <p className="text-xs text-red-500 mt-1 flex items-center gap-1">⚠ Email — {fieldErrors.email}</p>}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
             <div className="relative">
               <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-              <input name="mobile" type="tel" inputMode="numeric" maxLength={10} pattern="[6-9][0-9]{9}" value={form.mobile} onChange={handleChange} className="input pl-9" placeholder="98765 43210" />
+              <input name="mobile" type="tel" inputMode="numeric" maxLength={10} value={form.mobile}
+                onChange={handleChange} onBlur={handleBlur}
+                className={`input pl-9 ${fieldErrors.mobile ? 'border-red-400 focus:ring-red-300' : ''}`}
+                placeholder="98765 43210" />
             </div>
+            {fieldErrors.mobile && <p className="text-xs text-red-500 mt-1 flex items-center gap-1">⚠ Mobile — {fieldErrors.mobile}</p>}
           </div>
 
           <div>
@@ -216,8 +238,12 @@ export default function ProfilePage() {
             </label>
             <div className="relative">
               <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-              <input name="alternateMobile" type="tel" inputMode="numeric" maxLength={10} pattern="[6-9][0-9]{9}" value={form.alternateMobile} onChange={handleChange} className="input pl-9" placeholder="98765 43210" />
+              <input name="alternateMobile" type="tel" inputMode="numeric" maxLength={10} value={form.alternateMobile}
+                onChange={handleChange} onBlur={handleBlur}
+                className={`input pl-9 ${fieldErrors.alternateMobile ? 'border-red-400 focus:ring-red-300' : ''}`}
+                placeholder="98765 43210" />
             </div>
+            {fieldErrors.alternateMobile && <p className="text-xs text-red-500 mt-1 flex items-center gap-1">⚠ Alternate Mobile — {fieldErrors.alternateMobile}</p>}
           </div>
 
           <div>
@@ -226,8 +252,12 @@ export default function ProfilePage() {
             </label>
             <div className="relative">
               <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-              <input name="alternateEmail" type="email" value={form.alternateEmail} onChange={handleChange} className="input pl-9" placeholder="alternate@example.com" />
+              <input name="alternateEmail" type="text" value={form.alternateEmail}
+                onChange={handleChange} onBlur={handleBlur}
+                className={`input pl-9 ${fieldErrors.alternateEmail ? 'border-red-400 focus:ring-red-300' : ''}`}
+                placeholder="alternate@example.com" />
             </div>
+            {fieldErrors.alternateEmail && <p className="text-xs text-red-500 mt-1 flex items-center gap-1">⚠ Alternate Email — {fieldErrors.alternateEmail}</p>}
           </div>
         </div>
 
