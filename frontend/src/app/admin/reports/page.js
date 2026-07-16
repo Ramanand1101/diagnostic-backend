@@ -1,10 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { reportApi } from '@/lib/api';
-import { formatDate } from '@/utils/helpers';
+import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Badge from '@/components/ui/Badge';
-import { FiDownload, FiUpload } from 'react-icons/fi';
+import { FiDownload, FiUpload, FiTrash2, FiRefreshCw } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import Modal from '@/components/ui/Modal';
 
@@ -15,6 +15,8 @@ export default function AdminReportsPage() {
   const [bookingId, setBookingId] = useState('');
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [replacing, setReplacing] = useState(null);
+  const replaceInputRef = useRef(null);
 
   const fetchReports = () => {
     setLoading(true);
@@ -46,6 +48,37 @@ export default function AdminReportsPage() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this report permanently?')) return;
+    try {
+      await reportApi.deleteReport(id);
+      toast.success('Report deleted');
+      fetchReports();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const handleReplaceClick = (report) => {
+    setReplacing(report);
+    setTimeout(() => replaceInputRef.current?.click(), 50);
+  };
+
+  const handleReplaceFile = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f || !replacing) return;
+    const fd = new FormData();
+    fd.append('files', f);
+    try {
+      await reportApi.replaceReport(replacing._id, fd);
+      toast.success('Report replaced!');
+      fetchReports();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setReplacing(null);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -54,6 +87,8 @@ export default function AdminReportsPage() {
           <FiUpload /> Upload Report
         </button>
       </div>
+
+      <input ref={replaceInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleReplaceFile} />
 
       {loading ? <PageLoader /> : (
         <div className="card p-0 overflow-hidden">
@@ -77,14 +112,25 @@ export default function AdminReportsPage() {
                   <td className="table-cell">{r.uploadedBy?.name || '-'}</td>
                   <td className="table-cell">{formatDate(r.createdAt)}</td>
                   <td className="table-cell">
-                    {r.fileUrl && (
-                      <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary-600">
-                        <FiDownload />
-                      </a>
-                    )}
+                    <div className="flex gap-2 items-center">
+                      {r.fileUrl && (
+                        <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" title="Download" className="text-gray-400 hover:text-primary-600">
+                          <FiDownload />
+                        </a>
+                      )}
+                      <button onClick={() => handleReplaceClick(r)} title="Replace file" className="text-gray-400 hover:text-blue-600">
+                        <FiRefreshCw />
+                      </button>
+                      <button onClick={() => handleDelete(r._id)} title="Delete" className="text-gray-400 hover:text-red-600">
+                        <FiTrash2 />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
+              {reports.length === 0 && (
+                <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-10">No reports found</td></tr>
+              )}
             </tbody>
           </table>
         </div>

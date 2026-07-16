@@ -14,8 +14,8 @@ import {
 
 function LabForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
-    name: '', address: '', area: '', city: '', state: '', pincode: '',
-    phone: '', email: '', homeCollection: false, featured: false, description: '',
+    name: '', city: '', state: '', address: '', phone: '', email: '',
+    homeCollection: false, featured: false, description: '',
   });
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -42,25 +42,17 @@ function LabForm({ initial, onSave, onClose }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">Lab Name *</label>
           <input required value={form.name} onChange={(e) => set('name', e.target.value)} className="input" />
         </div>
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
-          <input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" placeholder="Flat no., building, street name" />
-        </div>
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Area / Locality</label>
-          <input value={form.area || ''} onChange={(e) => set('area', e.target.value)} className="input" placeholder="e.g. Gomti Nagar, Hazratganj" />
-        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-          <input value={form.city} onChange={(e) => set('city', e.target.value)} className="input" placeholder="e.g. Lucknow" />
+          <input value={form.city} onChange={(e) => set('city', e.target.value)} className="input" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-          <input value={form.state} onChange={(e) => set('state', e.target.value)} className="input" placeholder="e.g. Uttar Pradesh" />
+          <input value={form.state} onChange={(e) => set('state', e.target.value)} className="input" />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
-          <input value={form.pincode || ''} onChange={(e) => set('pincode', e.target.value)} className="input" placeholder="e.g. 226010" maxLength={6} />
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+          <input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
@@ -208,6 +200,7 @@ export default function AdminLabsPage() {
   const [q, setQ] = useState('');
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
+  const [selected, setSelected] = useState(new Set());
   const csvInputRef = useRef(null);
   const searchTimer = useRef(null);
   const limit = 20;
@@ -234,6 +227,20 @@ export default function AdminLabsPage() {
       setQ(val);
       setPage(1);
     }, 400);
+  };
+
+  const toggleSelect = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAll = () => setSelected(selected.size === labs.length ? new Set() : new Set(labs.map((l) => l._id)));
+
+  const handleBulkDelete = async () => {
+    if (!selected.size) return;
+    if (!confirm(`Delete ${selected.size} lab(s)? This cannot be undone.`)) return;
+    try {
+      await labApi.bulkDelete([...selected]);
+      toast.success(`${selected.size} lab(s) deleted`);
+      setSelected(new Set());
+      fetchLabs();
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const handleCsvUpload = async (e) => {
@@ -294,6 +301,14 @@ export default function AdminLabsPage() {
             className="input pl-9 py-2 text-sm w-full"
           />
         </div>
+        {selected.size > 0 && (
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors"
+          >
+            Delete Selected ({selected.size})
+          </button>
+        )}
         <div className="flex items-center gap-2 ml-auto">
           <a
             href={labApi.demoCsvUrl()}
@@ -340,6 +355,9 @@ export default function AdminLabsPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  <th className="table-header w-8">
+                    <input type="checkbox" checked={labs.length > 0 && selected.size === labs.length} onChange={toggleAll} className="rounded" />
+                  </th>
                   <th className="table-header">Name</th>
                   <th className="table-header">City</th>
                   <th className="table-header">Status</th>
@@ -351,7 +369,10 @@ export default function AdminLabsPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {labs.map((lab) => (
-                  <tr key={lab._id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={lab._id} className={`hover:bg-gray-50 transition-colors ${selected.has(lab._id) ? 'bg-red-50' : ''}`}>
+                    <td className="table-cell">
+                      <input type="checkbox" checked={selected.has(lab._id)} onChange={() => toggleSelect(lab._id)} className="rounded" />
+                    </td>
                     <td className="table-cell font-medium">{lab.name}</td>
                     <td className="table-cell">{lab.city}</td>
                     <td className="table-cell"><Badge status={lab.verificationStatus} /></td>
@@ -378,7 +399,7 @@ export default function AdminLabsPage() {
                   </tr>
                 ))}
                 {labs.length === 0 && (
-                  <tr><td colSpan={7} className="table-cell text-center text-gray-400 py-10">No labs found</td></tr>
+                  <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-10">No labs found</td></tr>
                 )}
               </tbody>
             </table>

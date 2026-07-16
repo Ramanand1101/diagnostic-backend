@@ -147,6 +147,14 @@ exports.compareLabs = asyncHandler(async (req, res) => {
   res.json(labs);
 });
 
+// DELETE /api/v1/labs/bulk-delete — admin: delete multiple labs by id array
+exports.bulkDeleteLabs = asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ message: 'ids array required' });
+  const result = await Lab.deleteMany({ _id: { $in: ids } });
+  res.json({ deleted: result.deletedCount });
+});
+
 // GET /api/v1/labs/demo-csv — public, returns a downloadable template
 exports.labDemoCsv = (req, res) => {
   const rows = [

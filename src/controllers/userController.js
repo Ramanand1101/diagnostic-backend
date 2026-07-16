@@ -61,3 +61,11 @@ exports.listUsers = asyncHandler(async (req, res) => {
 
   res.json({ items: users, total, page: Number(page), limit: Number(limit) });
 });
+
+exports.deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  if (user.role === 'superadmin') return res.status(403).json({ message: 'Cannot delete superadmin' });
+  await User.findByIdAndDelete(req.params.id);
+  res.json({ message: 'User deleted' });
+});

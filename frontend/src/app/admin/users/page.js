@@ -1,10 +1,11 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { userApi } from '@/lib/api';
-import { formatDate } from '@/utils/helpers';
+import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
-import { FiCheckCircle, FiSearch } from 'react-icons/fi';
+import { FiCheckCircle, FiSearch, FiTrash2 } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
@@ -34,6 +35,15 @@ export default function AdminUsersPage() {
     clearTimeout(searchTimer.current);
     const val = e.target.value;
     searchTimer.current = setTimeout(() => { setQ(val); setPage(1); }, 400);
+  };
+
+  const handleDelete = async (user) => {
+    if (!confirm(`Delete user "${user.name}"? This cannot be undone.`)) return;
+    try {
+      await userApi.deleteUser(user._id);
+      toast.success('User deleted');
+      fetchUsers();
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const roles = ['', 'superadmin', 'subadmin', 'lab', 'customer'];
@@ -78,6 +88,7 @@ export default function AdminUsersPage() {
                   <th className="table-header">Role</th>
                   <th className="table-header">Verified</th>
                   <th className="table-header">Joined</th>
+                  <th className="table-header">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -98,10 +109,17 @@ export default function AdminUsersPage() {
                       {u.verified && <FiCheckCircle className="text-green-500" />}
                     </td>
                     <td className="table-cell">{formatDate(u.createdAt)}</td>
+                    <td className="table-cell">
+                      {u.role !== 'superadmin' && (
+                        <button onClick={() => handleDelete(u)} title="Delete user" className="text-gray-400 hover:text-red-600">
+                          <FiTrash2 />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {users.length === 0 && (
-                  <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-10">No users found</td></tr>
+                  <tr><td colSpan={7} className="table-cell text-center text-gray-400 py-10">No users found</td></tr>
                 )}
               </tbody>
             </table>

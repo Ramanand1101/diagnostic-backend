@@ -41,7 +41,9 @@ const bookingSchema = new mongoose.Schema({
   coupon: String,
   notes: String,
   prescriptionUrl: String,
-  reminderSent: { type: Boolean, default: false }
+  reminderSent: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: Date
 }, { timestamps: true });
 
 module.exports = mongoose.model('Booking', bookingSchema);

@@ -129,6 +129,19 @@ export default function BulkUploadPage() {
         </p>
       </div>
 
+      {/* Explanation card */}
+      <div className="card border-l-4 border-l-primary-400 bg-primary-50 space-y-2">
+        <h2 className="font-semibold text-primary-800">What does Bulk Upload do?</h2>
+        <ul className="text-sm text-primary-700 space-y-1 list-disc list-inside">
+          <li>Takes a fixed catalogue of <strong>{TEST_COUNT}+ common diagnostic tests</strong> (CBC, LFT, KFT, Thyroid, etc.)</li>
+          <li>Creates one product record per test for each lab you select</li>
+          <li>Applies a <strong>price multiplier</strong> per lab — e.g. 0.85 = 15% cheaper than the reference price</li>
+          <li>Syncs every new product to <strong>Algolia</strong> so it appears instantly in search</li>
+          <li>"Skip existing" mode avoids duplicates — safe to run multiple times</li>
+        </ul>
+        <p className="text-xs text-primary-600 pt-1">Use this once after adding new labs, or to refresh pricing across all labs at once.</p>
+      </div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
         {[

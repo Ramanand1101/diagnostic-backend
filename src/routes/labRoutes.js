@@ -12,6 +12,7 @@ router.get('/nearby', lab.nearbyLabs);
 router.get('/compare', lab.compareLabs);
 router.get('/mine', protect, allowRoles('lab'), lab.getMyLab);
 router.post('/bulk-csv', protect, allowRoles('superadmin', 'subadmin'), csvUpload.single('file'), lab.bulkUploadLabsCsv);
+router.delete('/bulk-delete', protect, allowRoles('superadmin', 'subadmin'), lab.bulkDeleteLabs);
 router.get('/:slug', lab.getLabBySlug);
 router.post('/', protect, allowRoles('superadmin', 'subadmin', 'lab'), lab.createLab);
 router.put('/:id', protect, allowRoles('superadmin', 'subadmin', 'lab'), lab.updateLab);

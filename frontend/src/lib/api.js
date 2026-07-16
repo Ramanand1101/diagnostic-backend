@@ -42,6 +42,7 @@ export const userApi = {
   updateMe: (data) => api.put('/users/me', data),
   changePassword: (data) => api.put('/users/me/change-password', data),
   getAll: (params) => api.get('/users', { params }),
+  deleteUser: (id) => api.delete(`/users/${id}`),
 };
 
 // Labs
@@ -58,6 +59,7 @@ export const labApi = {
   reject: (id) => api.patch(`/labs/${id}/reject`),
   bulkCsv: (formData) => api.post('/labs/bulk-csv', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   demoCsvUrl: () => `${BASE_URL}/labs/demo-csv`,
+  bulkDelete: (ids) => api.delete('/labs/bulk-delete', { data: { ids } }),
 };
 
 // Categories
@@ -80,6 +82,8 @@ export const productApi = {
   bulkUploadTests: (data) => api.post('/products/bulk-tests', data),
   bulkCsv: (formData) => api.post('/products/bulk-csv', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   demoCsvUrl: () => `${BASE_URL}/products/demo-csv`,
+  bulkDelete: (ids) => api.delete('/products/bulk-delete', { data: { ids } }),
+  bulkPrice: (ids, salePrice, discountPercent) => api.patch('/products/bulk-price', { ids, salePrice, discountPercent }),
 };
 
 // Bookings
@@ -89,6 +93,9 @@ export const bookingApi = {
   getById: (id) => api.get(`/bookings/${id}`),
   updateStatus: (id, data) => api.patch(`/bookings/${id}/status`, data),
   markPaid: (id) => api.patch(`/bookings/${id}/paid`),
+  editBooking: (id, data) => api.patch(`/bookings/${id}/edit`, data),
+  deleteBooking: (id) => api.delete(`/bookings/${id}`),
+  restoreBooking: (id) => api.patch(`/bookings/${id}/restore`),
 };
 
 // Reports
@@ -97,6 +104,8 @@ export const reportApi = {
   upload: (data) => api.post('/reports', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
   getShared: (token) => api.get(`/reports/share/${token}`),
   getDownloadUrl: (id) => api.get(`/reports/${id}/download`),
+  deleteReport: (id) => api.delete(`/reports/${id}`),
+  replaceReport: (id, formData) => api.put(`/reports/${id}/replace`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };
 
 // Coupons

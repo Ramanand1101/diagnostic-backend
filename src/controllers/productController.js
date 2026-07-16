@@ -202,6 +202,25 @@ exports.bulkUploadTests = asyncHandler(async (req, res) => {
   });
 });
 
+// DELETE /api/v1/products/bulk-delete
+exports.bulkDeleteProducts = asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ message: 'ids array required' });
+  const result = await Product.deleteMany({ _id: { $in: ids } });
+  res.json({ deleted: result.deletedCount });
+});
+
+// PATCH /api/v1/products/bulk-price — set salePrice on multiple products
+exports.bulkUpdatePrice = asyncHandler(async (req, res) => {
+  const { ids, salePrice, discountPercent } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ message: 'ids array required' });
+  const update = {};
+  if (salePrice !== undefined) update.salePrice = Number(salePrice) || null;
+  if (discountPercent !== undefined) update.discountPercent = Number(discountPercent) || null;
+  const result = await Product.updateMany({ _id: { $in: ids } }, update);
+  res.json({ updated: result.modifiedCount });
+});
+
 // GET /api/v1/products/admin — lists ALL products (including inactive) for admin
 exports.adminListProducts = asyncHandler(async (req, res) => {
   const { q, lab, category, type, isActive, page = 1, limit = 20, sort = '-createdAt' } = req.query;

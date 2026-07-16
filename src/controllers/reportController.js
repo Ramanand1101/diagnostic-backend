@@ -177,3 +177,55 @@ exports.getSharedReport = asyncHandler(async (req, res) => {
   if (!report) return res.status(404).json({ message: 'Report not found' });
   res.json(report);
 });
+
+// DELETE /api/v1/reports/:id — delete report from S3 + DB
+exports.deleteReport = asyncHandler(async (req, res) => {
+  const report = await Report.findById(req.params.id);
+  if (!report) return res.status(404).json({ message: 'Report not found' });
+
+  if (report.storageKey) {
+    try {
+      await s3.deleteObject({ Bucket: bucket, Key: report.storageKey }).promise();
+    } catch { /* S3 delete failure should not block DB deletion */ }
+  }
+
+  await Report.findByIdAndDelete(req.params.id);
+  res.json({ message: 'Report deleted' });
+});
+
+// PUT /api/v1/reports/:id/replace — upload a new file to replace an existing report
+exports.replaceReport = asyncHandler(async (req, res) => {
+  const report = await Report.findById(req.params.id);
+  if (!report) return res.status(404).json({ message: 'Report not found' });
+
+  const file = req.files?.[0] || req.file;
+  if (!file) return res.status(400).json({ message: 'New file required' });
+
+  // Delete old S3 file
+  if (report.storageKey) {
+    try { await s3.deleteObject({ Bucket: bucket, Key: report.storageKey }).promise(); } catch { /* ignore */ }
+  }
+
+  const originalSize = file.buffer.length;
+  const compressedBuffer = await compressPdf(file.buffer);
+  const fileSize = compressedBuffer.length;
+  const prefix = process.env.AWS_S3_REPORTS_PREFIX || 'reports';
+  const safeName = file.originalname.replace(/\s+/g, '_');
+  const storageKey = `${prefix}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeName}`;
+
+  await s3.putObject({
+    Bucket: bucket,
+    Key: storageKey,
+    Body: compressedBuffer,
+    ContentType: 'application/pdf',
+    ACL: 'private',
+  }).promise();
+
+  const updated = await Report.findByIdAndUpdate(
+    req.params.id,
+    { storageKey, fileName: file.originalname, originalSize, fileSize, status: 'updated' },
+    { new: true }
+  );
+
+  res.json(updated);
+});

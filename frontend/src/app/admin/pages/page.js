@@ -5,11 +5,12 @@ import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiEye, FiCode } from 'react-icons/fi';
 
 function PageForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState(initial || { title: '', content: '', seoTitle: '', seoDescription: '', isPublished: true });
   const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,25 +25,54 @@ function PageForm({ initial, onSave, onClose }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-        <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="input" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Content (HTML)</label>
-        <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} className="input font-mono text-xs" rows={10} />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">SEO Title</label>
-        <input value={form.seoTitle} onChange={(e) => setForm({ ...form, seoTitle: e.target.value })} className="input" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">SEO Description</label>
-        <textarea value={form.seoDescription} onChange={(e) => setForm({ ...form, seoDescription: e.target.value })} className="input" rows={2} />
-      </div>
-      <div className="flex items-center gap-2">
-        <input type="checkbox" id="pagePublished" checked={form.isPublished} onChange={(e) => setForm({ ...form, isPublished: e.target.checked })} className="w-4 h-4 rounded text-primary-600" />
-        <label htmlFor="pagePublished" className="text-sm text-gray-700">Published</label>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+          <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="input" />
+        </div>
+
+        {/* Content editor with toggle */}
+        <div className="col-span-2">
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm font-medium text-gray-700">Content</label>
+            <button
+              type="button"
+              onClick={() => setPreview((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-800 font-medium"
+            >
+              {preview ? <><FiCode /> Edit HTML</> : <><FiEye /> Preview</>}
+            </button>
+          </div>
+          {preview ? (
+            <div
+              className="min-h-[260px] max-h-[400px] overflow-y-auto border border-gray-200 rounded-lg p-4 text-sm prose prose-sm max-w-none bg-white"
+              dangerouslySetInnerHTML={{ __html: form.content || '<p class="text-gray-400">Nothing to preview yet.</p>' }}
+            />
+          ) : (
+            <textarea
+              value={form.content}
+              onChange={(e) => setForm({ ...form, content: e.target.value })}
+              className="input font-mono text-xs"
+              rows={12}
+              placeholder="<h2>Heading</h2><p>Your content here...</p>"
+            />
+          )}
+          <p className="text-xs text-gray-400 mt-1">{form.content.length} characters · Toggle Preview to see rendered output</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">SEO Title</label>
+          <input value={form.seoTitle} onChange={(e) => setForm({ ...form, seoTitle: e.target.value })} className="input" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">SEO Description</label>
+          <input value={form.seoDescription} onChange={(e) => setForm({ ...form, seoDescription: e.target.value })} className="input" />
+        </div>
+
+        <div className="col-span-2 flex items-center gap-2">
+          <input type="checkbox" id="pagePublished" checked={form.isPublished} onChange={(e) => setForm({ ...form, isPublished: e.target.checked })} className="w-4 h-4 rounded text-primary-600" />
+          <label htmlFor="pagePublished" className="text-sm text-gray-700">Published</label>
+        </div>
       </div>
       <div className="flex gap-3 justify-end">
         <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
@@ -111,6 +141,9 @@ export default function AdminPagesPage() {
                   </td>
                 </tr>
               ))}
+              {pages.length === 0 && (
+                <tr><td colSpan={5} className="table-cell text-center text-gray-400 py-10">No pages yet</td></tr>
+              )}
             </tbody>
           </table>
         </div>

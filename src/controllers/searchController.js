@@ -48,7 +48,7 @@ function productRecord(p) {
     tags: p.tags || [],
     category: p.category ? String(p.category) : null,
     lab: p.lab && typeof p.lab === 'object'
-      ? { _id: String(p.lab._id), name: p.lab.name, slug: p.lab.slug, city: p.lab.city, state: p.lab.state || '', address: p.lab.address || '', pincode: p.lab.pincode || '' }
+      ? { _id: String(p.lab._id), name: p.lab.name, slug: p.lab.slug, city: p.lab.city, state: p.lab.state || '', address: p.lab.address || '', area: p.lab.area || '', pincode: p.lab.pincode || '' }
       : (p.lab ? String(p.lab) : null),
     isFeatured: !!p.isFeatured,
     isActive: !!p.isActive,
@@ -110,7 +110,7 @@ async function mongoSearch(q, type, city, limit) {
     };
     if (cityLabIds) filter.lab = { $in: cityLabIds };
     result.products = await Product.find(filter)
-      .populate('lab', 'name slug city state address pincode')
+      .populate('lab', 'name slug city state address area pincode')
       .limit(limit)
       .lean();
   }
@@ -345,7 +345,7 @@ exports.reindexLabs = asyncHandler(async (req, res) => {
 });
 
 exports.reindexProducts = asyncHandler(async (req, res) => {
-  const products = await Product.find().populate('lab', 'name slug city state address pincode').lean();
+  const products = await Product.find().populate('lab', 'name slug city state address area pincode').lean();
   const records = products.map(productRecord);
 
   await setIndexSettings('products', {

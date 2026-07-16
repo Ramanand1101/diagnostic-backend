@@ -10,6 +10,8 @@ router.get('/admin', protect, allowRoles('superadmin', 'subadmin'), controller.a
 router.get('/demo-csv', controller.productDemoCsv);
 router.post('/bulk-tests', protect, allowRoles('superadmin', 'subadmin'), controller.bulkUploadTests);
 router.post('/bulk-csv', protect, allowRoles('superadmin', 'subadmin'), csvUpload.single('file'), controller.bulkUploadProductsCsv);
+router.delete('/bulk-delete', protect, allowRoles('superadmin', 'subadmin'), controller.bulkDeleteProducts);
+router.patch('/bulk-price', protect, allowRoles('superadmin', 'subadmin'), controller.bulkUpdatePrice);
 router.get('/:slug', controller.getProductBySlug);
 router.post('/', protect, allowRoles('superadmin', 'subadmin', 'lab'), controller.createProduct);
 router.put('/:id', protect, allowRoles('superadmin', 'subadmin', 'lab'), controller.updateProduct);

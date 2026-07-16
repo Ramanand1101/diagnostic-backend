@@ -6,7 +6,7 @@ import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiUploadCloud, FiDownload } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiUploadCloud, FiDownload, FiDollarSign } from 'react-icons/fi';
 
 function CsvResultModal({ result, onClose }) {
   return (
@@ -136,6 +136,42 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
   );
 }
 
+function BulkPriceModal({ count, onSave, onClose }) {
+  const [salePrice, setSalePrice] = useState('');
+  const [discountPercent, setDiscountPercent] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!salePrice && !discountPercent) { toast.error('Enter at least one value'); return; }
+    setLoading(true);
+    try {
+      await onSave(salePrice || undefined, discountPercent || undefined);
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <p className="text-sm text-gray-600">Update price for <span className="font-semibold">{count} product(s)</span>. Fill one or both fields.</p>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Sale Price (₹)</label>
+        <input type="number" min="0" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} className="input" placeholder="e.g. 499" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Discount %</label>
+        <input type="number" min="0" max="100" value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} className="input" placeholder="e.g. 20" />
+      </div>
+      <div className="flex gap-3 justify-end">
+        <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+        <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Updating…' : 'Update Price'}</button>
+      </div>
+    </form>
+  );
+}
+
 export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -148,6 +184,7 @@ export default function AdminProductsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
+  const [selected, setSelected] = useState(new Set());
   const csvInputRef = useRef(null);
   const searchTimer = useRef(null);
   const limit = 20;
@@ -173,6 +210,9 @@ export default function AdminProductsPage() {
       setLabs(lRes.data.items || lRes.data.labs || []);
     });
   }, []);
+
+  const toggleSelect = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAll = () => setSelected(selected.size === products.length ? new Set() : new Set(products.map((p) => p._id)));
 
   const handleSearchChange = (e) => {
     clearTimeout(searchTimer.current);
@@ -208,6 +248,29 @@ export default function AdminProductsPage() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
+  const handleBulkDelete = async () => {
+    if (!selected.size) return;
+    if (!confirm(`Delete ${selected.size} product(s)? This cannot be undone.`)) return;
+    try {
+      await productApi.bulkDelete([...selected]);
+      toast.success(`${selected.size} product(s) deleted`);
+      setSelected(new Set());
+      fetchProducts();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const handleBulkPrice = async (salePrice, discountPercent) => {
+    try {
+      await productApi.bulkPrice([...selected], salePrice ? Number(salePrice) : undefined, discountPercent ? Number(discountPercent) : undefined);
+      toast.success(`Price updated for ${selected.size} product(s)`);
+      setSelected(new Set());
+      fetchProducts();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+      throw err;
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -228,6 +291,22 @@ export default function AdminProductsPage() {
             className="input pl-9 py-2 text-sm w-full"
           />
         </div>
+        {selected.size > 0 && (
+          <>
+            <button
+              onClick={() => setModal({ type: 'bulkPrice' })}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors"
+            >
+              <FiDollarSign className="text-sm" /> Update Price ({selected.size})
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors"
+            >
+              <FiTrash2 className="text-sm" /> Delete Selected ({selected.size})
+            </button>
+          </>
+        )}
         <div className="flex items-center gap-2 ml-auto">
           <a
             href={productApi.demoCsvUrl()}
@@ -267,6 +346,9 @@ export default function AdminProductsPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  <th className="table-header w-8">
+                    <input type="checkbox" checked={products.length > 0 && selected.size === products.length} onChange={toggleAll} className="rounded" />
+                  </th>
                   <th className="table-header">Name</th>
                   <th className="table-header">Type</th>
                   <th className="table-header">Lab</th>
@@ -277,7 +359,10 @@ export default function AdminProductsPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {products.map((p) => (
-                  <tr key={p._id} className="hover:bg-gray-50">
+                  <tr key={p._id} className={`hover:bg-gray-50 ${selected.has(p._id) ? 'bg-blue-50' : ''}`}>
+                    <td className="table-cell">
+                      <input type="checkbox" checked={selected.has(p._id)} onChange={() => toggleSelect(p._id)} className="rounded" />
+                    </td>
                     <td className="table-cell font-medium">{p.name}</td>
                     <td className="table-cell capitalize">{p.type}</td>
                     <td className="table-cell">{p.lab?.name || '-'}</td>
@@ -296,7 +381,7 @@ export default function AdminProductsPage() {
                   </tr>
                 ))}
                 {products.length === 0 && (
-                  <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-10">No products found</td></tr>
+                  <tr><td colSpan={7} className="table-cell text-center text-gray-400 py-10">No products found</td></tr>
                 )}
               </tbody>
             </table>
@@ -305,7 +390,7 @@ export default function AdminProductsPage() {
       )}
       <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
 
-      <Modal open={!!modal && modal.type !== 'csv'} onClose={() => setModal(null)} title={modal?.type === 'add' ? 'Add Product' : 'Edit Product'} size="lg">
+      <Modal open={!!modal && (modal.type === 'add' || modal.type === 'edit')} onClose={() => setModal(null)} title={modal?.type === 'add' ? 'Add Product' : 'Edit Product'} size="lg">
         <ProductForm
           initial={modal?.product}
           categories={categories}
@@ -313,6 +398,10 @@ export default function AdminProductsPage() {
           onSave={() => { setModal(null); fetchProducts(); }}
           onClose={() => setModal(null)}
         />
+      </Modal>
+
+      <Modal open={modal?.type === 'bulkPrice'} onClose={() => setModal(null)} title="Bulk Update Price" size="sm">
+        <BulkPriceModal count={selected.size} onSave={handleBulkPrice} onClose={() => setModal(null)} />
       </Modal>
 
       <Modal open={!!csvResult} onClose={() => setCsvResult(null)} title="CSV Upload Result" size="sm">

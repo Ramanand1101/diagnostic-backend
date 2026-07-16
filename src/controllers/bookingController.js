@@ -73,8 +73,8 @@ exports.createBooking = asyncHandler(async (req, res) => {
 });
 
 exports.listBookings = asyncHandler(async (req, res) => {
-  const { status, lab, q, page = 1, limit = 20 } = req.query;
-  const filter = {};
+  const { status, lab, q, deleted, page = 1, limit = 20 } = req.query;
+  const filter = { isDeleted: deleted === 'true' };
   if (status) filter.status = status;
   if (q) filter.bookingNo = new RegExp(q, 'i');
 
@@ -111,6 +111,44 @@ exports.markPaid = asyncHandler(async (req, res) => {
     paymentStatus: 'paid',
     paymentMethod: req.body.paymentMethod || 'online'
   }, { new: true });
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  res.json(booking);
+});
+
+// PATCH /api/v1/bookings/:id/edit — admin: change date, time, lab, items
+exports.updateBooking = asyncHandler(async (req, res) => {
+  const { slotDate, slotTime, lab, items, notes } = req.body;
+  const update = {};
+  if (slotDate !== undefined) update.slotDate = slotDate;
+  if (slotTime !== undefined) update.slotTime = slotTime;
+  if (lab !== undefined) update.lab = lab;
+  if (items !== undefined) update.items = items;
+  if (notes !== undefined) update.notes = notes;
+
+  const booking = await Booking.findByIdAndUpdate(req.params.id, update, { new: true })
+    .populate('user lab items.product');
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  res.json(booking);
+});
+
+// DELETE /api/v1/bookings/:id — soft delete
+exports.deleteBooking = asyncHandler(async (req, res) => {
+  const booking = await Booking.findByIdAndUpdate(
+    req.params.id,
+    { isDeleted: true, deletedAt: new Date() },
+    { new: true }
+  );
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  res.json({ message: 'Booking deleted', booking });
+});
+
+// PATCH /api/v1/bookings/:id/restore — restore soft-deleted booking
+exports.restoreBooking = asyncHandler(async (req, res) => {
+  const booking = await Booking.findByIdAndUpdate(
+    req.params.id,
+    { isDeleted: false, deletedAt: null },
+    { new: true }
+  );
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
   res.json(booking);
 });
