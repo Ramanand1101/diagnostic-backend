@@ -38,6 +38,7 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
   const [nameQuery, setNameQuery] = useState(initial?.name || '');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const nameSearchTimer = useRef(null);
 
   useEffect(() => {
@@ -50,21 +51,26 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
     }
   }, [form.category]);
 
+  const fetchSuggestions = (q) => {
+    setSuggestionsLoading(true);
+    testMasterApi.search(q)
+      .then((r) => { setSuggestions(r.data.items || []); setSuggestionsLoading(false); })
+      .catch(() => { setSuggestions([]); setSuggestionsLoading(false); });
+  };
+
+  // Show all tests immediately when the field is focused
+  const handleNameFocus = () => {
+    setShowSuggestions(true);
+    if (suggestions.length === 0) fetchSuggestions(nameQuery.trim());
+  };
+
   const handleNameInput = (e) => {
     const val = e.target.value;
     setNameQuery(val);
     setForm((f) => ({ ...f, name: val }));
+    setShowSuggestions(true);
     clearTimeout(nameSearchTimer.current);
-    if (val.trim().length >= 1) {
-      nameSearchTimer.current = setTimeout(() => {
-        testMasterApi.search(val.trim())
-          .then((r) => { setSuggestions(r.data.items || []); setShowSuggestions(true); })
-          .catch(() => setSuggestions([]));
-      }, 300);
-    } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
-    }
+    nameSearchTimer.current = setTimeout(() => fetchSuggestions(val.trim()), 300);
   };
 
   const handleSelectTest = (test) => {
@@ -109,32 +115,66 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
       <div className="grid grid-cols-2 gap-4">
         {/* Name with TestMaster autocomplete */}
         <div className="col-span-2 relative">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Test Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Test Name *
+            <span className="ml-2 text-xs font-normal text-primary-500">
+              — Choose from Test Master List
+            </span>
+          </label>
           <input
             required
             autoComplete="off"
             value={nameQuery}
             onChange={handleNameInput}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-            className="input"
-            placeholder="Type to search from Test Master List…"
+            onFocus={handleNameFocus}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            className="input pr-10"
+            placeholder="Click to see all tests or type to search…"
           />
-          {showSuggestions && suggestions.length > 0 && (
-            <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-              {suggestions.map((t) => (
-                <li
-                  key={t._id}
-                  onMouseDown={() => handleSelectTest(t)}
-                  className="px-4 py-2.5 text-sm hover:bg-primary-50 cursor-pointer border-b border-gray-50 last:border-0"
-                >
-                  <p className="font-medium text-gray-800">{t.name}</p>
-                  {(t.category?.name || t.sampleType) && (
-                    <p className="text-xs text-gray-400">{[t.category?.name, t.sampleType].filter(Boolean).join(' · ')}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
+          {/* dropdown arrow indicator */}
+          <span className="pointer-events-none absolute right-3 top-9 text-gray-400 text-xs">▼</span>
+
+          {showSuggestions && (
+            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+              {suggestionsLoading ? (
+                <div className="px-4 py-3 text-sm text-gray-400 text-center">Loading tests…</div>
+              ) : suggestions.length === 0 ? (
+                <div className="px-4 py-4 text-center">
+                  <p className="text-sm text-gray-500">No tests in master list yet.</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Go to <span className="font-medium text-primary-600">Test Master List</span> to add tests first.
+                  </p>
+                </div>
+              ) : (
+                <ul className="max-h-60 overflow-y-auto divide-y divide-gray-50">
+                  {suggestions.map((t) => (
+                    <li
+                      key={t._id}
+                      onMouseDown={() => handleSelectTest(t)}
+                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-primary-50 cursor-pointer transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{t.name}</p>
+                        <div className="flex gap-2 mt-0.5 flex-wrap">
+                          {t.category?.name && (
+                            <span className="text-xs text-primary-600 bg-primary-50 rounded px-1.5 py-0.5">{t.category.name}</span>
+                          )}
+                          {t.sampleType && (
+                            <span className="text-xs text-gray-500">{t.sampleType}</span>
+                          )}
+                          {t.reportTime && (
+                            <span className="text-xs text-gray-400">⏱ {t.reportTime}</span>
+                          )}
+                        </div>
+                      </div>
+                      {t.fastingRequired && (
+                        <span className="text-xs text-orange-600 bg-orange-50 rounded px-1.5 py-0.5 shrink-0">Fasting</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
 
