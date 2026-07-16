@@ -9,13 +9,13 @@ import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
 import {
   FiPlus, FiCheckCircle, FiXCircle, FiEdit, FiStar,
-  FiSearch, FiUploadCloud, FiDownload, FiX,
+  FiSearch, FiUploadCloud, FiDownload, FiEye, FiMail, FiPhone, FiMapPin,
 } from 'react-icons/fi';
 
 function LabForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
-    name: '', city: '', state: '', address: '', phone: '', email: '',
-    homeCollection: false, featured: false, description: '',
+    name: '', address: '', area: '', city: '', state: '', pincode: '',
+    phone: '', email: '', homeCollection: false, featured: false, description: '',
   });
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -42,17 +42,25 @@ function LabForm({ initial, onSave, onClose }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">Lab Name *</label>
           <input required value={form.name} onChange={(e) => set('name', e.target.value)} className="input" />
         </div>
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+          <input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" placeholder="Flat no., building, street name" />
+        </div>
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Area / Locality</label>
+          <input value={form.area || ''} onChange={(e) => set('area', e.target.value)} className="input" placeholder="e.g. Gomti Nagar, Hazratganj" />
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-          <input value={form.city} onChange={(e) => set('city', e.target.value)} className="input" />
+          <input value={form.city} onChange={(e) => set('city', e.target.value)} className="input" placeholder="e.g. Lucknow" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-          <input value={form.state} onChange={(e) => set('state', e.target.value)} className="input" />
+          <input value={form.state} onChange={(e) => set('state', e.target.value)} className="input" placeholder="e.g. Uttar Pradesh" />
         </div>
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-          <input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
+          <input value={form.pincode || ''} onChange={(e) => set('pincode', e.target.value)} className="input" placeholder="e.g. 226010" maxLength={6} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
@@ -60,7 +68,7 @@ function LabForm({ initial, onSave, onClose }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" />
+          <input type="text" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" placeholder="lab@example.com" />
         </div>
         <div className="col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -114,6 +122,76 @@ function CsvResultModal({ result, onClose }) {
       )}
       <div className="flex justify-end">
         <button onClick={onClose} className="btn-primary text-sm">Done</button>
+      </div>
+    </div>
+  );
+}
+
+function LabViewModal({ lab, onClose, onEdit }) {
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">{lab.name}</h2>
+          {lab.verificationStatus && (
+            <span className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+              lab.verificationStatus === 'verified' ? 'bg-green-100 text-green-700' :
+              lab.verificationStatus === 'rejected' ? 'bg-red-100 text-red-600' :
+              'bg-yellow-100 text-yellow-700'
+            }`}>{lab.verificationStatus}</span>
+          )}
+        </div>
+        {lab.featured && <span className="text-yellow-400 text-xl">⭐</span>}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 text-sm">
+        {/* Address block */}
+        {(lab.address || lab.area || lab.city) && (
+          <div className="flex gap-2 items-start">
+            <FiMapPin className="text-primary-500 mt-0.5 shrink-0" />
+            <div className="text-gray-700">
+              {lab.address && <div>{lab.address}</div>}
+              {lab.area && <div>{lab.area}</div>}
+              <div className="flex gap-1 flex-wrap">
+                {lab.city && <span>{lab.city}</span>}
+                {lab.state && <span>{lab.state}</span>}
+                {lab.pincode && <span className="text-gray-500">– {lab.pincode}</span>}
+              </div>
+            </div>
+          </div>
+        )}
+        {lab.phone && (
+          <div className="flex items-center gap-2 text-gray-700">
+            <FiPhone className="text-primary-500 shrink-0" />
+            <a href={`tel:${lab.phone}`} className="hover:text-primary-600">{lab.phone}</a>
+          </div>
+        )}
+        {lab.email && (
+          <div className="flex items-center gap-2 text-gray-700">
+            <FiMail className="text-primary-500 shrink-0" />
+            <a href={`mailto:${lab.email}`} className="hover:text-primary-600 break-all">{lab.email}</a>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="bg-gray-50 rounded-lg px-3 py-2">
+          <p className="text-xs text-gray-400 mb-0.5">Home Collection</p>
+          <p className="font-medium">{lab.homeCollection ? 'Available' : 'Not available'}</p>
+        </div>
+        <div className="bg-gray-50 rounded-lg px-3 py-2">
+          <p className="text-xs text-gray-400 mb-0.5">Rating</p>
+          <p className="font-medium">{lab.ratingAvg ? `${lab.ratingAvg} ★` : '—'}</p>
+        </div>
+      </div>
+
+      {lab.description && (
+        <p className="text-sm text-gray-600 leading-relaxed">{lab.description}</p>
+      )}
+
+      <div className="flex gap-3 justify-end pt-1 border-t border-gray-100">
+        <button onClick={onClose} className="btn-secondary text-sm">Close</button>
+        <button onClick={onEdit} className="btn-primary text-sm flex items-center gap-1.5"><FiEdit /> Edit Lab</button>
       </div>
     </div>
   );
@@ -293,6 +371,7 @@ export default function AdminLabsPage() {
                         {lab.verificationStatus !== 'rejected' && (
                           <button onClick={() => handleReject(lab._id)} title="Reject" className="text-red-500 hover:text-red-700"><FiXCircle /></button>
                         )}
+                        <button onClick={() => setModal({ type: 'view', lab })} title="View" className="text-gray-400 hover:text-primary-600"><FiEye /></button>
                         <button onClick={() => setModal({ type: 'edit', lab })} title="Edit" className="text-gray-400 hover:text-primary-600"><FiEdit /></button>
                       </div>
                     </td>
@@ -309,7 +388,17 @@ export default function AdminLabsPage() {
 
       <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
 
-      <Modal open={!!modal && modal.type !== 'csv'} onClose={() => setModal(null)}
+      <Modal open={modal?.type === 'view'} onClose={() => setModal(null)} title="Lab Details" size="md">
+        {modal?.lab && (
+          <LabViewModal
+            lab={modal.lab}
+            onClose={() => setModal(null)}
+            onEdit={() => setModal({ type: 'edit', lab: modal.lab })}
+          />
+        )}
+      </Modal>
+
+      <Modal open={modal?.type === 'add' || modal?.type === 'edit'} onClose={() => setModal(null)}
         title={modal?.type === 'add' ? 'Add New Lab' : 'Edit Lab'} size="lg">
         <LabForm
           initial={modal?.lab}

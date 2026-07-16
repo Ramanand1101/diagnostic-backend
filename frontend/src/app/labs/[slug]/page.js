@@ -7,7 +7,7 @@ import ProductCard from '@/components/product/ProductCard';
 import { PageLoader } from '@/components/ui/Spinner';
 import { labApi, productApi, reviewApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
-import { FiMapPin, FiPhone, FiMail, FiGlobe, FiStar, FiClock, FiHome, FiCheckCircle } from 'react-icons/fi';
+import { FiMapPin, FiPhone, FiGlobe, FiStar, FiClock, FiHome, FiCheckCircle } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
 export default function LabDetailPage() {
@@ -89,12 +89,7 @@ export default function LabDetailPage() {
                     <a href={`tel:${lab.phone}`} className="hover:text-primary-600">{lab.phone}</a>
                   </div>
                 )}
-                {lab.email && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <FiMail className="text-primary-500 flex-shrink-0" />
-                    <a href={`mailto:${lab.email}`} className="hover:text-primary-600">{lab.email}</a>
-                  </div>
-                )}
+
                 {lab.website && (
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <FiGlobe className="text-primary-500 flex-shrink-0" />

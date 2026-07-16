@@ -150,10 +150,10 @@ exports.compareLabs = asyncHandler(async (req, res) => {
 // GET /api/v1/labs/demo-csv — public, returns a downloadable template
 exports.labDemoCsv = (req, res) => {
   const rows = [
-    'name,city,state,address,phone,email,homeCollection,featured,description',
-    'Vijay Diagnostics Lucknow,Lucknow,Uttar Pradesh,Hazratganj Lucknow 226001,9876543210,vijay@example.com,true,false,NABL certified diagnostic centre',
-    'Apollo Diagnostics Gomti Nagar,Lucknow,Uttar Pradesh,Gomti Nagar Lucknow 226010,9876543211,apollo@example.com,true,true,Premium diagnostics with home collection',
-    'SRL Diagnostics Hazratganj,Lucknow,Uttar Pradesh,Hazratganj Lucknow 226001,9876543212,srl@example.com,true,false,Trusted pathology services',
+    'name,address,area,city,state,pincode,phone,homeCollection,featured,description',
+    'Vijay Diagnostics,Shop 12 Hazratganj Market,Hazratganj,Lucknow,Uttar Pradesh,226001,9876543210,true,false,NABL certified diagnostic centre',
+    'Apollo Diagnostics,Plot 5 Sector A,Gomti Nagar,Lucknow,Uttar Pradesh,226010,9876543211,true,true,Premium diagnostics with home collection',
+    'SRL Diagnostics,Civil Lines Road,Civil Lines,Lucknow,Uttar Pradesh,226001,9876543212,true,false,Trusted pathology services',
   ].join('\n');
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="labs-template.csv"');
