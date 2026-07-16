@@ -31,6 +31,7 @@ const crmRoutes = require('./routes/crmRoutes');
 const leadRoutes = require('./routes/leadRoutes');
 const referralDoctorRoutes = require('./routes/referralDoctorRoutes');
 const followUpRoutes = require('./routes/followUpRoutes');
+const labCrmRoutes = require('./routes/labCrmRoutes');
 
 const app = express();
 
@@ -74,6 +75,7 @@ app.use('/api/v1/crm', crmRoutes);
 app.use('/api/v1/leads', leadRoutes);
 app.use('/api/v1/referral-doctors', referralDoctorRoutes);
 app.use('/api/v1/follow-ups', followUpRoutes);
+app.use('/api/v1/lab-crm', labCrmRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

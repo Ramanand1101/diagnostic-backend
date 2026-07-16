@@ -14,6 +14,7 @@ router.delete('/bulk-delete', protect, allowRoles('superadmin', 'subadmin'), con
 router.patch('/bulk-price', protect, allowRoles('superadmin', 'subadmin'), controller.bulkUpdatePrice);
 router.get('/:slug', controller.getProductBySlug);
 router.post('/', protect, allowRoles('superadmin', 'subadmin', 'lab'), controller.createProduct);
+router.patch('/:id/set-price', protect, allowRoles('lab'), controller.setPrice);
 router.put('/:id', protect, allowRoles('superadmin', 'subadmin', 'lab'), controller.updateProduct);
 router.delete('/:id', protect, allowRoles('superadmin', 'subadmin', 'lab'), controller.deleteProduct);
 

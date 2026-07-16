@@ -20,7 +20,8 @@ const productSchema = new mongoose.Schema({
   seoTitle: String,
   seoDescription: String,
   isFeatured: { type: Boolean, default: false },
-  isActive: { type: Boolean, default: true }
+  isActive: { type: Boolean, default: true },
+  addedByAdmin: { type: Boolean, default: false },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Product', productSchema);

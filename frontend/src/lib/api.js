@@ -102,6 +102,7 @@ export const productApi = {
   bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/products/bulk-csv', fd); },
   bulkDelete: (ids) => api.delete('/products/bulk-delete', { data: { ids } }),
   bulkPrice: (ids, salePrice, discountPercent) => api.patch('/products/bulk-price', { ids, salePrice, discountPercent }),
+  setPrice: (id, data) => api.patch(`/products/${id}/set-price`, data),
 };
 
 // Bookings
@@ -179,6 +180,13 @@ export const settingApi = {
   getAll: () => api.get('/settings'),
   create: (data) => api.post('/settings', data),
   update: (id, data) => api.put(`/settings/${id}`, data),
+};
+
+// Lab CRM (for lab role — filtered to own lab)
+export const labCrmApi = {
+  stats: () => api.get('/lab-crm/stats'),
+  patientList: (params) => api.get('/lab-crm/patients', { params }),
+  patientDetail: (id) => api.get(`/lab-crm/patients/${id}`),
 };
 
 // CRM

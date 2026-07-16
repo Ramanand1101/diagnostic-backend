@@ -37,6 +37,7 @@ exports.getProductBySlug = asyncHandler(async (req, res) => {
 
 exports.createProduct = asyncHandler(async (req, res) => {
   if (!req.body.slug && req.body.name) req.body.slug = makeSlug(req.body.name);
+  if (['superadmin', 'subadmin'].includes(req.user?.role)) req.body.addedByAdmin = true;
   const product = await Product.create(req.body);
   await syncObjects('products', [{
     objectID: String(product._id),
@@ -360,4 +361,22 @@ exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
   }
 
   res.json({ created, errors, total: rows.length });
+});
+
+// PATCH /api/v1/products/:id/set-price — lab owner sets price for a product on their lab
+exports.setPrice = asyncHandler(async (req, res) => {
+  const Lab = require('../models/Lab');
+  const lab = await Lab.findOne({ owner: req.user._id });
+  if (!lab) return res.status(403).json({ message: 'Lab profile not found' });
+
+  const product = await Product.findOne({ _id: req.params.id, lab: lab._id });
+  if (!product) return res.status(404).json({ message: 'Product not found in your lab' });
+
+  const { price, salePrice, discountPercent } = req.body;
+  if (price !== undefined) product.price = Number(price);
+  if (salePrice !== undefined) product.salePrice = salePrice ? Number(salePrice) : undefined;
+  if (discountPercent !== undefined) product.discountPercent = discountPercent ? Number(discountPercent) : undefined;
+  await product.save();
+
+  res.json(product);
 });

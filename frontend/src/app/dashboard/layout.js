@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import { FiGrid, FiCalendar, FiFileText, FiUser, FiMessageSquare, FiMapPin, FiPackage } from 'react-icons/fi';
+import { FiGrid, FiCalendar, FiFileText, FiUser, FiMessageSquare, FiMapPin, FiPackage, FiActivity, FiUsers, FiBriefcase, FiPhoneCall, FiUserCheck } from 'react-icons/fi';
 import { PageLoader } from '@/components/ui/Spinner';
 
 const customerNav = [
@@ -21,6 +21,13 @@ const labNav = [
   { href: '/dashboard/lab', label: 'My Lab', icon: FiMapPin },
   { href: '/dashboard/lab/products', label: 'Tests & Packages', icon: FiPackage },
   { href: '/dashboard/lab/bookings', label: 'Bookings', icon: FiCalendar },
+  { label: '── CRM ──', divider: true },
+  { href: '/dashboard/lab/crm', label: 'CRM Dashboard', icon: FiActivity },
+  { href: '/dashboard/lab/crm/patients', label: 'Patients', icon: FiUsers },
+  { href: '/dashboard/lab/crm/leads', label: 'Leads', icon: FiBriefcase },
+  { href: '/dashboard/lab/crm/followups', label: 'Follow-ups', icon: FiPhoneCall },
+  { href: '/dashboard/lab/crm/doctors', label: 'Ref. Doctors', icon: FiUserCheck },
+  { label: '──────', divider: true },
   { href: '/dashboard/tickets', label: 'Support', icon: FiMessageSquare },
   { href: '/dashboard/profile', label: 'Profile', icon: FiUser },
 ];
@@ -57,7 +64,11 @@ export default function DashboardLayout({ children }) {
                 </div>
               </div>
               <nav className="space-y-1">
-                {navItems.map(({ href, label, icon: Icon }) => {
+                {navItems.map((item, i) => {
+                  if (item.divider) return (
+                    <p key={i} className="text-xs text-gray-400 px-3 pt-3 pb-1 font-medium">{item.label}</p>
+                  );
+                  const { href, label, icon: Icon } = item;
                   const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
                   return (
                     <Link
