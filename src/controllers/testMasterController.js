@@ -84,20 +84,12 @@ exports.remove = async (req, res) => {
 // GET /api/v1/test-master/demo-csv
 exports.demoCsv = (req, res) => {
   const csv = [
-    '# Test Master List CSV Template',
-    '# name: Test name (required, must be unique)',
-    '# category: Category name (must match existing category)',
-    '# subcategory: Subcategory name (optional)',
-    '# sampleType: Blood / Urine / Stool / Saliva / Swab etc.',
-    '# reportTime: e.g. 24 hours / Same day / 48 hours',
-    '# fastingRequired: true / false',
-    '# homeCollection: true / false',
-    '# description: Optional description',
     'name,category,subcategory,sampleType,reportTime,fastingRequired,homeCollection,description',
-    'Complete Blood Count (CBC),Pathology,Blood Tests,Blood,24 hours,false,true,Basic blood test to check overall health',
-    'Lipid Profile,Pathology,Blood Tests,Blood,24 hours,true,true,Checks cholesterol and triglycerides',
-    'Chest X-Ray,Radiology,,X-ray,Same day,false,false,Standard chest radiograph',
+    'Complete Blood Count (CBC),Pathology,Blood Tests,Blood,24 hours,false,true,Basic blood test',
+    'Lipid Profile,Pathology,Blood Tests,Blood,24 hours,true,true,Checks cholesterol',
     'Urine Routine,Pathology,Urine Tests,Urine,4 hours,false,false,Basic urine examination',
+    'Chest X-Ray,Radiology,,X-ray,Same day,false,false,Standard chest radiograph',
+    'Thyroid Profile (T3 T4 TSH),Pathology,,Blood,48 hours,false,true,Thyroid function test',
   ].join('\n');
 
   res.setHeader('Content-Type', 'text/csv');
@@ -108,8 +100,8 @@ exports.demoCsv = (req, res) => {
 // POST /api/v1/test-master/bulk-csv
 exports.bulkCsv = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: 'CSV file required' });
-    const rows = parseCSV(req.file.buffer.toString('utf8'));
+    if (!req.file) return res.status(400).json({ message: 'CSV file required. Make sure you are uploading a .csv file.' });
+    const { rows } = parseCSV(req.file.buffer);
 
     let created = 0, updated = 0;
     const errors = [];
@@ -148,7 +140,8 @@ exports.bulkCsv = async (req, res) => {
           }
         }
 
-        const existing = await TestMaster.findOne({ name: { $regex: `^${data.name}$`, $options: 'i' } });
+        const escapedName = data.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const existing = await TestMaster.findOne({ name: { $regex: `^${escapedName}$`, $options: 'i' } });
         if (existing) {
           await TestMaster.findByIdAndUpdate(existing._id, data);
           updated++;

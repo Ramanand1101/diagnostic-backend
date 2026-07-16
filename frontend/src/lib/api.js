@@ -11,6 +11,11 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = Cookies.get('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // For FormData (file uploads), remove the default Content-Type so the browser
+  // can set multipart/form-data with the correct boundary — multer requires this.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 
