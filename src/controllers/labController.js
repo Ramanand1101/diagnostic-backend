@@ -10,6 +10,7 @@ function labRecord(lab) {
     id: String(lab._id),
     name: lab.name,
     slug: lab.slug,
+    brand: lab.brand ? (lab.brand.name || String(lab.brand)) : '',
     city: lab.city || '',
     state: lab.state || '',
     address: lab.address || '',
@@ -49,7 +50,7 @@ exports.listLabs = asyncHandler(async (req, res) => {
   if (homeCollection !== undefined) filter.homeCollection = homeCollection === 'true';
 
   const skip = (Number(page) - 1) * safeLimit;
-  const items = await Lab.find(filter).sort(sort).skip(skip).limit(safeLimit);
+  const items = await Lab.find(filter).populate('brand', 'name slug').sort(sort).skip(skip).limit(safeLimit);
   const total = await Lab.countDocuments(filter);
   res.json({ items, page: Number(page), limit: safeLimit, total });
 });
@@ -154,12 +155,23 @@ exports.bulkUploadLabsCsv = asyncHandler(async (req, res) => {
   const created = [];
   const errors = [];
 
+  const Brand = require('../models/Brand');
   for (const [i, row] of rows.entries()) {
     if (!row.name) { errors.push({ row: i + 2, error: 'name is required' }); continue; }
     try {
+      // Resolve brand by name
+      let brandId = null;
+      const brandName = (row.brand || '').trim();
+      if (brandName) {
+        const brand = await Brand.findOne({ name: new RegExp(`^${brandName}$`, 'i') });
+        if (brand) brandId = brand._id;
+        // else: skip silently — brand not found, lab created without brand
+      }
+
       const slug = makeSlug(`${row.name}-${row.city || ''}-${Date.now()}`);
       const lab = await Lab.create({
         name: row.name,
+        brand: brandId,
         address: row.address || '',
         area: row.area || row.locality || '',
         city: row.city || '',

@@ -292,15 +292,21 @@ exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
       }
 
       // Resolve target labs
+      const Brand = require('../models/Brand');
       const brandKey = (row.brand || '').trim();
       const emailKey = (row.labemail || row.lab_email || '').trim();
 
       let targetLabs = [];
       if (brandKey) {
-        // All labs with this brand
-        targetLabs = await Lab.find({ brand: new RegExp(`^${brandKey}$`, 'i') }).select('_id name').lean();
+        // Find Brand document by name, then all labs with that brand ObjectId
+        const brandDoc = await Brand.findOne({ name: new RegExp(`^${brandKey}$`, 'i') });
+        if (!brandDoc) {
+          errors.push({ row: i + 2, error: `Brand "${brandKey}" not found. Create it in Admin → Brands first.` });
+          continue;
+        }
+        targetLabs = await Lab.find({ brand: brandDoc._id }).select('_id name').lean();
         if (!targetLabs.length) {
-          errors.push({ row: i + 2, error: `No labs found with brand "${brandKey}"` });
+          errors.push({ row: i + 2, error: `Brand "${brandKey}" exists but has no labs assigned yet.` });
           continue;
         }
       } else if (emailKey) {

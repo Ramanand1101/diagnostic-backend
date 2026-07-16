@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { labApi } from '@/lib/api';
+import { labApi, brandApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
@@ -9,15 +9,39 @@ import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
 import {
   FiPlus, FiCheckCircle, FiXCircle, FiEdit, FiStar,
-  FiSearch, FiUploadCloud, FiDownload, FiEye, FiMail, FiPhone, FiMapPin,
+  FiSearch, FiUploadCloud, FiDownload, FiEye, FiMail, FiPhone, FiMapPin, FiLayers,
 } from 'react-icons/fi';
 
 function LabForm({ initial, onSave, onClose }) {
-  const [form, setForm] = useState(initial || {
-    name: '', brand: '', address: '', area: '', city: '', state: '', pincode: '',
-    phone: '', email: '', homeCollection: false, featured: false, description: '',
+  const [form, setForm] = useState({
+    name: initial?.name || '',
+    brand: initial?.brand?._id || initial?.brand || '',
+    address: initial?.address || '',
+    area: initial?.area || '',
+    city: initial?.city || '',
+    state: initial?.state || '',
+    pincode: initial?.pincode || '',
+    phone: initial?.phone || '',
+    email: initial?.email || '',
+    homeCollection: initial?.homeCollection || false,
+    featured: initial?.featured || false,
+    description: initial?.description || '',
   });
   const [loading, setLoading] = useState(false);
+  const [brands, setBrands] = useState([]);
+  const [cityBrands, setCityBrands] = useState([]);
+
+  useEffect(() => {
+    brandApi.getAll({ limit: 200 }).then((r) => setBrands(r.data.items || []));
+  }, []);
+
+  useEffect(() => {
+    if (form.city && form.city.length >= 2) {
+      brandApi.getByCity(form.city).then((r) => setCityBrands(r.data.items || []));
+    } else {
+      setCityBrands([]);
+    }
+  }, [form.city]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e) => {
@@ -45,11 +69,40 @@ function LabForm({ initial, onSave, onClose }) {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Brand / Chain
-            <span className="text-xs text-gray-400 font-normal ml-1">(for multi-branch)</span>
+            <span className="text-xs text-gray-400 font-normal ml-1">(optional)</span>
           </label>
-          <input value={form.brand || ''} onChange={(e) => set('brand', e.target.value)} className="input" placeholder="e.g. Apollo Diagnostics" />
+          <select value={form.brand || ''} onChange={(e) => set('brand', e.target.value)} className="input">
+            <option value="">— No brand / Independent lab —</option>
+            {brands.map((b) => (
+              <option key={b._id} value={b._id}>
+                {b.name}{b.labCount > 0 ? ` (${b.labCount} branches)` : ''}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
+
+      {/* City-brand hint — shows after city is typed */}
+      {cityBrands.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
+          <FiLayers className="shrink-0 mt-0.5" />
+          <div>
+            <span className="font-medium">Brands already in {form.city}:</span>{' '}
+            {cityBrands.map((b) => (
+              <span key={b._id} className="inline-flex items-center gap-1 mr-2">
+                <button
+                  type="button"
+                  onClick={() => set('brand', b._id)}
+                  className="underline hover:text-amber-900 font-medium"
+                >
+                  {b.name}
+                </button>
+                <span className="text-amber-600">({b.cityBranchCount} branch{b.cityBranchCount > 1 ? 'es' : ''})</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Street / Building No.</label>
         <input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" placeholder="e.g. Shop 12, Civil Lines Road" />
@@ -414,10 +467,10 @@ export default function AdminLabsPage() {
                     <td className="table-cell">
                       {lab.brand ? (
                         <button
-                          onClick={() => { setFilterBrand(lab.brand); setPage(1); }}
+                          onClick={() => { setFilterBrand(lab.brand._id || lab.brand); setPage(1); }}
                           className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full hover:bg-primary-100 transition-colors"
                         >
-                          {lab.brand}
+                          {lab.brand.name || lab.brand}
                         </button>
                       ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>

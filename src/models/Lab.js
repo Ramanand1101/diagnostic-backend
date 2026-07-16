@@ -9,7 +9,7 @@ const labSchema = new mongoose.Schema({
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   name: { type: String, required: true },
   slug: { type: String, unique: true, index: true },
-  brand: { type: String, index: true },   // e.g. "Apollo Diagnostics" — links all branches of same chain
+  brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', default: null, index: true },
   description: String,
   address: String,
   area: String,

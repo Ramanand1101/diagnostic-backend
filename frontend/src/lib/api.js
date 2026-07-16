@@ -74,6 +74,15 @@ export const categoryApi = {
   delete: (id) => api.delete(`/categories/${id}`),
 };
 
+// Brands
+export const brandApi = {
+  getAll: (params) => api.get('/brands', { params }),
+  getByCity: (city) => api.get('/brands/by-city', { params: { city } }),
+  create: (data) => api.post('/brands', data),
+  update: (id, data) => api.put(`/brands/${id}`, data),
+  delete: (id) => api.delete(`/brands/${id}`),
+};
+
 // Products
 export const productApi = {
   getAll: (params) => api.get('/products', { params }),
