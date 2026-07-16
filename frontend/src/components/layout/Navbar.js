@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { FiMenu, FiX, FiUser, FiLogOut, FiPhone, FiShoppingCart, FiMail } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 import { CONTACT_PHONE, CONTACT_EMAIL } from '@/config/contact';
 
@@ -13,6 +14,7 @@ export default function Navbar() {
   const { count: cartCount } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -28,9 +30,17 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleLogout = () => { logout(); setUserOpen(false); router.push('/'); };
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
+    setUserOpen(false);
+    setMenuOpen(false);
+    logout();
+    toast.success(`Logged out successfully. See you soon, ${user?.name?.split(' ')[0] || 'there'}!`, { duration: 3000 });
+    router.push('/');
+  };
 
   return (
+    <>
     <nav className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-16 gap-4">
@@ -115,7 +125,7 @@ export default function Navbar() {
                       <Link href="/dashboard/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Profile</Link>
                       <Link href="/dashboard/bookings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Bookings</Link>
                       <hr className="my-1" />
-                      <button onClick={handleLogout}
+                      <button onClick={() => { setUserOpen(false); setShowLogoutModal(true); }}
                         className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
                         <FiLogOut /> Logout
                       </button>
@@ -156,7 +166,7 @@ export default function Navbar() {
                     {isAdmin ? 'Admin Panel' : 'Dashboard'}
                   </Link>
                   <Link href="/dashboard/bookings" className="block text-gray-700 font-medium py-1" onClick={() => setMenuOpen(false)}>My Bookings</Link>
-                  <button onClick={handleLogout} className="text-red-600 font-medium flex items-center gap-2 py-1"><FiLogOut /> Logout</button>
+                  <button onClick={() => { setMenuOpen(false); setShowLogoutModal(true); }} className="text-red-600 font-medium flex items-center gap-2 py-1"><FiLogOut /> Logout</button>
                 </>
               ) : (
                 <div className="flex gap-3">
@@ -168,5 +178,37 @@ export default function Navbar() {
           </div>
         )}
     </nav>
+
+      {/* ── Logout confirmation modal ── */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center px-4"
+          onClick={() => setShowLogoutModal(false)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FiLogOut className="text-red-500 text-2xl" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Logout?</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Are you sure you want to logout,{' '}
+              <span className="font-semibold text-gray-700">{user?.name?.split(' ')[0]}</span>?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={confirmLogout}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors flex items-center justify-center gap-2">
+                <FiLogOut className="text-sm" /> Yes, Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

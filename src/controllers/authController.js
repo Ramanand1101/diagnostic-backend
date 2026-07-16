@@ -36,10 +36,18 @@ async function createOtpRecord({ identifier, purpose }) {
   return { otp, record };
 }
 
+const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+const MOBILE_RE = /^[6-9]\d{9}$/;
+
 exports.register = asyncHandler(async (req, res) => {
   const { name, email, mobile, password, role } = req.body;
 
-  const exists = await User.findOne({ $or: [{ email }, { mobile }] });
+  if (email && !EMAIL_RE.test(email))
+    return res.status(400).json({ message: 'Please enter a valid email address.' });
+  if (mobile && !MOBILE_RE.test(mobile))
+    return res.status(400).json({ message: 'Mobile number must be exactly 10 digits and start with 6–9.' });
+
+  const exists = await User.findOne({ $or: [{ email }, ...(mobile ? [{ mobile }] : [])] });
   if (exists) return res.status(400).json({ message: 'User already exists' });
 
   const user = await User.create({
@@ -216,9 +224,12 @@ exports.me = asyncHandler(async (req, res) => {
 exports.autoRegister = asyncHandler(async (req, res) => {
   const { name, email, mobile, gender } = req.body;
 
-  if (!name || !email) {
+  if (!name || !email)
     return res.status(400).json({ message: 'Name and email are required to create your account.' });
-  }
+  if (!EMAIL_RE.test(email))
+    return res.status(400).json({ message: 'Please enter a valid email address.' });
+  if (mobile && !MOBILE_RE.test(mobile))
+    return res.status(400).json({ message: 'Mobile number must be exactly 10 digits and start with 6–9.' });
 
   // If account already exists, tell frontend so it can redirect to login
   const exists = await User.findOne({ $or: [{ email }, ...(mobile ? [{ mobile }] : [])] });

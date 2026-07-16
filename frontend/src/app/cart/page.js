@@ -300,8 +300,12 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.phone || form.phone.length < 10) {
-      toast.error('Please enter a valid 10-digit phone number'); return;
+    const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    if (!form.phone || !/^[6-9]\d{9}$/.test(form.phone)) {
+      toast.error('Please enter a valid 10-digit mobile number starting with 6–9.'); return;
+    }
+    if (form.email && !EMAIL_RE.test(form.email)) {
+      toast.error('Please enter a valid email address.'); return;
     }
     if (!pincodeValid) { toast.error('Please enter a valid pincode first'); return; }
 

@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import Spinner from '@/components/ui/Spinner';
 import {
   FiUser, FiMail, FiPhone, FiMapPin, FiNavigation,
-  FiSave, FiPlus, FiTrash2, FiEdit2, FiCheck, FiX,
+  FiSave, FiPlus, FiTrash2, FiEdit2, FiCheck, FiX, FiLock, FiEye, FiEyeOff,
 } from 'react-icons/fi';
 
 const EMPTY_ADDRESS = { label: 'Home', line1: '', city: '', state: '', pincode: '' };
@@ -34,7 +34,44 @@ export default function ProfilePage() {
 
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [pwLoading, setPwLoading] = useState(false);
+  const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false });
+
+  const handlePwChange = (e) => setPwForm({ ...pwForm, [e.target.name]: e.target.value });
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      toast.error('New passwords do not match.'); return;
+    }
+    if (pwForm.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters.'); return;
+    }
+    setPwLoading(true);
+    try {
+      await userApi.changePassword({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword });
+      toast.success('Password changed successfully!');
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  const MOBILE_RE = /^[6-9]\d{9}$/;
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    // Strip non-digits and cap at 10 for phone fields
+    if (name === 'mobile' || name === 'alternateMobile') {
+      setForm({ ...form, [name]: value.replace(/\D/g, '').slice(0, 10) });
+    } else {
+      setForm({ ...form, [name]: value });
+    }
+  };
   const handleDraftChange = (e) => setAddressDraft({ ...addressDraft, [e.target.name]: e.target.value });
 
   // ── Location detection ─────────────────────────────────────────────
@@ -96,6 +133,18 @@ export default function ProfilePage() {
   // ── Save profile ───────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (form.email && !EMAIL_RE.test(form.email)) {
+      toast.error('Please enter a valid email address.'); return;
+    }
+    if (form.alternateEmail && !EMAIL_RE.test(form.alternateEmail)) {
+      toast.error('Please enter a valid alternate email address.'); return;
+    }
+    if (form.mobile && !MOBILE_RE.test(form.mobile)) {
+      toast.error('Mobile number must be exactly 10 digits and start with 6–9.'); return;
+    }
+    if (form.alternateMobile && !MOBILE_RE.test(form.alternateMobile)) {
+      toast.error('Alternate mobile must be exactly 10 digits and start with 6–9.'); return;
+    }
     setLoading(true);
     try {
       const payload = {
@@ -157,7 +206,7 @@ export default function ProfilePage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
             <div className="relative">
               <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-              <input name="mobile" type="tel" value={form.mobile} onChange={handleChange} className="input pl-9" placeholder="10-digit mobile" />
+              <input name="mobile" type="tel" inputMode="numeric" maxLength={10} pattern="[6-9][0-9]{9}" value={form.mobile} onChange={handleChange} className="input pl-9" placeholder="98765 43210" />
             </div>
           </div>
 
@@ -167,7 +216,7 @@ export default function ProfilePage() {
             </label>
             <div className="relative">
               <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-              <input name="alternateMobile" type="tel" value={form.alternateMobile} onChange={handleChange} className="input pl-9" placeholder="Alternate 10-digit mobile" />
+              <input name="alternateMobile" type="tel" inputMode="numeric" maxLength={10} pattern="[6-9][0-9]{9}" value={form.alternateMobile} onChange={handleChange} className="input pl-9" placeholder="98765 43210" />
             </div>
           </div>
 
@@ -280,6 +329,50 @@ export default function ProfilePage() {
           {loading ? <Spinner size="sm" /> : <FiSave />}
           {loading ? 'Saving...' : 'Save Profile'}
         </button>
+      </form>
+
+      {/* ── Change Password ── */}
+      <form onSubmit={handleChangePassword} className="space-y-4 mt-2">
+        <div className="card space-y-4">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2 text-base">
+            <FiLock className="text-primary-500" /> Change Password
+          </h2>
+
+          {[
+            { name: 'currentPassword', label: 'Current Password', key: 'current' },
+            { name: 'newPassword',     label: 'New Password',     key: 'new' },
+            { name: 'confirmPassword', label: 'Confirm New Password', key: 'confirm' },
+          ].map(({ name, label, key }) => (
+            <div key={name}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+              <div className="relative">
+                <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+                <input
+                  name={name}
+                  type={showPw[key] ? 'text' : 'password'}
+                  value={pwForm[name]}
+                  onChange={handlePwChange}
+                  required
+                  className="input pl-9 pr-10"
+                  placeholder={label}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((p) => ({ ...p, [key]: !p[key] }))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPw[key] ? <FiEyeOff className="text-sm" /> : <FiEye className="text-sm" />}
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <button type="submit" disabled={pwLoading}
+            className="btn-primary w-full flex items-center justify-center gap-2 py-3">
+            {pwLoading ? <Spinner size="sm" /> : <FiLock />}
+            {pwLoading ? 'Updating...' : 'Update Password'}
+          </button>
+        </div>
       </form>
     </div>
   );

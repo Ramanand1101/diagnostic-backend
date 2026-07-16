@@ -40,6 +40,7 @@ export const authApi = {
 export const userApi = {
   getMe: () => api.get('/users/me'),
   updateMe: (data) => api.put('/users/me', data),
+  changePassword: (data) => api.put('/users/me/change-password', data),
   getAll: (params) => api.get('/users', { params }),
 };
 

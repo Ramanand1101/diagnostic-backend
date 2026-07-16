@@ -87,10 +87,26 @@ export default function RegisterPage() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  const MOBILE_RE = /^[6-9]\d{9}$/;
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'mobile') {
+      setForm({ ...form, mobile: value.replace(/\D/g, '').slice(0, 10) });
+    } else {
+      setForm({ ...form, [name]: value });
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!EMAIL_RE.test(form.email)) {
+      toast.error('Please enter a valid email address.'); return;
+    }
+    if (form.mobile && !MOBILE_RE.test(form.mobile)) {
+      toast.error('Mobile number must be exactly 10 digits and start with 6–9.'); return;
+    }
     if (form.password !== form.confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -194,10 +210,13 @@ export default function RegisterPage() {
             <input
               name="mobile"
               type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              pattern="[6-9][0-9]{9}"
               value={form.mobile}
               onChange={handleChange}
               className="input"
-              placeholder="+91 98765 43210"
+              placeholder="98765 43210"
             />
           </div>
           <div>
