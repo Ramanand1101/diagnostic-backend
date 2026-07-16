@@ -178,18 +178,14 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
             )}
           </div>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-0.5 text-[11px] text-gray-400">
-            {(labInfo.city || labInfo.state) && (
+            {(labInfo.city || labInfo.address) && (
               <span className="flex items-center gap-0.5">
                 <FiMapPin className="text-[10px]" />
-                {[labInfo.city, labInfo.state].filter(Boolean).join(', ')}
-                {labInfo.address && (
-                  <span className="text-gray-500">
-                    &nbsp;·&nbsp;
-                    <span className="text-gray-600 font-medium">
-                      {labInfo.address.split(',')[0].trim()}
-                    </span>
-                  </span>
-                )}
+                {(() => {
+                  const area = labInfo.address?.split(',')[1]?.trim();
+                  if (area && labInfo.city) return `${area}, ${labInfo.city}`;
+                  return labInfo.city || '';
+                })()}
               </span>
             )}
             {/* View Location tooltip */}
