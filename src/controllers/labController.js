@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Lab = require('../models/Lab');
 const { syncObjects, deleteObject } = require('../services/algoliaSync');
 const makeSlug = require('../utils/slug');
+const { parseCSV } = require('../utils/csvParser');
 
 exports.getCities = asyncHandler(async (req, res) => {
   const cities = await Lab.distinct('city', { approved: true });
@@ -144,4 +145,54 @@ exports.compareLabs = asyncHandler(async (req, res) => {
   const ids = (req.query.ids || '').split(',').filter(Boolean);
   const labs = await Lab.find({ _id: { $in: ids } });
   res.json(labs);
+});
+
+// GET /api/v1/labs/demo-csv — public, returns a downloadable template
+exports.labDemoCsv = (req, res) => {
+  const rows = [
+    'name,city,state,address,phone,email,homeCollection,featured,description',
+    'Vijay Diagnostics Lucknow,Lucknow,Uttar Pradesh,Hazratganj Lucknow 226001,9876543210,vijay@example.com,true,false,NABL certified diagnostic centre',
+    'Apollo Diagnostics Gomti Nagar,Lucknow,Uttar Pradesh,Gomti Nagar Lucknow 226010,9876543211,apollo@example.com,true,true,Premium diagnostics with home collection',
+    'SRL Diagnostics Hazratganj,Lucknow,Uttar Pradesh,Hazratganj Lucknow 226001,9876543212,srl@example.com,true,false,Trusted pathology services',
+  ].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="labs-template.csv"');
+  res.send(rows);
+};
+
+// POST /api/v1/labs/bulk-csv — admin only, file in req.file.buffer
+exports.bulkUploadLabsCsv = asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'CSV file is required.' });
+
+  const { rows } = parseCSV(req.file.buffer);
+  if (!rows.length) return res.status(400).json({ message: 'CSV has no data rows.' });
+
+  const created = [];
+  const errors = [];
+
+  for (const [i, row] of rows.entries()) {
+    if (!row.name) { errors.push({ row: i + 2, error: 'name is required' }); continue; }
+    try {
+      const slug = makeSlug(`${row.name}-${row.city || ''}-${Date.now()}`);
+      const lab = await Lab.create({
+        name: row.name,
+        city: row.city || '',
+        state: row.state || '',
+        address: row.address || '',
+        phone: row.phone || '',
+        email: row.email || '',
+        homeCollection: row.homecollection === 'true' || row.homecollection === '1',
+        featured: row.featured === 'true' || row.featured === '1',
+        description: row.description || '',
+        slug,
+        approved: true,
+        verificationStatus: 'verified',
+      });
+      created.push(lab._id);
+    } catch (err) {
+      errors.push({ row: i + 2, error: err.message });
+    }
+  }
+
+  res.json({ created: created.length, errors, total: rows.length });
 });

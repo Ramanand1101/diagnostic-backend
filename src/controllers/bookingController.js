@@ -73,9 +73,10 @@ exports.createBooking = asyncHandler(async (req, res) => {
 });
 
 exports.listBookings = asyncHandler(async (req, res) => {
-  const { status, lab, page = 1, limit = 20 } = req.query;
+  const { status, lab, q, page = 1, limit = 20 } = req.query;
   const filter = {};
   if (status) filter.status = status;
+  if (q) filter.bookingNo = new RegExp(q, 'i');
 
   if (req.user.role === 'customer') {
     filter.user = req.user._id;

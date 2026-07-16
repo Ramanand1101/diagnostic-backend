@@ -1,10 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { userApi } from '@/lib/api';
 import { formatDate } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
-import { FiCheckCircle } from 'react-icons/fi';
+import { FiCheckCircle, FiSearch } from 'react-icons/fi';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
@@ -12,11 +12,13 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [roleFilter, setRoleFilter] = useState('');
+  const [q, setQ] = useState('');
+  const searchTimer = useRef(null);
   const limit = 20;
 
-  useEffect(() => {
+  const fetchUsers = useCallback(() => {
     setLoading(true);
-    const params = { page, limit };
+    const params = { page, limit, q: q || undefined };
     if (roleFilter) params.role = roleFilter;
     userApi.getAll(params)
       .then((res) => {
@@ -24,17 +26,41 @@ export default function AdminUsersPage() {
         setTotal(res.data.total || 0);
       })
       .finally(() => setLoading(false));
-  }, [page, roleFilter]);
+  }, [page, roleFilter, q]);
+
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  const handleSearchChange = (e) => {
+    clearTimeout(searchTimer.current);
+    const val = e.target.value;
+    searchTimer.current = setTimeout(() => { setQ(val); setPage(1); }, 400);
+  };
 
   const roles = ['', 'superadmin', 'subadmin', 'lab', 'customer'];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <h1 className="text-2xl font-bold text-gray-900">Users</h1>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+          <input
+            type="text"
+            placeholder="Search name, email or mobile…"
+            onChange={handleSearchChange}
+            className="input pl-9 py-2 text-sm w-full"
+          />
+        </div>
+        <span className="ml-auto text-xs text-gray-400">{total} total</span>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
         {roles.map((r) => (
-          <button key={r} onClick={() => { setRoleFilter(r); setPage(1); }} className={`px-3 py-1.5 text-xs font-medium rounded-full capitalize transition-colors ${roleFilter === r ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600'}`}>
+          <button key={r} onClick={() => { setRoleFilter(r); setPage(1); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full capitalize transition-colors ${
+              roleFilter === r ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-300'
+            }`}>
             {r || 'All'}
           </button>
         ))}
@@ -74,6 +100,9 @@ export default function AdminUsersPage() {
                     <td className="table-cell">{formatDate(u.createdAt)}</td>
                   </tr>
                 ))}
+                {users.length === 0 && (
+                  <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-10">No users found</td></tr>
+                )}
               </tbody>
             </table>
           </div>

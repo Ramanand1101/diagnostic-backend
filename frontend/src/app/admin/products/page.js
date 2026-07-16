@@ -1,12 +1,46 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { productApi, categoryApi, labApi } from '@/lib/api';
 import { formatCurrency, formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiUploadCloud, FiDownload } from 'react-icons/fi';
+
+function CsvResultModal({ result, onClose }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3 text-center">
+        <div className="bg-green-50 rounded-xl p-4">
+          <p className="text-2xl font-bold text-green-600">{result.created}</p>
+          <p className="text-xs text-green-700 mt-1">Created</p>
+        </div>
+        <div className="bg-red-50 rounded-xl p-4">
+          <p className="text-2xl font-bold text-red-500">{result.errors?.length || 0}</p>
+          <p className="text-xs text-red-600 mt-1">Errors</p>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-4">
+          <p className="text-2xl font-bold text-gray-700">{result.total}</p>
+          <p className="text-xs text-gray-500 mt-1">Total Rows</p>
+        </div>
+      </div>
+      {result.errors?.length > 0 && (
+        <div className="max-h-48 overflow-y-auto">
+          <p className="text-sm font-medium text-gray-700 mb-2">Row errors:</p>
+          {result.errors.map((e, i) => (
+            <div key={i} className="text-xs text-red-600 bg-red-50 rounded px-3 py-1.5 mb-1">
+              Row {e.row}: {e.error}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex justify-end">
+        <button onClick={onClose} className="btn-primary text-sm">Done</button>
+      </div>
+    </div>
+  );
+}
 
 function ProductForm({ initial, categories, labs, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
@@ -110,40 +144,121 @@ export default function AdminProductsPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [modal, setModal] = useState(null);
-  const limit = 15;
+  const [q, setQ] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvResult, setCsvResult] = useState(null);
+  const csvInputRef = useRef(null);
+  const searchTimer = useRef(null);
+  const limit = 20;
 
-  const fetchAll = () => {
+  const fetchProducts = useCallback(() => {
     setLoading(true);
+    productApi.adminGetAll({ page, limit, q: q || undefined, type: typeFilter || undefined })
+      .then((res) => {
+        setProducts(res.data.items || []);
+        setTotal(res.data.total || 0);
+      })
+      .finally(() => setLoading(false));
+  }, [page, q, typeFilter]);
+
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  useEffect(() => {
     Promise.all([
-      productApi.getAll({ page, limit }),
       categoryApi.getAll({ limit: 100 }),
       labApi.getAll({ limit: 100 }),
-    ]).then(([pRes, cRes, lRes]) => {
-      setProducts(pRes.data.items || pRes.data.products || []);
-      setTotal(pRes.data.total || 0);
+    ]).then(([cRes, lRes]) => {
       setCategories(cRes.data.items || cRes.data.categories || []);
       setLabs(lRes.data.items || lRes.data.labs || []);
-    }).finally(() => setLoading(false));
+    });
+  }, []);
+
+  const handleSearchChange = (e) => {
+    clearTimeout(searchTimer.current);
+    const val = e.target.value;
+    searchTimer.current = setTimeout(() => { setQ(val); setPage(1); }, 400);
   };
 
-  useEffect(() => { fetchAll(); }, [page]);
+  const handleCsvUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith('.csv')) { toast.error('Please select a .csv file'); return; }
+    const fd = new FormData();
+    fd.append('file', file);
+    setCsvUploading(true);
+    try {
+      const res = await productApi.bulkCsv(fd);
+      setCsvResult(res.data);
+      fetchProducts();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setCsvUploading(false);
+      e.target.value = '';
+    }
+  };
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this product?')) return;
     try {
       await productApi.delete(id);
       toast.success('Product deleted');
-      fetchAll();
+      fetchProducts();
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Products</h1>
         <button onClick={() => setModal({ type: 'add' })} className="btn-primary flex items-center gap-2 text-sm">
           <FiPlus /> Add Product
         </button>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+          <input
+            type="text"
+            placeholder="Search by name…"
+            onChange={handleSearchChange}
+            className="input pl-9 py-2 text-sm w-full"
+          />
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <a
+            href={productApi.demoCsvUrl()}
+            download="products-template.csv"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-primary-300 hover:text-primary-600 transition-colors"
+          >
+            <FiDownload className="text-sm" /> Demo CSV
+          </a>
+          <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
+          <button
+            onClick={() => csvInputRef.current?.click()}
+            disabled={csvUploading}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-primary-300 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors disabled:opacity-60"
+          >
+            <FiUploadCloud className="text-sm" />
+            {csvUploading ? 'Uploading…' : 'Upload CSV'}
+          </button>
+        </div>
+      </div>
+
+      {/* Type filter tabs */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {['', 'test', 'package', 'medicine'].map((t) => (
+          <button key={t} onClick={() => { setTypeFilter(t); setPage(1); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full capitalize transition-colors ${
+              typeFilter === t ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-300'
+            }`}>
+            {t || 'All Types'}
+          </button>
+        ))}
+        <span className="ml-auto text-xs text-gray-400">{total} total</span>
       </div>
 
       {loading ? <PageLoader /> : (
@@ -180,6 +295,9 @@ export default function AdminProductsPage() {
                     </td>
                   </tr>
                 ))}
+                {products.length === 0 && (
+                  <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-10">No products found</td></tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -187,14 +305,18 @@ export default function AdminProductsPage() {
       )}
       <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
 
-      <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.type === 'add' ? 'Add Product' : 'Edit Product'} size="lg">
+      <Modal open={!!modal && modal.type !== 'csv'} onClose={() => setModal(null)} title={modal?.type === 'add' ? 'Add Product' : 'Edit Product'} size="lg">
         <ProductForm
           initial={modal?.product}
           categories={categories}
           labs={labs}
-          onSave={() => { setModal(null); fetchAll(); }}
+          onSave={() => { setModal(null); fetchProducts(); }}
           onClose={() => setModal(null)}
         />
+      </Modal>
+
+      <Modal open={!!csvResult} onClose={() => setCsvResult(null)} title="CSV Upload Result" size="sm">
+        {csvResult && <CsvResultModal result={csvResult} onClose={() => setCsvResult(null)} />}
       </Modal>
     </div>
   );

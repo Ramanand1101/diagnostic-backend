@@ -56,6 +56,8 @@ export const labApi = {
   update: (id, data) => api.put(`/labs/${id}`, data),
   approve: (id) => api.patch(`/labs/${id}/approve`),
   reject: (id) => api.patch(`/labs/${id}/reject`),
+  bulkCsv: (formData) => api.post('/labs/bulk-csv', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  demoCsvUrl: () => `${BASE_URL}/labs/demo-csv`,
 };
 
 // Categories
@@ -70,11 +72,14 @@ export const categoryApi = {
 // Products
 export const productApi = {
   getAll: (params) => api.get('/products', { params }),
+  adminGetAll: (params) => api.get('/products/admin', { params }),
   getBySlug: (slug) => api.get(`/products/${slug}`),
   create: (data) => api.post('/products', data),
   update: (id, data) => api.put(`/products/${id}`, data),
   delete: (id) => api.delete(`/products/${id}`),
   bulkUploadTests: (data) => api.post('/products/bulk-tests', data),
+  bulkCsv: (formData) => api.post('/products/bulk-csv', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  demoCsvUrl: () => `${BASE_URL}/products/demo-csv`,
 };
 
 // Bookings

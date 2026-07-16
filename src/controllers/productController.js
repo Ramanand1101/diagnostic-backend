@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Product = require('../models/Product');
 const { syncObjects, deleteObject } = require('../services/algoliaSync');
 const makeSlug = require('../utils/slug');
+const { parseCSV } = require('../utils/csvParser');
 
 exports.listProducts = asyncHandler(async (req, res) => {
   const { type, q, lab, city, category, brand, featured, fastingRequired, homeCollection, page = 1, limit = 20, sort = '-createdAt' } = req.query;
@@ -199,4 +200,83 @@ exports.bulkUploadTests = asyncHandler(async (req, res) => {
     total: created + skipped,
     labs: labs.map((l) => ({ _id: l._id, name: l.name })),
   });
+});
+
+// GET /api/v1/products/admin — lists ALL products (including inactive) for admin
+exports.adminListProducts = asyncHandler(async (req, res) => {
+  const { q, lab, category, type, isActive, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const filter = {};
+  if (type) filter.type = type;
+  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }];
+  if (category) filter.category = category;
+  if (lab) filter.lab = lab;
+  if (isActive !== undefined) filter.isActive = isActive === 'true';
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const [items, total] = await Promise.all([
+    Product.find(filter).populate('lab', 'name city').populate('category', 'name').sort(sort).skip(skip).limit(Number(limit)),
+    Product.countDocuments(filter),
+  ]);
+  res.json({ items, page: Number(page), limit: Number(limit), total });
+});
+
+// GET /api/v1/products/demo-csv — public template download
+exports.productDemoCsv = (req, res) => {
+  const rows = [
+    'name,type,price,salePrice,reportTime,sampleType,homeCollection,fastingRequired,description,labEmail',
+    'CBC Complete Blood Count,test,299,199,24 hours,Blood,true,true,Measures different components of blood,lab@example.com',
+    'Lipid Profile,test,599,399,24 hours,Blood,true,true,Cholesterol and triglyceride analysis,lab@example.com',
+    'Full Body Checkup Basic,package,1999,1499,48 hours,Blood,true,true,Comprehensive preventive health package,lab@example.com',
+    'Thyroid Profile T3 T4 TSH,test,449,299,24 hours,Blood,true,false,Complete thyroid function test,lab@example.com',
+  ].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="products-template.csv"');
+  res.send(rows);
+};
+
+// POST /api/v1/products/bulk-csv — admin only
+exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'CSV file is required.' });
+
+  const { rows } = parseCSV(req.file.buffer);
+  if (!rows.length) return res.status(400).json({ message: 'CSV has no data rows.' });
+
+  const Lab = require('../models/Lab');
+  const created = [];
+  const errors = [];
+
+  for (const [i, row] of rows.entries()) {
+    if (!row.name) { errors.push({ row: i + 2, error: 'name is required' }); continue; }
+    if (!row.price) { errors.push({ row: i + 2, error: 'price is required' }); continue; }
+
+    try {
+      let labId = null;
+      const emailKey = row.labemail || row.lab_email || row.labemail;
+      if (emailKey) {
+        const lab = await Lab.findOne({ email: new RegExp(`^${emailKey}$`, 'i') }).select('_id');
+        if (lab) labId = lab._id;
+      }
+
+      const slug = makeSlug(`${row.name}-${Date.now()}`);
+      const product = await Product.create({
+        name: row.name,
+        type: row.type || 'test',
+        price: Number(row.price) || 0,
+        salePrice: row.saleprice ? Number(row.saleprice) : undefined,
+        reportTime: row.reporttime || '',
+        sampleType: row.sampletype || '',
+        homeCollection: row.homecollection === 'true' || row.homecollection === '1',
+        fastingRequired: row.fastingrequired === 'true' || row.fastingrequired === '1',
+        description: row.description || '',
+        lab: labId,
+        slug,
+        isActive: true,
+      });
+      created.push(product._id);
+    } catch (err) {
+      errors.push({ row: i + 2, error: err.message });
+    }
+  }
+
+  res.json({ created: created.length, errors, total: rows.length });
 });

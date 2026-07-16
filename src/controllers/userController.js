@@ -49,8 +49,9 @@ exports.changePassword = asyncHandler(async (req, res) => {
 });
 
 exports.listUsers = asyncHandler(async (req, res) => {
-  const { role, page = 1, limit = 20 } = req.query;
+  const { role, q, page = 1, limit = 20 } = req.query;
   const filter = role ? { role } : {};
+  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { email: new RegExp(q, 'i') }, { mobile: new RegExp(q, 'i') }];
   const skip = (Number(page) - 1) * Number(limit);
 
   const [users, total] = await Promise.all([

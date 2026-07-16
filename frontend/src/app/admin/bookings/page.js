@@ -1,13 +1,13 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { bookingApi } from '@/lib/api';
-import { formatDate, formatCurrency, statusColor, getErrorMessage } from '@/utils/helpers';
+import { formatDate, formatCurrency, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
-import { FiEye } from 'react-icons/fi';
+import { FiEye, FiSearch } from 'react-icons/fi';
 
 export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState([]);
@@ -15,13 +15,15 @@ export default function AdminBookingsPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState('');
+  const [q, setQ] = useState('');
   const [selected, setSelected] = useState(null);
   const [newStatus, setNewStatus] = useState('');
+  const searchTimer = useRef(null);
   const limit = 20;
 
-  const fetchBookings = () => {
+  const fetchBookings = useCallback(() => {
     setLoading(true);
-    const params = { page, limit };
+    const params = { page, limit, q: q || undefined };
     if (statusFilter) params.status = statusFilter;
     bookingApi.getAll(params)
       .then((res) => {
@@ -29,9 +31,15 @@ export default function AdminBookingsPage() {
         setTotal(res.data.total || 0);
       })
       .finally(() => setLoading(false));
-  };
+  }, [page, statusFilter, q]);
 
-  useEffect(() => { fetchBookings(); }, [page, statusFilter]);
+  useEffect(() => { fetchBookings(); }, [fetchBookings]);
+
+  const handleSearchChange = (e) => {
+    clearTimeout(searchTimer.current);
+    const val = e.target.value;
+    searchTimer.current = setTimeout(() => { setQ(val); setPage(1); }, 400);
+  };
 
   const handleStatusUpdate = async () => {
     if (!newStatus) return;
@@ -54,13 +62,36 @@ export default function AdminBookingsPage() {
   const statuses = ['pending', 'confirmed', 'assigned', 'collected', 'processing', 'completed', 'cancelled', 'refunded'];
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
+        <span className="text-xs text-gray-400">{total} total</span>
+      </div>
 
+      {/* Search */}
+      <div className="relative max-w-xs">
+        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+        <input
+          type="text"
+          placeholder="Search booking number…"
+          onChange={handleSearchChange}
+          className="input pl-9 py-2 text-sm w-full"
+        />
+      </div>
+
+      {/* Status filter tabs */}
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => { setStatusFilter(''); setPage(1); }} className={`px-3 py-1.5 text-xs font-medium rounded-full ${!statusFilter ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600'}`}>All</button>
+        <button onClick={() => { setStatusFilter(''); setPage(1); }}
+          className={`px-3 py-1.5 text-xs font-medium rounded-full ${!statusFilter ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600'}`}>
+          All
+        </button>
         {statuses.map((s) => (
-          <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }} className={`px-3 py-1.5 text-xs font-medium rounded-full capitalize ${statusFilter === s ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600'}`}>{s}</button>
+          <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full capitalize transition-colors ${
+              statusFilter === s ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-300'
+            }`}>
+            {s}
+          </button>
         ))}
       </div>
 
@@ -82,7 +113,7 @@ export default function AdminBookingsPage() {
               <tbody className="divide-y divide-gray-50">
                 {bookings.map((b) => (
                   <tr key={b._id} className="hover:bg-gray-50">
-                    <td className="table-cell font-mono font-medium">{b.bookingNo}</td>
+                    <td className="table-cell font-mono font-medium text-xs">{b.bookingNo}</td>
                     <td className="table-cell">{b.user?.name || b.guest?.name || '-'}</td>
                     <td className="table-cell">{formatDate(b.slotDate)}</td>
                     <td className="table-cell"><Badge status={b.status} /></td>
@@ -98,6 +129,9 @@ export default function AdminBookingsPage() {
                     </td>
                   </tr>
                 ))}
+                {bookings.length === 0 && (
+                  <tr><td colSpan={7} className="table-cell text-center text-gray-400 py-10">No bookings found</td></tr>
+                )}
               </tbody>
             </table>
           </div>
