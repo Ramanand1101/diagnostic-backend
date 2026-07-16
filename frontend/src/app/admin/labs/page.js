@@ -14,8 +14,8 @@ import {
 
 function LabForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
-    name: '', city: '', state: '', address: '', phone: '', email: '',
-    homeCollection: false, featured: false, description: '',
+    name: '', address: '', area: '', city: '', state: '', pincode: '',
+    phone: '', email: '', homeCollection: false, featured: false, description: '',
   });
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -36,46 +36,56 @@ function LabForm({ initial, onSave, onClose }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Lab Name *</label>
-          <input required value={form.name} onChange={(e) => set('name', e.target.value)} className="input" />
-        </div>
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Lab Name *</label>
+        <input required value={form.name} onChange={(e) => set('name', e.target.value)} className="input" placeholder="e.g. Apollo Diagnostics" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Street / Building No.</label>
+        <input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" placeholder="e.g. Shop 12, Civil Lines Road" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Area / Locality</label>
+        <input value={form.area || ''} onChange={(e) => set('area', e.target.value)} className="input" placeholder="e.g. Gomti Nagar, Hazratganj" />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-          <input value={form.city} onChange={(e) => set('city', e.target.value)} className="input" />
+          <input value={form.city} onChange={(e) => set('city', e.target.value)} className="input" placeholder="Lucknow" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-          <input value={form.state} onChange={(e) => set('state', e.target.value)} className="input" />
-        </div>
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-          <input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" />
+          <input value={form.state} onChange={(e) => set('state', e.target.value)} className="input" placeholder="Uttar Pradesh" />
         </div>
         <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
+          <input value={form.pincode || ''} onChange={(e) => set('pincode', e.target.value)} className="input" placeholder="226010" maxLength={6} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-          <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" />
+          <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" placeholder="9876543210" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input type="text" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" placeholder="lab@example.com" />
         </div>
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-          <textarea value={form.description} onChange={(e) => set('description', e.target.value)} className="input" rows={3} />
-        </div>
-        <div className="col-span-2 flex flex-wrap gap-5">
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input type="checkbox" checked={form.homeCollection} onChange={(e) => set('homeCollection', e.target.checked)} className="w-4 h-4 text-primary-600 rounded" />
-            Home Collection Available
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input type="checkbox" checked={form.featured} onChange={(e) => set('featured', e.target.checked)} className="w-4 h-4 text-yellow-500 rounded" />
-            <FiStar className="text-yellow-500" /> Mark as Top Lab
-          </label>
-        </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+        <textarea value={form.description} onChange={(e) => set('description', e.target.value)} className="input" rows={2} />
+      </div>
+      <div className="flex flex-wrap gap-5 pt-1">
+        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" checked={form.homeCollection} onChange={(e) => set('homeCollection', e.target.checked)} className="w-4 h-4 text-primary-600 rounded" />
+          Home Collection Available
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" checked={form.featured} onChange={(e) => set('featured', e.target.checked)} className="w-4 h-4 text-yellow-500 rounded" />
+          <FiStar className="text-yellow-500" /> Mark as Top Lab
+        </label>
       </div>
       <div className="flex gap-3 justify-end pt-2">
         <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
