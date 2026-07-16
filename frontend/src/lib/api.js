@@ -182,6 +182,17 @@ export const settingApi = {
   update: (id, data) => api.put(`/settings/${id}`, data),
 };
 
+// Test Master
+export const testMasterApi = {
+  list: (params) => api.get('/test-master', { params }),
+  search: (q) => api.get('/test-master/search', { params: { q } }),
+  create: (data) => api.post('/test-master', data),
+  update: (id, data) => api.put(`/test-master/${id}`, data),
+  delete: (id) => api.delete(`/test-master/${id}`),
+  demoCsv: () => api.get('/test-master/demo-csv', { responseType: 'blob' }),
+  bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/test-master/bulk-csv', fd); },
+};
+
 // Lab CRM (for lab role — filtered to own lab)
 export const labCrmApi = {
   stats: () => api.get('/lab-crm/stats'),

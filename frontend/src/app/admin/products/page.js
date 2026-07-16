@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { productApi, categoryApi, labApi } from '@/lib/api';
+import { productApi, categoryApi, labApi, testMasterApi } from '@/lib/api';
 import { formatCurrency, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
@@ -9,14 +9,19 @@ import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
 import { FiPlus, FiEdit, FiTrash2, FiSearch, FiDollarSign } from 'react-icons/fi';
 
+function formatReportTime(val) {
+  if (!val) return '';
+  const trimmed = val.trim();
+  if (/^\d+$/.test(trimmed)) return `${trimmed} hours`;
+  return trimmed;
+}
+
 function ProductForm({ initial, categories, labs, onSave, onClose }) {
   const [form, setForm] = useState({
     name: initial?.name || '',
     category: initial?.category?._id || initial?.category || '',
     subcategory: initial?.subcategory?._id || initial?.subcategory || '',
     lab: initial?.lab?._id || initial?.lab || '',
-    price: initial?.price || '',
-    salePrice: initial?.salePrice || '',
     discountPercent: initial?.discountPercent || '',
     description: initial?.description || '',
     reportTime: initial?.reportTime || '',
@@ -29,6 +34,12 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
   const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // TestMaster autocomplete
+  const [nameQuery, setNameQuery] = useState(initial?.name || '');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const nameSearchTimer = useRef(null);
+
   useEffect(() => {
     if (form.category) {
       categoryApi.getSubcategories(form.category)
@@ -39,11 +50,49 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
     }
   }, [form.category]);
 
+  const handleNameInput = (e) => {
+    const val = e.target.value;
+    setNameQuery(val);
+    setForm((f) => ({ ...f, name: val }));
+    clearTimeout(nameSearchTimer.current);
+    if (val.trim().length >= 1) {
+      nameSearchTimer.current = setTimeout(() => {
+        testMasterApi.search(val.trim())
+          .then((r) => { setSuggestions(r.data.items || []); setShowSuggestions(true); })
+          .catch(() => setSuggestions([]));
+      }, 300);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSelectTest = (test) => {
+    setNameQuery(test.name);
+    setForm((f) => ({
+      ...f,
+      name: test.name,
+      category: test.category?._id || test.category || f.category,
+      subcategory: test.subcategory?._id || test.subcategory || '',
+      sampleType: test.sampleType || f.sampleType,
+      reportTime: test.reportTime || f.reportTime,
+      fastingRequired: test.fastingRequired ?? f.fastingRequired,
+      homeCollection: test.homeCollection ?? f.homeCollection,
+      description: test.description || f.description,
+    }));
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = { ...form, subcategory: form.subcategory || null };
+      const payload = {
+        ...form,
+        reportTime: formatReportTime(form.reportTime),
+        subcategory: form.subcategory || null,
+      };
       if (initial?._id) await productApi.update(initial._id, payload);
       else await productApi.create(payload);
       toast.success(initial ? 'Product updated!' : 'Product created!');
@@ -58,10 +107,37 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" />
+        {/* Name with TestMaster autocomplete */}
+        <div className="col-span-2 relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Test Name *</label>
+          <input
+            required
+            autoComplete="off"
+            value={nameQuery}
+            onChange={handleNameInput}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+            className="input"
+            placeholder="Type to search from Test Master List…"
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+              {suggestions.map((t) => (
+                <li
+                  key={t._id}
+                  onMouseDown={() => handleSelectTest(t)}
+                  className="px-4 py-2.5 text-sm hover:bg-primary-50 cursor-pointer border-b border-gray-50 last:border-0"
+                >
+                  <p className="font-medium text-gray-800">{t.name}</p>
+                  {(t.category?.name || t.sampleType) && (
+                    <p className="text-xs text-gray-400">{[t.category?.name, t.sampleType].filter(Boolean).join(' · ')}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
           <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value, subcategory: '' })} className="input">
@@ -91,16 +167,14 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹) *</label>
-          <input required type="number" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Sale Price (₹)</label>
-          <input type="number" min="0" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} className="input" />
-        </div>
-        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Report Time</label>
-          <input value={form.reportTime} onChange={(e) => setForm({ ...form, reportTime: e.target.value })} className="input" placeholder="e.g. 24 hours" />
+          <input
+            value={form.reportTime}
+            onChange={(e) => setForm({ ...form, reportTime: e.target.value })}
+            onBlur={() => setForm((f) => ({ ...f, reportTime: formatReportTime(f.reportTime) }))}
+            className="input"
+            placeholder="Type number (e.g. 24) → auto becomes '24 hours'"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Sample Type</label>
@@ -124,6 +198,9 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
           ))}
         </div>
       </div>
+      <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+        Price is set by the lab owner — no price needed here.
+      </p>
       <div className="flex gap-3 justify-end">
         <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
         <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Saving...' : 'Save'}</button>

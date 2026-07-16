@@ -8,7 +8,7 @@ const productSchema = new mongoose.Schema({
   subcategory: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
   lab: { type: mongoose.Schema.Types.ObjectId, ref: 'Lab' },
   description: String,
-  price: { type: Number, required: true },
+  price: { type: Number, default: 0 },
   salePrice: Number,
   discountPercent: Number,
   fastingRequired: { type: Boolean, default: false },
