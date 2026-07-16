@@ -297,18 +297,35 @@ exports.globalSearch = asyncHandler(async (req, res) => {
   if (hasAlgoliaConfig()) {
     try {
       if (type === 'all' || type === 'labs') {
-        const params = { hitsPerPage: limit, filters: 'approved:true' };
+        const params = { hitsPerPage: limit };
         if (city) params.optionalFilters = [`city:${city}`];
         const r = await searchIndex('labs', q, params);
-        response.labs = r.hits || [];
+        // filter in JS — approved facet may or may not be configured in Algolia
+        response.labs = (r.hits || []).filter((l) => l.approved !== false);
       }
       if (type === 'all' || type === 'products') {
-        const r = await searchIndex('products', q, { hitsPerPage: limit, filters: 'isActive:true' });
-        response.products = r.hits || [];
+        // fetch extra so JS filtering still returns enough results
+        const r = await searchIndex('products', q, { hitsPerPage: limit * 2 });
+        const hits = (r.hits || []).filter((p) => p.isActive !== false).slice(0, limit);
+        // If lab is stored as a bare ObjectID string (not populated), Algolia data is stale — use MongoDB
+        const needsReindex = hits.length > 0 && hits.some((p) => typeof p.lab === 'string');
+        if (needsReindex) {
+          const fallback = await mongoSearch(q, 'products', city, limit);
+          response.products = fallback.products;
+        } else {
+          response.products = hits;
+        }
       }
       if (type === 'all' || type === 'pages') {
-        const r = await searchIndex('pages', q, { hitsPerPage: limit, filters: 'isPublished:true' });
-        response.pages = r.hits || [];
+        const r = await searchIndex('pages', q, { hitsPerPage: limit });
+        response.pages = (r.hits || []).filter((p) => p.isPublished !== false);
+      }
+      // If Algolia returned nothing at all, fall back to MongoDB (handles un-indexed state)
+      if (response.products.length === 0 && response.labs.length === 0) {
+        const fallback = await mongoSearch(q, type, city, limit);
+        response.labs = fallback.labs;
+        response.products = fallback.products;
+        response.pages = fallback.pages;
       }
     } catch (algoliaErr) {
       console.warn('Algolia search failed, using MongoDB fallback:', algoliaErr.message);
