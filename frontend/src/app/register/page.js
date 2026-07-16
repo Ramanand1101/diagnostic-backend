@@ -87,7 +87,7 @@ export default function RegisterPage() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.(com|co\.in|co|in|net|info|ai)$/i;
   const MOBILE_RE = /^[6-9]\d{9}$/;
 
   const handleChange = (e) => {
