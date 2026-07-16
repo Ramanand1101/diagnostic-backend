@@ -6,7 +6,7 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { bookingApi, userApi } from '@/lib/api';
+import { bookingApi, userApi, authApi } from '@/lib/api';
 import { getErrorMessage } from '@/utils/helpers';
 import {
   FiTrash2, FiShoppingCart, FiMapPin, FiArrowLeft,
@@ -222,7 +222,7 @@ const DEFAULT_FORM = {
 
 function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
   const router = useRouter();
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, login } = useAuth();
 
   const [form, setForm] = useState(DEFAULT_FORM);
   const [pincodeValid, setPincodeValid] = useState(false);
@@ -267,13 +267,44 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user) { router.push('/login?redirect=/cart'); return; }
     if (!form.phone || form.phone.length < 10) {
       toast.error('Please enter a valid 10-digit phone number'); return;
     }
     if (!pincodeValid) { toast.error('Please enter a valid pincode first'); return; }
 
     setSubmitting(true);
+
+    // Auto-register guest and log them in before booking
+    let activeUser = user;
+    if (!activeUser) {
+      if (!form.email) {
+        toast.error('Please enter your email to create an account and confirm booking.');
+        setSubmitting(false);
+        return;
+      }
+      try {
+        const res = await authApi.autoRegister({
+          name: form.patientName,
+          email: form.email,
+          mobile: form.phone,
+          gender: form.patientGender,
+        });
+        login(res.data.token, res.data.user);
+        activeUser = res.data.user;
+        toast.success(`Account created! Check ${form.email} for your login credentials.`, { duration: 5000 });
+      } catch (err) {
+        const msg = err?.response?.data?.message || '';
+        if (err?.response?.status === 409) {
+          toast.error('An account with this email already exists. Please login first.');
+          router.push(`/login?redirect=/cart`);
+        } else {
+          toast.error(msg || 'Could not create account. Please try again.');
+        }
+        setSubmitting(false);
+        return;
+      }
+    }
+
     try {
       for (const group of groups) {
         const subtotal = group.items.reduce((sum, i) => sum + (i.salePrice || i.price), 0);
@@ -304,7 +335,7 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
         });
       }
       // Save phone to profile if not already set
-      if (!user.mobile && form.phone) {
+      if (!activeUser.mobile && form.phone) {
         try {
           await userApi.updateMe({ mobile: form.phone });
           await refreshUser();
@@ -312,7 +343,10 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
       }
 
       // Clear persisted form
-      try { sessionStorage.removeItem(FORM_KEY(user._id)); } catch {}
+      try {
+        sessionStorage.removeItem(FORM_KEY(activeUser._id || activeUser.id));
+        sessionStorage.removeItem('cart_form_guest');
+      } catch {}
 
       toast.success('Booking confirmed! Check your dashboard.');
       onSuccess();
@@ -429,9 +463,12 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
       )}
 
       {!user && (
-        <p className="text-xs text-center text-gray-500 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
-          <Link href="/login" className="text-primary-600 font-semibold">Login</Link> required to confirm booking
-        </p>
+        <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
+          <FiAlertCircle className="text-blue-500 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-blue-800">
+            No account? No problem — we&apos;ll create one for you automatically and send your login credentials to your email.
+          </p>
+        </div>
       )}
 
       <button
@@ -440,8 +477,10 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
         className="w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold text-sm transition-colors mt-2"
       >
         {submitting
-          ? 'Confirming…'
-          : `Confirm Booking${groups.length > 1 ? ` (${groups.length} labs)` : ''}`}
+          ? (user ? 'Confirming…' : 'Creating account & booking…')
+          : user
+            ? `Confirm Booking${groups.length > 1 ? ` (${groups.length} labs)` : ''}`
+            : `Create Account & Confirm Booking`}
       </button>
     </form>
   );

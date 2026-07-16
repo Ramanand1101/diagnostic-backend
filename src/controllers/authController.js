@@ -210,6 +210,77 @@ exports.me = asyncHandler(async (req, res) => {
   res.json(req.user);
 });
 
+// POST /api/v1/auth/auto-register
+// Called from cart page when a guest submits the booking form.
+// Creates account + sends welcome email with temp password, then returns token.
+exports.autoRegister = asyncHandler(async (req, res) => {
+  const { name, email, mobile, gender } = req.body;
+
+  if (!name || !email) {
+    return res.status(400).json({ message: 'Name and email are required to create your account.' });
+  }
+
+  // If account already exists, tell frontend so it can redirect to login
+  const exists = await User.findOne({ $or: [{ email }, ...(mobile ? [{ mobile }] : [])] });
+  if (exists) {
+    return res.status(409).json({ message: 'An account with this email already exists. Please login to continue.' });
+  }
+
+  const tempPassword = cryptoRandomPassword();
+
+  const user = await User.create({
+    name,
+    email,
+    mobile: mobile || undefined,
+    gender: gender || undefined,
+    password: tempPassword,
+    role: 'customer',
+    verified: true,
+  });
+
+  // Send welcome email with credentials
+  try {
+    await sendMail({
+      to: email,
+      subject: 'Welcome to HealthONTime — Your Account Details',
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
+          <h2 style="color:#16a34a;margin-bottom:4px">Welcome to HealthONTime!</h2>
+          <p style="color:#6b7280;font-size:14px;margin-top:0">Your account has been created automatically while booking.</p>
+          <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0"/>
+          <p style="font-size:14px;color:#111827">Here are your login credentials:</p>
+          <table style="font-size:14px;margin:12px 0;border-collapse:collapse;width:100%">
+            <tr><td style="padding:6px 0;color:#6b7280;width:90px">Email</td><td style="color:#111827;font-weight:600">${email}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280">Password</td><td style="color:#111827;font-weight:600;letter-spacing:1px">${tempPassword}</td></tr>
+          </table>
+          <p style="font-size:13px;color:#f59e0b;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px">
+            ⚠️ This is a temporary password. Please change it after your first login from your profile settings.
+          </p>
+          <a href="https://healthontime.in/login" style="display:inline-block;margin-top:16px;background:#16a34a;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">
+            Login to HealthONTime
+          </a>
+          <p style="font-size:12px;color:#9ca3af;margin-top:20px">If you did not make this booking, please contact support at info@healthontime.in</p>
+        </div>
+      `,
+    });
+  } catch {
+    // Email failure should not block the booking
+  }
+
+  const token = signToken(user);
+  res.status(201).json({
+    token,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      mobile: user.mobile,
+      role: user.role,
+      verified: true,
+    },
+  });
+});
+
 // POST /api/v1/auth/google
 // Receives Google credential (ID token), verifies it, returns JWT.
 exports.googleAuth = asyncHandler(async (req, res) => {

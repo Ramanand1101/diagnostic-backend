@@ -33,6 +33,7 @@ export const authApi = {
   sendOtp: (data) => api.post('/auth/send-otp', data),
   verifyOtp: (data) => api.post('/auth/verify-otp', data),
   me: () => api.get('/auth/me'),
+  autoRegister: (data) => api.post('/auth/auto-register', data),
 };
 
 // Users
