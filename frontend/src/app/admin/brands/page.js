@@ -4,6 +4,7 @@ import { brandApi } from '@/lib/api';
 import { getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
+import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
 import { FiPlus, FiEdit, FiTrash2, FiMapPin, FiGlobe, FiLayers } from 'react-icons/fi';
 
@@ -125,6 +126,16 @@ export default function AdminBrandsPage() {
           <FiPlus /> Add Brand
         </button>
       </div>
+
+      {/* CSV Upload */}
+      <CsvUploadSection
+        title="Bulk Upload Brands via CSV"
+        description="Upload multiple brands at once. Existing brands (matched by name) will be updated."
+        onDemoDownload={brandApi.demoCsv}
+        onUpload={brandApi.bulkCsv}
+        demoFileName="brands-template.csv"
+        onSuccess={fetchBrands}
+      />
 
       {/* How it works card */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-800">

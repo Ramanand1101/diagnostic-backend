@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Category = require('../models/Category');
 const makeSlug = require('../utils/slug');
+const { parseCSV } = require('../utils/csvParser');
 
 // GET /categories  — supports ?parent=null (top-level) or ?parent=<id> (subcategories)
 exports.list = asyncHandler(async (req, res) => {
@@ -26,7 +27,7 @@ exports.list = asyncHandler(async (req, res) => {
   res.json({ items, total, page: Number(page), limit: safeLimit });
 });
 
-// GET /categories/tree — full tree: categories with their subcategories nested
+// GET /categories/tree
 exports.tree = asyncHandler(async (req, res) => {
   const [parents, children] = await Promise.all([
     Category.find({ parent: null, isActive: true }).sort('name').lean(),
@@ -74,7 +75,104 @@ exports.update = asyncHandler(async (req, res) => {
 exports.remove = asyncHandler(async (req, res) => {
   const item = await Category.findByIdAndDelete(req.params.id);
   if (!item) return res.status(404).json({ message: 'Not found' });
-  // cascade delete subcategories
   await Category.deleteMany({ parent: req.params.id });
   res.json({ message: 'Deleted' });
+});
+
+// GET /categories/demo-csv
+exports.demoCsv = (req, res) => {
+  const rows = [
+    'name,parentCategory,description,isActive',
+    '--- Top-level categories: leave parentCategory empty ---,,, ',
+    'Pathology,,Blood and body fluid tests,true',
+    'Radiology,,Imaging and scan services,true',
+    'Packages,,Health checkup bundles,true',
+    '--- Subcategories: put parent name in parentCategory column ---,,, ',
+    'Blood Tests,Pathology,Complete blood analysis tests,true',
+    'Urine Tests,Pathology,Urine examination tests,true',
+    'Stool Tests,Pathology,Stool/fecal analysis tests,true',
+    'Hormones,Pathology,Hormone level tests,true',
+    'Thyroid Tests,Pathology,Thyroid function tests,true',
+    'Liver Function,Pathology,Liver health tests,true',
+    'Kidney Function,Pathology,Kidney health tests,true',
+    'Diabetes,Pathology,Blood sugar and HbA1c tests,true',
+    'Cardiac Tests,Pathology,Heart health tests,true',
+    'X-Ray,Radiology,Digital X-ray services,true',
+    'MRI,Radiology,Magnetic resonance imaging,true',
+    'CT Scan,Radiology,Computed tomography scans,true',
+    'Ultrasound,Radiology,Sonography services,true',
+    'Full Body Checkup,Packages,Comprehensive health packages,true',
+    'Diabetes Package,Packages,Diabetes management packages,true',
+    'Heart Package,Packages,Cardiac health packages,true',
+  ].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="categories-template.csv"');
+  res.send(rows);
+};
+
+// POST /categories/bulk-csv
+// Columns: name, parentCategory (parent name — empty = top-level), description, isActive
+exports.bulkCsv = asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'CSV file required' });
+
+  const { rows } = parseCSV(req.file.buffer);
+  if (!rows.length) return res.status(400).json({ message: 'CSV has no data rows' });
+
+  let created = 0, updated = 0;
+  const errors = [];
+  // Cache parent lookups within this upload
+  const parentCache = {};
+
+  for (const [i, row] of rows.entries()) {
+    const name = (row.name || '').trim();
+    if (!name || name.startsWith('---')) continue; // skip blank/comment rows
+
+    try {
+      // Resolve parent
+      let parentId = null;
+      const parentName = (row.parentcategory || row.parent || '').trim();
+      if (parentName) {
+        if (parentCache[parentName.toLowerCase()]) {
+          parentId = parentCache[parentName.toLowerCase()];
+        } else {
+          const parentDoc = await Category.findOne({ name: new RegExp(`^${parentName}$`, 'i'), parent: null });
+          if (!parentDoc) {
+            errors.push({ row: i + 2, error: `Parent category "${parentName}" not found. Make sure it's listed earlier in the CSV or already exists.` });
+            continue;
+          }
+          parentId = parentDoc._id;
+          parentCache[parentName.toLowerCase()] = parentDoc._id;
+        }
+      }
+
+      const payload = {
+        name,
+        parent: parentId,
+        description: row.description || '',
+        isActive: row.isactive !== 'false',
+      };
+
+      // Upsert: match by name + parent
+      const existing = await Category.findOne({
+        name: new RegExp(`^${name}$`, 'i'),
+        parent: parentId,
+      });
+
+      if (existing) {
+        await Category.findByIdAndUpdate(existing._id, payload);
+        updated++;
+        // Cache top-level for later subcategory rows
+        if (!parentId) parentCache[name.toLowerCase()] = existing._id;
+      } else {
+        const slug = makeSlug(parentId ? `${parentName}-${name}` : name);
+        const doc = await Category.create({ ...payload, slug });
+        created++;
+        if (!parentId) parentCache[name.toLowerCase()] = doc._id;
+      }
+    } catch (err) {
+      errors.push({ row: i + 2, error: err.message });
+    }
+  }
+
+  res.json({ created, updated, errors, total: rows.length });
 });

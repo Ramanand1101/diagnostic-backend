@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { categoryApi } from '@/lib/api';
+import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import { getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
@@ -232,6 +233,15 @@ export default function AdminCategoriesPage() {
           <FiPlus /> Add Category
         </button>
       </div>
+
+      <CsvUploadSection
+        title="Bulk Upload Categories & Subcategories via CSV"
+        description="Leave parentCategory empty for top-level. Put parent name for subcategories. Existing entries are updated."
+        onDemoDownload={categoryApi.demoCsv}
+        onUpload={categoryApi.bulkCsv}
+        demoFileName="categories-template.csv"
+        onSuccess={fetchTree}
+      />
 
       {loading ? <PageLoader /> : tree.length === 0 ? (
         <div className="card p-12 text-center">

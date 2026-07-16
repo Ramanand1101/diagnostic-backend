@@ -6,6 +6,7 @@ import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
+import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
 import {
   FiPlus, FiCheckCircle, FiXCircle, FiEdit, FiStar,
@@ -72,7 +73,7 @@ function LabForm({ initial, onSave, onClose }) {
             <span className="text-xs text-gray-400 font-normal ml-1">(optional)</span>
           </label>
           <select value={form.brand || ''} onChange={(e) => set('brand', e.target.value)} className="input">
-            <option value="">— No brand / Independent lab —</option>
+            <option value="">Choose brand name</option>
             {brands.map((b) => (
               <option key={b._id} value={b._id}>
                 {b.name}{b.labCount > 0 ? ` (${b.labCount} branches)` : ''}
@@ -157,40 +158,6 @@ function LabForm({ initial, onSave, onClose }) {
   );
 }
 
-function CsvResultModal({ result, onClose }) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3 text-center">
-        <div className="bg-green-50 rounded-xl p-4">
-          <p className="text-2xl font-bold text-green-600">{result.created}</p>
-          <p className="text-xs text-green-700 mt-1">Created</p>
-        </div>
-        <div className="bg-red-50 rounded-xl p-4">
-          <p className="text-2xl font-bold text-red-500">{result.errors?.length || 0}</p>
-          <p className="text-xs text-red-600 mt-1">Errors</p>
-        </div>
-        <div className="bg-gray-50 rounded-xl p-4">
-          <p className="text-2xl font-bold text-gray-700">{result.total}</p>
-          <p className="text-xs text-gray-500 mt-1">Total Rows</p>
-        </div>
-      </div>
-      {result.errors?.length > 0 && (
-        <div className="max-h-48 overflow-y-auto">
-          <p className="text-sm font-medium text-gray-700 mb-2">Row errors:</p>
-          {result.errors.map((e, i) => (
-            <div key={i} className="text-xs text-red-600 bg-red-50 rounded px-3 py-1.5 mb-1">
-              Row {e.row}: {e.error}
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="flex justify-end">
-        <button onClick={onClose} className="btn-primary text-sm">Done</button>
-      </div>
-    </div>
-  );
-}
-
 function LabViewModal({ lab, onClose, onEdit }) {
   return (
     <div className="space-y-5">
@@ -271,11 +238,8 @@ export default function AdminLabsPage() {
   const [filterFeatured, setFilterFeatured] = useState(false);
   const [filterBrand, setFilterBrand] = useState('');
   const [q, setQ] = useState('');
-  const [csvUploading, setCsvUploading] = useState(false);
-  const [csvResult, setCsvResult] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [limit, setLimit] = useState(20);
-  const csvInputRef = useRef(null);
   const searchTimer = useRef(null);
 
   const fetchLabs = useCallback(() => {
@@ -317,25 +281,6 @@ export default function AdminLabsPage() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
-  const handleCsvUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.name.endsWith('.csv')) { toast.error('Please select a .csv file'); return; }
-    const fd = new FormData();
-    fd.append('file', file);
-    setCsvUploading(true);
-    try {
-      const res = await labApi.bulkCsv(fd);
-      setCsvResult(res.data);
-      fetchLabs();
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    } finally {
-      setCsvUploading(false);
-      e.target.value = '';
-    }
-  };
-
   const handleApprove = async (id) => {
     try { await labApi.approve(id); toast.success('Lab approved!'); fetchLabs(); }
     catch (err) { toast.error(getErrorMessage(err)); }
@@ -364,6 +309,16 @@ export default function AdminLabsPage() {
         </button>
       </div>
 
+      {/* CSV Upload */}
+      <CsvUploadSection
+        title="Bulk Upload Labs via CSV"
+        description="Upload multiple labs at once. Include brand name column to auto-assign brand."
+        onDemoDownload={labApi.demoCsv}
+        onUpload={labApi.bulkCsv}
+        demoFileName="labs-template.csv"
+        onSuccess={fetchLabs}
+      />
+
       {/* Toolbar: search + CSV buttons */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
@@ -383,24 +338,7 @@ export default function AdminLabsPage() {
             Delete Selected ({selected.size})
           </button>
         )}
-        <div className="flex items-center gap-2 ml-auto">
-          <a
-            href={labApi.demoCsvUrl()}
-            download="labs-template.csv"
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-primary-300 hover:text-primary-600 transition-colors"
-          >
-            <FiDownload className="text-sm" /> Demo CSV
-          </a>
-          <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
-          <button
-            onClick={() => csvInputRef.current?.click()}
-            disabled={csvUploading}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-primary-300 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors disabled:opacity-60"
-          >
-            <FiUploadCloud className="text-sm" />
-            {csvUploading ? 'Uploading…' : 'Upload CSV'}
-          </button>
-        </div>
+        <div className="ml-auto" />
       </div>
 
       {/* Tab filters */}
@@ -528,9 +466,6 @@ export default function AdminLabsPage() {
         />
       </Modal>
 
-      <Modal open={!!csvResult} onClose={() => setCsvResult(null)} title="CSV Upload Result" size="sm">
-        {csvResult && <CsvResultModal result={csvResult} onClose={() => setCsvResult(null)} />}
-      </Modal>
     </div>
   );
 }

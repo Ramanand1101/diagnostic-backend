@@ -1,46 +1,13 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { productApi, categoryApi, labApi } from '@/lib/api';
-import { formatCurrency, formatDate, getErrorMessage } from '@/utils/helpers';
+import { formatCurrency, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
+import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiUploadCloud, FiDownload, FiDollarSign } from 'react-icons/fi';
-
-function CsvResultModal({ result, onClose }) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3 text-center">
-        <div className="bg-green-50 rounded-xl p-4">
-          <p className="text-2xl font-bold text-green-600">{result.created}</p>
-          <p className="text-xs text-green-700 mt-1">Created</p>
-        </div>
-        <div className="bg-red-50 rounded-xl p-4">
-          <p className="text-2xl font-bold text-red-500">{result.errors?.length || 0}</p>
-          <p className="text-xs text-red-600 mt-1">Errors</p>
-        </div>
-        <div className="bg-gray-50 rounded-xl p-4">
-          <p className="text-2xl font-bold text-gray-700">{result.total}</p>
-          <p className="text-xs text-gray-500 mt-1">Total Rows</p>
-        </div>
-      </div>
-      {result.errors?.length > 0 && (
-        <div className="max-h-48 overflow-y-auto">
-          <p className="text-sm font-medium text-gray-700 mb-2">Row errors:</p>
-          {result.errors.map((e, i) => (
-            <div key={i} className="text-xs text-red-600 bg-red-50 rounded px-3 py-1.5 mb-1">
-              Row {e.row}: {e.error}
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="flex justify-end">
-        <button onClick={onClose} className="btn-primary text-sm">Done</button>
-      </div>
-    </div>
-  );
-}
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiDollarSign } from 'react-icons/fi';
 
 function ProductForm({ initial, categories, labs, onSave, onClose }) {
   const [form, setForm] = useState({
@@ -211,11 +178,8 @@ export default function AdminProductsPage() {
   const [modal, setModal] = useState(null);
   const [q, setQ] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [csvUploading, setCsvUploading] = useState(false);
-  const [csvResult, setCsvResult] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [limit, setLimit] = useState(20);
-  const csvInputRef = useRef(null);
   const searchTimer = useRef(null);
 
   const fetchProducts = useCallback(() => {
@@ -247,25 +211,6 @@ export default function AdminProductsPage() {
     clearTimeout(searchTimer.current);
     const val = e.target.value;
     searchTimer.current = setTimeout(() => { setQ(val); setPage(1); }, 400);
-  };
-
-  const handleCsvUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.name.endsWith('.csv')) { toast.error('Please select a .csv file'); return; }
-    const fd = new FormData();
-    fd.append('file', file);
-    setCsvUploading(true);
-    try {
-      const res = await productApi.bulkCsv(fd);
-      setCsvResult(res.data);
-      fetchProducts();
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    } finally {
-      setCsvUploading(false);
-      e.target.value = '';
-    }
   };
 
   const handleDelete = async (id) => {
@@ -336,25 +281,16 @@ export default function AdminProductsPage() {
             </button>
           </>
         )}
-        <div className="flex items-center gap-2 ml-auto">
-          <a
-            href={productApi.demoCsvUrl()}
-            download="products-template.csv"
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-primary-300 hover:text-primary-600 transition-colors"
-          >
-            <FiDownload className="text-sm" /> Demo CSV
-          </a>
-          <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
-          <button
-            onClick={() => csvInputRef.current?.click()}
-            disabled={csvUploading}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-primary-300 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors disabled:opacity-60"
-          >
-            <FiUploadCloud className="text-sm" />
-            {csvUploading ? 'Uploading…' : 'Upload CSV'}
-          </button>
-        </div>
       </div>
+
+      <CsvUploadSection
+        title="Bulk Upload Products via CSV"
+        description="Upload tests/packages for labs or brands. Download the demo CSV to see the required format."
+        onDemoDownload={productApi.demoCsv}
+        onUpload={productApi.bulkCsv}
+        demoFileName="products-template.csv"
+        onSuccess={fetchProducts}
+      />
 
       {/* Type filter tabs */}
       <div className="flex flex-wrap gap-2 items-center">
@@ -433,9 +369,6 @@ export default function AdminProductsPage() {
         <BulkPriceModal count={selected.size} onSave={handleBulkPrice} onClose={() => setModal(null)} />
       </Modal>
 
-      <Modal open={!!csvResult} onClose={() => setCsvResult(null)} title="CSV Upload Result" size="sm">
-        {csvResult && <CsvResultModal result={csvResult} onClose={() => setCsvResult(null)} />}
-      </Modal>
     </div>
   );
 }

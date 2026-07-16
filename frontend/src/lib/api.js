@@ -57,7 +57,8 @@ export const labApi = {
   update: (id, data) => api.put(`/labs/${id}`, data),
   approve: (id) => api.patch(`/labs/${id}/approve`),
   reject: (id) => api.patch(`/labs/${id}/reject`),
-  bulkCsv: (formData) => api.post('/labs/bulk-csv', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/labs/bulk-csv', fd); },
+  demoCsv: () => api.get('/labs/demo-csv', { responseType: 'blob' }),
   demoCsvUrl: () => `${BASE_URL}/labs/demo-csv`,
   bulkDelete: (ids) => api.delete('/labs/bulk-delete', { data: { ids } }),
 };
@@ -72,6 +73,8 @@ export const categoryApi = {
   create: (data) => api.post('/categories', data),
   update: (id, data) => api.put(`/categories/${id}`, data),
   delete: (id) => api.delete(`/categories/${id}`),
+  demoCsv: () => api.get('/categories/demo-csv', { responseType: 'blob' }),
+  bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/categories/bulk-csv', fd); },
 };
 
 // Brands
@@ -81,6 +84,8 @@ export const brandApi = {
   create: (data) => api.post('/brands', data),
   update: (id, data) => api.put(`/brands/${id}`, data),
   delete: (id) => api.delete(`/brands/${id}`),
+  demoCsv: () => api.get('/brands/demo-csv', { responseType: 'blob' }),
+  bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/brands/bulk-csv', fd); },
 };
 
 // Products
@@ -92,8 +97,9 @@ export const productApi = {
   update: (id, data) => api.put(`/products/${id}`, data),
   delete: (id) => api.delete(`/products/${id}`),
   bulkUploadTests: (data) => api.post('/products/bulk-tests', data),
-  bulkCsv: (formData) => api.post('/products/bulk-csv', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  demoCsv: () => api.get('/products/demo-csv', { responseType: 'blob' }),
   demoCsvUrl: () => `${BASE_URL}/products/demo-csv`,
+  bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/products/bulk-csv', fd); },
   bulkDelete: (ids) => api.delete('/products/bulk-delete', { data: { ids } }),
   bulkPrice: (ids, salePrice, discountPercent) => api.patch('/products/bulk-price', { ids, salePrice, discountPercent }),
 };
