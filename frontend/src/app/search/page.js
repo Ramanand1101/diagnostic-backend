@@ -182,6 +182,30 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
               <span className="flex items-center gap-0.5">
                 <FiMapPin className="text-[10px]" />
                 {[labInfo.city, labInfo.state].filter(Boolean).join(', ')}
+                {labInfo.address && (
+                  <span className="text-gray-500">
+                    &nbsp;·&nbsp;
+                    <span className="text-gray-600 font-medium">
+                      {labInfo.address.split(',')[0].trim()}
+                    </span>
+                  </span>
+                )}
+              </span>
+            )}
+            {/* View Location tooltip */}
+            {(labInfo.address || labInfo.pincode) && (
+              <span className="relative group/loc inline-flex items-center cursor-pointer">
+                <span className="flex items-center gap-0.5 text-primary-500 hover:text-primary-700 transition-colors font-medium">
+                  <FiMapPin className="text-[10px]" />
+                  <span>View Location</span>
+                </span>
+                {/* Tooltip */}
+                <span className="pointer-events-none absolute left-0 top-full mt-1.5 z-50 w-56 bg-gray-900 text-white text-[11px] rounded-lg px-3 py-2.5 leading-relaxed shadow-xl
+                  opacity-0 group-hover/loc:opacity-100 scale-95 group-hover/loc:scale-100 transition-all duration-150 origin-top-left">
+                  {labInfo.address && <span className="block">{labInfo.address}</span>}
+                  {labInfo.pincode && <span className="block mt-1 text-gray-300">Pincode: {labInfo.pincode}</span>}
+                  {labInfo.city && <span className="block text-gray-400">{[labInfo.city, labInfo.state].filter(Boolean).join(', ')}</span>}
+                </span>
               </span>
             )}
             {labInfo.homeCollection && <span className="text-green-600">🏠 Home</span>}
