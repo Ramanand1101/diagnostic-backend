@@ -39,7 +39,7 @@ exports.getCities = asyncHandler(async (req, res) => {
 
 exports.listLabs = asyncHandler(async (req, res) => {
   const { q, city, approved, featured, homeCollection, page = 1, limit = 20, sort = '-createdAt' } = req.query;
-  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const filter = {};
   if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { city: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }];
   if (city) filter.city = new RegExp(city, 'i');

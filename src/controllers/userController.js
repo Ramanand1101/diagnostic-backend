@@ -50,7 +50,7 @@ exports.changePassword = asyncHandler(async (req, res) => {
 
 exports.listUsers = asyncHandler(async (req, res) => {
   const { role, q, page = 1, limit = 20 } = req.query;
-  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const filter = role ? { role } : {};
   if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { email: new RegExp(q, 'i') }, { mobile: new RegExp(q, 'i') }];
   const skip = (Number(page) - 1) * safeLimit;

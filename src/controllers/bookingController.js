@@ -74,7 +74,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
 exports.listBookings = asyncHandler(async (req, res) => {
   const { status, lab, q, deleted, page = 1, limit = 20 } = req.query;
-  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const filter = { isDeleted: deleted === 'true' };
   if (status) filter.status = status;
   if (q) filter.bookingNo = new RegExp(q, 'i');

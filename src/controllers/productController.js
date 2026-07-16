@@ -224,7 +224,7 @@ exports.bulkUpdatePrice = asyncHandler(async (req, res) => {
 // GET /api/v1/products/admin — lists ALL products (including inactive) for admin
 exports.adminListProducts = asyncHandler(async (req, res) => {
   const { q, lab, category, type, isActive, page = 1, limit = 20, sort = '-createdAt' } = req.query;
-  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const filter = {};
   if (type) filter.type = type;
   if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }];
