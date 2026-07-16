@@ -1,21 +1,42 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { brandApi } from '@/lib/api';
 import { getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
 import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2, FiMapPin, FiGlobe, FiLayers } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiMapPin, FiGlobe, FiLayers, FiUploadCloud, FiX } from 'react-icons/fi';
 
 function BrandForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState({
     name: initial?.name || '',
+    logo: initial?.logo || '',
     website: initial?.website || '',
     description: initial?.description || '',
     isActive: initial?.isActive ?? true,
   });
   const [loading, setLoading] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoRef = useRef(null);
+
+  const handleLogoChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setLogoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('logo', file);
+      const res = await brandApi.uploadLogo(fd);
+      setForm((f) => ({ ...f, logo: res.data.url }));
+      toast.success('Logo uploaded!');
+    } catch {
+      toast.error('Logo upload failed');
+    } finally {
+      setLogoUploading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,6 +56,44 @@ function BrandForm({ initial, onSave, onClose }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Logo upload */}
+      <div className="flex flex-col items-center gap-2">
+        <div
+          onClick={() => !logoUploading && logoRef.current?.click()}
+          className="relative w-28 h-28 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer overflow-hidden hover:border-primary-400 transition-colors bg-gray-50 group"
+        >
+          {logoUploading ? (
+            <div className="text-center">
+              <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-1" />
+              <p className="text-xs text-gray-400">Uploading…</p>
+            </div>
+          ) : form.logo ? (
+            <>
+              <img src={form.logo} alt="Logo" className="w-full h-full object-contain p-3" />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <FiUploadCloud className="text-white text-2xl" />
+              </div>
+            </>
+          ) : (
+            <div className="text-center px-2">
+              <FiUploadCloud className="mx-auto text-gray-300 text-3xl mb-1" />
+              <p className="text-xs text-gray-400">Upload Logo</p>
+            </div>
+          )}
+        </div>
+        <input ref={logoRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogoChange} />
+        <p className="text-xs text-gray-400">PNG, JPG or WebP · Max 5 MB</p>
+        {form.logo && (
+          <button
+            type="button"
+            onClick={() => setForm((f) => ({ ...f, logo: '' }))}
+            className="text-xs text-red-500 hover:underline flex items-center gap-1"
+          >
+            <FiX size={11} /> Remove logo
+          </button>
+        )}
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Brand / Chain Name *</label>
         <input
@@ -76,7 +135,7 @@ function BrandForm({ initial, onSave, onClose }) {
       </label>
       <div className="flex gap-3 justify-end pt-1">
         <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-        <button type="submit" disabled={loading} className="btn-primary">
+        <button type="submit" disabled={loading || logoUploading} className="btn-primary">
           {loading ? 'Saving...' : 'Save Brand'}
         </button>
       </div>
@@ -170,16 +229,28 @@ export default function AdminBrandsPage() {
           {brands.map((brand) => (
             <div key={brand._id} className="card hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900 truncate">{brand.name}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${brand.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                      {brand.isActive ? 'Active' : 'Inactive'}
-                    </span>
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  {/* Logo or initial avatar */}
+                  <div className="w-12 h-12 rounded-xl border border-gray-100 bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                    {brand.logo ? (
+                      <img src={brand.logo} alt={brand.name} className="w-full h-full object-contain p-1" />
+                    ) : (
+                      <span className="text-xl font-bold text-primary-600">
+                        {brand.name[0]?.toUpperCase()}
+                      </span>
+                    )}
                   </div>
-                  {brand.description && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{brand.description}</p>
-                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-gray-900 truncate">{brand.name}</h3>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${brand.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                        {brand.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    {brand.description && (
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">{brand.description}</p>
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button onClick={() => setModal({ type: 'edit', brand })} className="text-gray-400 hover:text-primary-600 p-1.5 rounded-lg hover:bg-gray-100">

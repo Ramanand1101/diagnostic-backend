@@ -74,6 +74,15 @@ exports.remove = asyncHandler(async (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
+// POST /brands/upload-logo
+exports.uploadLogo = asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'Image file required' });
+  const url =
+    req.file.location ||
+    `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${req.file.key}`;
+  res.json({ url });
+});
+
 // GET /brands/demo-csv
 exports.demoCsv = (req, res) => {
   const rows = [

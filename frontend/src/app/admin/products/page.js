@@ -16,7 +16,7 @@ function formatReportTime(val) {
   return trimmed;
 }
 
-function ProductForm({ initial, categories, labs, onSave, onClose }) {
+function ProductForm({ initial, labs, onSave, onClose }) {
   const [form, setForm] = useState({
     name: initial?.name || '',
     category: initial?.category?._id || initial?.category || '',
@@ -31,7 +31,6 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
     isActive: initial?.isActive ?? true,
     isFeatured: initial?.isFeatured || false,
   });
-  const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // TestMaster autocomplete
@@ -40,16 +39,6 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const nameSearchTimer = useRef(null);
-
-  useEffect(() => {
-    if (form.category) {
-      categoryApi.getSubcategories(form.category)
-        .then((r) => setSubcategories(r.data.items || []))
-        .catch(() => setSubcategories([]));
-    } else {
-      setSubcategories([]);
-    }
-  }, [form.category]);
 
   const fetchSuggestions = (q) => {
     setSuggestionsLoading(true);
@@ -178,27 +167,6 @@ function ProductForm({ initial, categories, labs, onSave, onClose }) {
           )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value, subcategory: '' })} className="input">
-            <option value="">Select category</option>
-            {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Subcategory {subcategories.length === 0 && form.category && <span className="text-xs text-gray-400">(none added yet)</span>}
-          </label>
-          <select
-            value={form.subcategory}
-            onChange={(e) => setForm({ ...form, subcategory: e.target.value })}
-            className="input"
-            disabled={!form.category || subcategories.length === 0}
-          >
-            <option value="">Select subcategory</option>
-            {subcategories.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
-          </select>
-        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Lab</label>
           <select value={form.lab} onChange={(e) => setForm({ ...form, lab: e.target.value })} className="input">
@@ -475,7 +443,6 @@ export default function AdminProductsPage() {
       <Modal open={!!modal && (modal.type === 'add' || modal.type === 'edit')} onClose={() => setModal(null)} title={modal?.type === 'add' ? 'Add Product' : 'Edit Product'} size="lg">
         <ProductForm
           initial={modal?.product}
-          categories={categories}
           labs={labs}
           onSave={() => { setModal(null); fetchProducts(); }}
           onClose={() => setModal(null)}

@@ -91,6 +91,7 @@ export const brandApi = {
   delete: (id) => api.delete(`/brands/${id}`),
   demoCsv: () => api.get('/brands/demo-csv', { responseType: 'blob' }),
   bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/brands/bulk-csv', fd); },
+  uploadLogo: (formData) => api.post('/brands/upload-logo', formData),
 };
 
 // Products
