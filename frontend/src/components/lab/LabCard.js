@@ -11,8 +11,14 @@ export default function LabCard({ lab, compareIds, onToggleCompare }) {
     }`}>
       {/* Header */}
       <div className="bg-gradient-to-r from-primary-50 to-secondary-50 px-5 pt-10 pb-8 flex items-start gap-4">
-        <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md">
-          <GiMicroscope className="text-white text-2xl" />
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden bg-white border border-gray-100">
+          {lab.brand?.logo ? (
+            <img src={lab.brand.logo} alt={lab.brand.name} className="w-full h-full object-contain p-1.5" />
+          ) : (
+            <div className="w-full h-full bg-primary-600 flex items-center justify-center">
+              <GiMicroscope className="text-white text-2xl" />
+            </div>
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <Link href={`/labs/${lab.slug}`}>
@@ -20,6 +26,9 @@ export default function LabCard({ lab, compareIds, onToggleCompare }) {
               {lab.name}
             </h3>
           </Link>
+          {lab.brand?.name && (
+            <p className="text-xs text-primary-600 font-medium mt-0.5">{lab.brand.name}</p>
+          )}
           <div className="flex items-center gap-1.5 text-gray-500 text-sm mt-1">
             <FiMapPin className="flex-shrink-0 text-xs" />
             <span className="line-clamp-1">{lab.city}{lab.state ? `, ${lab.state}` : ''}</span>

@@ -154,9 +154,15 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
 
       {/* ── Lab header ── */}
       <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 px-3 py-3 sm:px-4 bg-gray-50 border-b border-gray-200">
-        {/* Avatar */}
-        <div className={`w-9 h-9 sm:w-10 sm:h-10 ${labColor(labInfo.name)} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm mt-0.5 sm:mt-0`}>
-          {initial}
+        {/* Avatar / Brand logo */}
+        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm mt-0.5 sm:mt-0 overflow-hidden bg-white border border-gray-200">
+          {labInfo.brand?.logo ? (
+            <img src={labInfo.brand.logo} alt={labInfo.brand.name || labInfo.name} className="w-full h-full object-contain p-0.5" />
+          ) : (
+            <div className={`w-full h-full ${labColor(labInfo.name)} flex items-center justify-center text-white font-bold text-sm`}>
+              {initial}
+            </div>
+          )}
         </div>
 
         {/* Lab info */}

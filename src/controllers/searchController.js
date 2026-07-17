@@ -97,7 +97,7 @@ async function mongoSearch(q, type, city, limit) {
       ],
     };
     if (cityRegex) filter.city = cityRegex;
-    result.labs = await Lab.find(filter).limit(limit).lean();
+    result.labs = await Lab.find(filter).populate('brand', 'name slug logo').limit(limit).lean();
   }
 
   if (type === 'all' || type === 'products') {
@@ -110,7 +110,11 @@ async function mongoSearch(q, type, city, limit) {
     };
     if (cityLabIds) filter.lab = { $in: cityLabIds };
     result.products = await Product.find(filter)
-      .populate('lab', 'name slug city state address area pincode')
+      .populate({
+        path: 'lab',
+        select: 'name slug city state address area pincode homeCollection ratingAvg verificationStatus accreditation brand',
+        populate: { path: 'brand', select: 'name slug logo' },
+      })
       .limit(limit)
       .lean();
   }

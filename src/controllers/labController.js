@@ -56,7 +56,9 @@ exports.listLabs = asyncHandler(async (req, res) => {
 });
 
 exports.getLabBySlug = asyncHandler(async (req, res) => {
-  const lab = await Lab.findOne({ slug: req.params.slug }).populate('owner', 'name email mobile role');
+  const lab = await Lab.findOne({ slug: req.params.slug })
+    .populate('owner', 'name email mobile role')
+    .populate('brand', 'name slug logo website');
   if (!lab) return res.status(404).json({ message: 'Lab not found' });
   res.json(lab);
 });

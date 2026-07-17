@@ -50,23 +50,34 @@ export default function LabDetailPage() {
         <div className="bg-gradient-to-r from-gray-900 to-primary-700 text-white py-10 px-4">
           <div className="max-w-5xl mx-auto">
             <div className="flex items-start justify-between flex-wrap gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <h1 className="text-3xl font-bold">{lab.name}</h1>
-                  {lab.verificationStatus === 'verified' && (
-                    <FiCheckCircle className="text-secondary-300 text-xl" title="Verified" />
-                  )}
-                </div>
-                <div className="flex items-center gap-1 text-primary-100 text-sm">
-                  <FiMapPin /> {lab.address}{lab.city ? `, ${lab.city}` : ''}
-                </div>
-                {lab.ratingAvg > 0 && (
-                  <div className="flex items-center gap-1 mt-2 text-yellow-300">
-                    <FiStar className="fill-yellow-300" />
-                    <span className="font-semibold">{lab.ratingAvg.toFixed(1)}</span>
-                    <span className="text-primary-200 text-sm">({lab.reviewCount} reviews)</span>
+              <div className="flex items-start gap-4">
+                {/* Brand logo */}
+                {lab.brand?.logo && (
+                  <div className="w-16 h-16 rounded-xl bg-white flex items-center justify-center shadow-md overflow-hidden flex-shrink-0">
+                    <img src={lab.brand.logo} alt={lab.brand.name} className="w-full h-full object-contain p-1.5" />
                   </div>
                 )}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h1 className="text-3xl font-bold">{lab.name}</h1>
+                    {lab.verificationStatus === 'verified' && (
+                      <FiCheckCircle className="text-secondary-300 text-xl" title="Verified" />
+                    )}
+                  </div>
+                  {lab.brand?.name && (
+                    <p className="text-primary-200 text-sm font-medium mb-1">{lab.brand.name}</p>
+                  )}
+                  <div className="flex items-center gap-1 text-primary-100 text-sm">
+                    <FiMapPin /> {lab.address}{lab.city ? `, ${lab.city}` : ''}
+                  </div>
+                  {lab.ratingAvg > 0 && (
+                    <div className="flex items-center gap-1 mt-2 text-yellow-300">
+                      <FiStar className="fill-yellow-300" />
+                      <span className="font-semibold">{lab.ratingAvg.toFixed(1)}</span>
+                      <span className="text-primary-200 text-sm">({lab.reviewCount} reviews)</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 {lab.homeCollection && <span className="badge bg-secondary-500/30 text-white"><FiHome className="mr-1" />Home Collection</span>}
