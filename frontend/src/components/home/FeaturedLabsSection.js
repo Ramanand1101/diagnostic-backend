@@ -28,12 +28,22 @@ export default function FeaturedLabsSection() {
 
   useEffect(() => {
     setLoading(true);
-    const params = { approved: 'true', featured: 'true', limit: 4 };
-    if (city) params.city = city;
-    labApi.getAll(params)
+    const base = { approved: 'true', limit: 4 };
+    if (city) base.city = city;
+
+    labApi.getAll({ ...base, featured: 'true' })
       .then((res) => {
-        setLabs(res.data.items || res.data.labs || []);
-        setTotalInCity(res.data.total || 0);
+        const items = res.data.items || res.data.labs || [];
+        if (items.length > 0) {
+          setLabs(items);
+          setTotalInCity(res.data.total || 0);
+          return;
+        }
+        // No featured labs in this city — fallback to any approved labs
+        return labApi.getAll(base).then((r2) => {
+          setLabs(r2.data.items || r2.data.labs || []);
+          setTotalInCity(r2.data.total || 0);
+        });
       })
       .catch(() => {})
       .finally(() => setLoading(false));

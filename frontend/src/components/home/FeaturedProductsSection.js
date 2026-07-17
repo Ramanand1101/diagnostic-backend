@@ -30,12 +30,22 @@ export default function FeaturedProductsSection() {
 
   useEffect(() => {
     setLoading(true);
-    const params = { isFeatured: 'true', limit: 8 };
-    if (city) params.city = city;
-    productApi.getAll(params)
+    const base = { isActive: 'true', limit: 8 };
+    if (city) base.city = city;
+
+    productApi.getAll({ ...base, isFeatured: 'true' })
       .then((res) => {
-        setProducts(res.data.items || []);
-        setTotal(res.data.total || 0);
+        const items = res.data.items || [];
+        if (items.length > 0) {
+          setProducts(items);
+          setTotal(res.data.total || 0);
+          return;
+        }
+        // No featured products in this city — fallback to any active products
+        return productApi.getAll(base).then((r2) => {
+          setProducts(r2.data.items || []);
+          setTotal(r2.data.total || 0);
+        });
       })
       .catch(() => {})
       .finally(() => setLoading(false));
