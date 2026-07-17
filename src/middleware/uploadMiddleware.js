@@ -3,7 +3,14 @@ const multerS3 = require('multer-s3');
 const path = require('path');
 const { s3, bucket } = require('../config/s3');
 
+// Stub returned when S3 is not configured — prevents startup crash on Vercel
+function notConfigured(field) {
+  const handler = (req, res) => res.status(503).json({ message: 'File upload not available — S3 not configured.' });
+  return { single: () => handler, array: () => handler, fields: () => handler };
+}
+
 function makeUpload(prefix) {
+  if (!bucket) return notConfigured();
   return multer({
     storage: multerS3({
       s3,
@@ -39,6 +46,7 @@ function memoryUpload(options = {}) {
 }
 
 function makePublicUpload(prefix) {
+  if (!bucket) return notConfigured();
   return multer({
     storage: multerS3({
       s3,
