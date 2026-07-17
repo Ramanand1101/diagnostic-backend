@@ -245,25 +245,26 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
             >
               {/* Test info */}
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mb-0.5">
-                  {p.type && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[p.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                      {p.type}
-                    </span>
-                  )}
+                <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{p.name}</p>
+                <div className="flex flex-wrap items-center gap-x-1 mt-0.5">
                   {p.fastingRequired && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-orange-50 text-orange-600 border border-orange-100">Fasting</span>
+                    <span className="text-[10px] text-orange-600 font-medium">Fasting Required</span>
                   )}
-                  {p.reportTime && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-0.5">
-                      <FiClock className="text-[9px]" /> Report time {p.reportTime}
-                    </span>
+                  {p.fastingRequired && p.homeCollection && (
+                    <span className="text-[10px] text-gray-300">·</span>
                   )}
                   {p.homeCollection && (
-                    <span className="hidden sm:inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-green-50 text-green-600 border border-green-100">🏠 Home</span>
+                    <span className="text-[10px] text-green-600 font-medium">Home Collection Available</span>
+                  )}
+                  {(p.fastingRequired || p.homeCollection) && p.reportTime && (
+                    <span className="text-[10px] text-gray-300">·</span>
+                  )}
+                  {p.reportTime && (
+                    <span className="text-[10px] text-blue-600 font-medium flex items-center gap-0.5">
+                      <FiClock className="text-[9px]" /> Reports in - {p.reportTime}
+                    </span>
                   )}
                 </div>
-                <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{p.name}</p>
               </div>
 
               {/* Price + action */}
