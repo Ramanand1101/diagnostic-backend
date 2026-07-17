@@ -254,16 +254,16 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
                   {p.fastingRequired && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-orange-50 text-orange-600 border border-orange-100">Fasting</span>
                   )}
+                  {p.reportTime && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-0.5">
+                      <FiClock className="text-[9px]" /> Report time {p.reportTime}
+                    </span>
+                  )}
                   {p.homeCollection && (
                     <span className="hidden sm:inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-green-50 text-green-600 border border-green-100">🏠 Home</span>
                   )}
                 </div>
                 <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{p.name}</p>
-                {p.reportTime && (
-                  <p className="hidden sm:flex text-[11px] text-gray-400 mt-0.5 items-center gap-0.5">
-                    <FiClock className="text-[10px]" /> {p.reportTime}
-                  </p>
-                )}
               </div>
 
               {/* Price + action */}
