@@ -32,6 +32,13 @@ exports.subscribe = asyncHandler(async (req, res) => {
   res.status(201).json(item);
 });
 
+exports.bulkDelete = asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+  if (!ids?.length) return res.status(400).json({ message: 'No ids provided' });
+  const result = await Newsletter.deleteMany({ _id: { $in: ids } });
+  res.json({ deleted: result.deletedCount });
+});
+
 exports.toggleSubscription = asyncHandler(async (req, res) => {
   const item = await Newsletter.findById(req.params.id);
   if (!item) return res.status(404).json({ message: 'Subscriber not found' });

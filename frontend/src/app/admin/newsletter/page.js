@@ -12,6 +12,7 @@ export default function AdminNewsletterPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [selected, setSelected] = useState(new Set());
   const limit = 20;
 
   const fetchSubscribers = useCallback(() => {
@@ -26,14 +27,19 @@ export default function AdminNewsletterPage() {
 
   useEffect(() => { fetchSubscribers(); }, [fetchSubscribers]);
 
+  const toggleSelect = (id) => setSelected((s) => {
+    const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+  const toggleAll = () => setSelected(
+    selected.size === subscribers.length ? new Set() : new Set(subscribers.map((s) => s._id))
+  );
+
   const handleToggle = async (s) => {
     try {
       await newsletterApi.toggle(s._id);
       toast.success(s.subscribed ? `${s.email} unsubscribed` : `${s.email} re-subscribed`);
       fetchSubscribers();
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const handleDelete = async (s) => {
@@ -42,9 +48,18 @@ export default function AdminNewsletterPage() {
       await newsletterApi.delete(s._id);
       toast.success('Subscriber deleted');
       fetchSubscribers();
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    }
+    } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selected.size) return;
+    if (!confirm(`Delete ${selected.size} subscriber(s)? This cannot be undone.`)) return;
+    try {
+      await newsletterApi.bulkDelete([...selected]);
+      toast.success(`${selected.size} subscriber(s) deleted`);
+      setSelected(new Set());
+      fetchSubscribers();
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   return (
@@ -60,11 +75,38 @@ export default function AdminNewsletterPage() {
         </div>
       </div>
 
+      {/* Bulk delete bar */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <span className="text-sm text-red-700 font-medium">{selected.size} selected</span>
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+          >
+            <FiTrash2 size={12} /> Delete Selected
+          </button>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="text-xs text-red-500 hover:underline ml-auto"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {loading ? <PageLoader /> : (
         <div className="card p-0 overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
+                <th className="table-header w-8">
+                  <input
+                    type="checkbox"
+                    checked={subscribers.length > 0 && selected.size === subscribers.length}
+                    onChange={toggleAll}
+                    className="rounded"
+                  />
+                </th>
                 <th className="table-header">Email</th>
                 <th className="table-header">Source</th>
                 <th className="table-header">Status</th>
@@ -74,10 +116,13 @@ export default function AdminNewsletterPage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {subscribers.length === 0 && (
-                <tr><td colSpan={5} className="table-cell text-center text-gray-400 py-10">No subscribers yet</td></tr>
+                <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-10">No subscribers yet</td></tr>
               )}
               {subscribers.map((s) => (
-                <tr key={s._id} className="hover:bg-gray-50">
+                <tr key={s._id} className={`hover:bg-gray-50 ${selected.has(s._id) ? 'bg-red-50' : ''}`}>
+                  <td className="table-cell">
+                    <input type="checkbox" checked={selected.has(s._id)} onChange={() => toggleSelect(s._id)} className="rounded" />
+                  </td>
                   <td className="table-cell font-medium">{s.email}</td>
                   <td className="table-cell text-gray-500">{s.source || 'website'}</td>
                   <td className="table-cell">
@@ -99,7 +144,9 @@ export default function AdminNewsletterPage() {
                             : 'border-green-200 bg-green-50 text-green-600 hover:bg-green-100'
                         }`}
                       >
-                        {s.subscribed ? <><FiUserX size={12} /> Unsubscribe</> : <><FiUserCheck size={12} /> Re-subscribe</>}
+                        {s.subscribed
+                          ? <><FiUserX size={12} /> Unsubscribe</>
+                          : <><FiUserCheck size={12} /> Re-subscribe</>}
                       </button>
                       <button
                         onClick={() => handleDelete(s)}

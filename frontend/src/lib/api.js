@@ -173,6 +173,7 @@ export const newsletterApi = {
   getAll: (params) => api.get('/newsletter', { params }),
   toggle: (id) => api.patch(`/newsletter/${id}/toggle`),
   delete: (id) => api.delete(`/newsletter/${id}`),
+  bulkDelete: (ids) => api.delete('/newsletter/bulk-delete', { data: { ids } }),
 };
 
 // Tickets
