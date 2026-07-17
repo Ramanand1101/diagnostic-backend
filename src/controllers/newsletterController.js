@@ -33,6 +33,15 @@ exports.subscribe = asyncHandler(async (req, res) => {
 });
 
 exports.listSubscribers = asyncHandler(async (req, res) => {
-  const items = await Newsletter.find().sort('-createdAt');
-  res.json(items);
+  const { page = 1, limit = 20, q } = req.query;
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
+  const filter = {};
+  if (q) filter.email = new RegExp(q, 'i');
+
+  const skip = (Number(page) - 1) * safeLimit;
+  const [items, total] = await Promise.all([
+    Newsletter.find(filter).sort('-createdAt').skip(skip).limit(safeLimit),
+    Newsletter.countDocuments(filter),
+  ]);
+  res.json({ items, total, page: Number(page), limit: safeLimit });
 });
