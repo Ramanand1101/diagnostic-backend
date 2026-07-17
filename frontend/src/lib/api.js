@@ -269,4 +269,10 @@ export const uploadApi = {
     api.post('/uploads/prescription', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };
 
+// Home Page CMS
+export const homeContentApi = {
+  get: () => api.get('/home-content'),
+  update: (data) => api.put('/home-content', data),
+};
+
 export default api;

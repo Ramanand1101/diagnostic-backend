@@ -36,7 +36,10 @@ exports.getProductBySlug = asyncHandler(async (req, res) => {
 });
 
 exports.createProduct = asyncHandler(async (req, res) => {
-  if (!req.body.slug && req.body.name) req.body.slug = makeSlug(req.body.name);
+  if (!req.body.slug && req.body.name) {
+    const labSuffix = req.body.lab ? String(req.body.lab).slice(-6) : Date.now().toString().slice(-6);
+    req.body.slug = makeSlug(`${req.body.name}-${labSuffix}`);
+  }
   if (['superadmin', 'subadmin'].includes(req.user?.role)) req.body.addedByAdmin = true;
   const product = await Product.create(req.body);
   await syncObjects('products', [{
