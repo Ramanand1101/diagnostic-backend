@@ -65,16 +65,9 @@ export default function HeroSlider() {
     return () => clearTimeout(t);
   }, [swChar, swDel, swIdx, query]);
 
-  /* ── Fetch popular tests from DB on mount ── */
+  /* ── Fetch popular tests when city is selected ── */
   useEffect(() => {
-    searchApi.popular({ limit: 10 })
-      .then((res) => setPopularTests(res.data.tests || []))
-      .catch(() => {});
-  }, []);
-
-  /* ── Re-fetch when city changes ── */
-  useEffect(() => {
-    if (!city) return;
+    if (!city) { setPopularTests([]); return; }
     searchApi.popular({ city, limit: 10 })
       .then((res) => setPopularTests(res.data.tests || []))
       .catch(() => {});
@@ -386,7 +379,14 @@ export default function HeroSlider() {
                 )}
 
                 {showPopular && popularTests.length === 0 && (
-                  <div className="px-4 py-4 text-center text-xs text-gray-400">Loading popular tests…</div>
+                  <div className="px-4 py-5 text-center text-sm text-gray-400">
+                    {city ? 'Loading popular tests…' : (
+                      <span>
+                        <button type="button" onClick={() => setCityModalOpen(true)} className="text-sky-600 font-semibold hover:underline">Select your city</button>
+                        {' '}to see popular tests nearby
+                      </span>
+                    )}
+                  </div>
                 )}
 
                 {/* Live results — shown when typing */}

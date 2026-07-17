@@ -27,6 +27,7 @@ function LabForm({ initial, onSave, onClose }) {
     homeCollection: initial?.homeCollection || false,
     featured: initial?.featured || false,
     description: initial?.description || '',
+    accreditation: initial?.accreditation || [],
   });
   const [loading, setLoading] = useState(false);
   const [brands, setBrands] = useState([]);
@@ -45,12 +46,23 @@ function LabForm({ initial, onSave, onClose }) {
   }, [form.city]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const toggleAccreditation = (val) => {
+    setForm((f) => ({
+      ...f,
+      accreditation: f.accreditation.includes(val)
+        ? f.accreditation.filter((a) => a !== val)
+        : [...f.accreditation, val],
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      if (initial?._id) await labApi.update(initial._id, form);
-      else await labApi.create(form);
+      const payload = { ...form };
+      if (!payload.brand) payload.brand = null;
+      if (initial?._id) await labApi.update(initial._id, payload);
+      else await labApi.create(payload);
       toast.success(initial ? 'Lab updated!' : 'Lab created!');
       onSave();
     } catch (err) {
@@ -139,6 +151,22 @@ function LabForm({ initial, onSave, onClose }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
         <textarea value={form.description} onChange={(e) => set('description', e.target.value)} className="input" rows={2} />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Accreditation / Certifications</label>
+        <div className="flex flex-wrap gap-3">
+          {['NABL', 'ISO 15189', 'CAP', 'NABL-ISO', 'JCI'].map((cert) => (
+            <label key={cert} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.accreditation.includes(cert)}
+                onChange={() => toggleAccreditation(cert)}
+                className="w-4 h-4 text-purple-600 rounded"
+              />
+              {cert}
+            </label>
+          ))}
+        </div>
       </div>
       <div className="flex flex-wrap gap-5 pt-1">
         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
@@ -406,8 +434,15 @@ export default function AdminLabsPage() {
                       {lab.brand ? (
                         <button
                           onClick={() => { setFilterBrand(lab.brand._id || lab.brand); setPage(1); }}
-                          className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full hover:bg-primary-100 transition-colors"
+                          className="flex items-center gap-1.5 text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full hover:bg-primary-100 transition-colors"
                         >
+                          {lab.brand.logo ? (
+                            <img src={lab.brand.logo} alt="" className="w-4 h-4 rounded object-contain" />
+                          ) : (
+                            <span className="w-4 h-4 rounded bg-primary-200 text-primary-700 flex items-center justify-center text-[9px] font-bold shrink-0">
+                              {(lab.brand.name || '?')[0].toUpperCase()}
+                            </span>
+                          )}
                           {lab.brand.name || lab.brand}
                         </button>
                       ) : <span className="text-gray-300 text-xs">—</span>}

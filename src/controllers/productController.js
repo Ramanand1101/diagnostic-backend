@@ -378,5 +378,26 @@ exports.setPrice = asyncHandler(async (req, res) => {
   if (discountPercent !== undefined) product.discountPercent = discountPercent ? Number(discountPercent) : undefined;
   await product.save();
 
+  syncObjects('products', [{
+    objectID: String(product._id),
+    id: String(product._id),
+    type: product.type,
+    name: product.name,
+    slug: product.slug,
+    description: product.description || '',
+    price: product.price,
+    salePrice: product.salePrice || null,
+    discountPercent: product.discountPercent || null,
+    reportTime: product.reportTime || '',
+    homeCollection: !!product.homeCollection,
+    fastingRequired: !!product.fastingRequired,
+    brand: product.brand || '',
+    tags: product.tags || [],
+    category: product.category ? String(product.category) : null,
+    lab: product.lab ? String(product.lab) : null,
+    isFeatured: !!product.isFeatured,
+    isActive: !!product.isActive,
+  }]).catch(() => {});
+
   res.json(product);
 });

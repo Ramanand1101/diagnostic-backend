@@ -303,7 +303,7 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
 
   const F = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const today = new Date().toISOString().split('T')[0];
-  const hasHome = groups.some((g) => g.items.some((i) => i.homeCollection));
+  const hasHome = groups.some((g) => g.items[0]?.lab?.homeCollection || g.items.some((i) => i.homeCollection));
 
   const handleSubmit = async (e) => {
     e.preventDefault();

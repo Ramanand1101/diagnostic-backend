@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Booking = require('../models/Booking');
 const Coupon = require('../models/Coupon');
 const Product = require('../models/Product');
+const { sendMail } = require('../config/email');
 
 function bookingNo() {
   return `BK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -68,6 +69,57 @@ exports.createBooking = asyncHandler(async (req, res) => {
     notes: payload.notes,
     prescriptionUrl: payload.prescriptionUrl
   });
+
+  // Send booking confirmation email (non-blocking)
+  try {
+    const populated = await Booking.findById(booking._id).populate('lab', 'name address city phone');
+    const toEmail = user.email || payload.guest?.email;
+    if (toEmail) {
+      const lab = populated.lab;
+      const itemsHtml = booking.items.map((i) =>
+        `<tr><td style="padding:6px 12px;border-bottom:1px solid #f0f0f0">${i.name}</td><td style="padding:6px 12px;border-bottom:1px solid #f0f0f0;text-align:right">₹${i.price}</td></tr>`
+      ).join('');
+      const labAddress = lab ? [lab.address, lab.city].filter(Boolean).join(', ') : '';
+      await sendMail({
+        to: toEmail,
+        subject: `Booking Confirmed – ${booking.bookingNo}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
+            <div style="background:#0ea5e9;padding:24px 32px;border-radius:12px 12px 0 0">
+              <h1 style="color:#fff;margin:0;font-size:20px">Booking Confirmed ✓</h1>
+              <p style="color:#bae6fd;margin:4px 0 0;font-size:14px">Booking ID: <strong>${booking.bookingNo}</strong></p>
+            </div>
+            <div style="background:#fff;padding:24px 32px;border:1px solid #e5e7eb;border-top:none">
+              <p style="margin:0 0 16px">Hi <strong>${user.name || 'there'}</strong>,<br>Your lab test booking has been confirmed.</p>
+              ${lab ? `<div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+                <p style="margin:0;font-weight:600;font-size:15px">${lab.name}</p>
+                ${labAddress ? `<p style="margin:4px 0 0;color:#64748b;font-size:13px">📍 ${labAddress}</p>` : ''}
+                ${lab.phone ? `<p style="margin:4px 0 0;color:#64748b;font-size:13px">📞 ${lab.phone}</p>` : ''}
+              </div>` : ''}
+              <p style="margin:0 0 6px;font-weight:600">Appointment</p>
+              <p style="margin:0 0 16px;color:#475569;font-size:14px">
+                📅 ${booking.slotDate ? new Date(booking.slotDate).toDateString() : 'To be confirmed'}
+                ${booking.slotTime ? ` at ${booking.slotTime}` : ''}<br>
+                🏠 Visit type: ${booking.visitType === 'home' ? 'Home Collection' : 'Visit Lab'}
+              </p>
+              <table style="width:100%;border-collapse:collapse;font-size:14px">
+                <thead><tr style="background:#f8fafc">
+                  <th style="padding:8px 12px;text-align:left;font-weight:600">Test</th>
+                  <th style="padding:8px 12px;text-align:right;font-weight:600">Price</th>
+                </tr></thead>
+                <tbody>${itemsHtml}</tbody>
+              </table>
+              ${booking.discount > 0 ? `<p style="text-align:right;margin:8px 0 4px;font-size:13px;color:#16a34a">Discount: –₹${booking.discount}</p>` : ''}
+              <p style="text-align:right;margin:8px 0 0;font-weight:700;font-size:16px;color:#0ea5e9">Total: ₹${booking.total}</p>
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+              <p style="font-size:12px;color:#94a3b8;margin:0">If you have any questions, reply to this email or call the lab directly.</p>
+            </div>
+          </div>`,
+      });
+    }
+  } catch (emailErr) {
+    console.error('Booking email failed:', emailErr.message);
+  }
 
   res.status(201).json(booking);
 });

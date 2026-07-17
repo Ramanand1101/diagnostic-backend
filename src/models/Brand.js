@@ -6,6 +6,8 @@ const brandSchema = new mongoose.Schema({
   logo: String,
   description: String,
   website: String,
+  phone: String,
+  email: String,
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 

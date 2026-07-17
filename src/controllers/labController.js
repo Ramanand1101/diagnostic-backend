@@ -50,7 +50,7 @@ exports.listLabs = asyncHandler(async (req, res) => {
   if (homeCollection !== undefined) filter.homeCollection = homeCollection === 'true';
 
   const skip = (Number(page) - 1) * safeLimit;
-  const items = await Lab.find(filter).populate('brand', 'name slug').sort(sort).skip(skip).limit(safeLimit);
+  const items = await Lab.find(filter).populate('brand', 'name slug logo').sort(sort).skip(skip).limit(safeLimit);
   const total = await Lab.countDocuments(filter);
   res.json({ items, page: Number(page), limit: safeLimit, total });
 });

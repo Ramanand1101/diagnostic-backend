@@ -13,6 +13,8 @@ function BrandForm({ initial, onSave, onClose }) {
     name: initial?.name || '',
     logo: initial?.logo || '',
     website: initial?.website || '',
+    phone: initial?.phone || '',
+    email: initial?.email || '',
     description: initial?.description || '',
     isActive: initial?.isActive ?? true,
   });
@@ -113,6 +115,28 @@ function BrandForm({ initial, onSave, onClose }) {
           className="input"
           placeholder="https://www.apollodiagnostics.in"
         />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+          <input
+            type="tel"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            className="input"
+            placeholder="1800-xxx-xxxx"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            className="input"
+            placeholder="contact@brand.com"
+          />
+        </div>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
