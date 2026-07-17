@@ -417,7 +417,13 @@ export default function HomeSettingsPage() {
     setSaving(true);
     try {
       await homeContentApi.update(content);
-      toast.success('Home page content saved!');
+      // Immediately clear the home page cache so changes appear instantly
+      await fetch('/api/revalidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: '/' }),
+      }).catch(() => {});
+      toast.success('Home page updated! Changes are live now.');
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {

@@ -71,7 +71,7 @@ const STEP_ICONS = [FiSearch, FiCalendar, FiFileText];
 async function getHomeContent() {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/home-content`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 10 },
     });
     if (!res.ok) return DEFAULT_CONTENT;
     return await res.json();
