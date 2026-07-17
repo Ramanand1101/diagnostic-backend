@@ -7,7 +7,7 @@ import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiDollarSign } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiDollarSign, FiDownload } from 'react-icons/fi';
 
 function formatReportTime(val) {
   if (!val) return '';
@@ -22,6 +22,8 @@ function ProductForm({ initial, labs, onSave, onClose }) {
     category: initial?.category?._id || initial?.category || '',
     subcategory: initial?.subcategory?._id || initial?.subcategory || '',
     lab: initial?.lab?._id || initial?.lab || '',
+    price: initial?.price || '',
+    salePrice: initial?.salePrice || '',
     discountPercent: initial?.discountPercent || '',
     description: initial?.description || '',
     reportTime: initial?.reportTime || '',
@@ -87,6 +89,8 @@ function ProductForm({ initial, labs, onSave, onClose }) {
         ...form,
         reportTime: formatReportTime(form.reportTime),
         subcategory: form.subcategory || null,
+        price: form.price ? Number(form.price) : undefined,
+        salePrice: form.salePrice ? Number(form.salePrice) : undefined,
       };
       if (initial?._id) await productApi.update(initial._id, payload);
       else await productApi.create(payload);
@@ -192,6 +196,39 @@ function ProductForm({ initial, labs, onSave, onClose }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
           <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input" rows={3} />
         </div>
+        {/* Price fields */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Price (₹)
+            <span className="ml-1 text-xs font-normal text-gray-400">optional — lab can set later</span>
+          </label>
+          <input
+            type="number"
+            min="0"
+            value={form.price}
+            onChange={(e) => setForm({ ...form, price: e.target.value })}
+            className="input"
+            placeholder="e.g. 499"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Sale Price (₹)
+            <span className="ml-1 text-xs font-normal text-gray-400">discounted price</span>
+          </label>
+          <input
+            type="number"
+            min="0"
+            value={form.salePrice}
+            onChange={(e) => setForm({ ...form, salePrice: e.target.value })}
+            className="input"
+            placeholder="e.g. 349"
+          />
+        </div>
+        {form.price && form.salePrice && Number(form.salePrice) >= Number(form.price) && (
+          <div className="col-span-2">
+            <p className="text-xs text-red-500">Sale price should be less than the regular price</p>
+          </div>
+        )}
         <div className="col-span-2 flex flex-wrap gap-4">
           {[
             { key: 'homeCollection', label: 'Home Collection' },
@@ -206,9 +243,6 @@ function ProductForm({ initial, labs, onSave, onClose }) {
           ))}
         </div>
       </div>
-      <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-        Price is set by the lab owner — no price needed here.
-      </p>
       <div className="flex gap-3 justify-end">
         <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
         <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Saving...' : 'Save'}</button>
@@ -265,6 +299,7 @@ export default function AdminProductsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [selected, setSelected] = useState(new Set());
   const [limit, setLimit] = useState(20);
+  const [downloading, setDownloading] = useState(false);
   const searchTimer = useRef(null);
 
   const fetchProducts = useCallback(() => {
@@ -318,6 +353,24 @@ export default function AdminProductsPage() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
+  const handleDownloadAll = async () => {
+    setDownloading(true);
+    try {
+      const res = await productApi.exportCsv({ q: q || undefined, category: typeFilter || undefined });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `products-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('CSV downloaded!');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const handleBulkPrice = async (salePrice, discountPercent) => {
     try {
       await productApi.bulkPrice([...selected], salePrice ? Number(salePrice) : undefined, discountPercent ? Number(discountPercent) : undefined);
@@ -334,9 +387,19 @@ export default function AdminProductsPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-        <button onClick={() => setModal({ type: 'add' })} className="btn-primary flex items-center gap-2 text-sm">
-          <FiPlus /> Add Product
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadAll}
+            disabled={downloading}
+            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+          >
+            <FiDownload className={downloading ? 'animate-spin' : ''} />
+            {downloading ? 'Downloading…' : 'Download All CSV'}
+          </button>
+          <button onClick={() => setModal({ type: 'add' })} className="btn-primary flex items-center gap-2 text-sm">
+            <FiPlus /> Add Product
+          </button>
+        </div>
       </div>
 
       {/* Toolbar */}

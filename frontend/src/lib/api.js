@@ -109,6 +109,7 @@ export const productApi = {
   bulkDelete: (ids) => api.delete('/products/bulk-delete', { data: { ids } }),
   bulkPrice: (ids, salePrice, discountPercent) => api.patch('/products/bulk-price', { ids, salePrice, discountPercent }),
   setPrice: (id, data) => api.patch(`/products/${id}/set-price`, data),
+  exportCsv: (params) => api.get('/products/export-csv', { params, responseType: 'blob' }),
 };
 
 // Bookings

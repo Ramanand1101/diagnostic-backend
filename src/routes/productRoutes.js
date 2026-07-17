@@ -7,6 +7,7 @@ const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 
 
 router.get('/', controller.listProducts);
 router.get('/admin', protect, allowRoles('superadmin', 'subadmin'), controller.adminListProducts);
+router.get('/export-csv', protect, allowRoles('superadmin', 'subadmin'), controller.exportCsv);
 router.get('/demo-csv', controller.productDemoCsv);
 router.post('/bulk-tests', protect, allowRoles('superadmin', 'subadmin'), controller.bulkUploadTests);
 router.post('/bulk-csv', protect, allowRoles('superadmin', 'subadmin'), csvUpload.single('file'), controller.bulkUploadProductsCsv);

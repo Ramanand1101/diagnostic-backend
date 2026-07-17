@@ -401,3 +401,50 @@ exports.setPrice = asyncHandler(async (req, res) => {
 
   res.json(product);
 });
+
+// GET /api/v1/products/export-csv — admin: download all products as CSV
+exports.exportCsv = asyncHandler(async (req, res) => {
+  const { q, lab, category } = req.query;
+  const filter = {};
+  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }];
+  if (category) filter.category = category;
+  if (lab) filter.lab = lab;
+
+  const items = await Product.find(filter)
+    .populate('lab', 'name city email')
+    .populate('category', 'name')
+    .populate('subcategory', 'name')
+    .sort('-createdAt')
+    .limit(10000)
+    .lean();
+
+  const escape = (v) => {
+    const s = v == null ? '' : String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const headers = ['name','price','salePrice','reportTime','sampleType','homeCollection','fastingRequired','description','category','subcategory','lab','labCity','labEmail','isActive','isFeatured','addedByAdmin'];
+  const rows = items.map((p) => [
+    p.name,
+    p.price || '',
+    p.salePrice || '',
+    p.reportTime || '',
+    p.sampleType || '',
+    p.homeCollection ? 'true' : 'false',
+    p.fastingRequired ? 'true' : 'false',
+    (p.description || '').replace(/\n/g, ' '),
+    p.category?.name || '',
+    p.subcategory?.name || '',
+    p.lab?.name || '',
+    p.lab?.city || '',
+    p.lab?.email || '',
+    p.isActive ? 'true' : 'false',
+    p.isFeatured ? 'true' : 'false',
+    p.addedByAdmin ? 'true' : 'false',
+  ].map(escape).join(','));
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="products-export-${Date.now()}.csv"`);
+  res.send(csv);
+});
