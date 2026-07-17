@@ -171,6 +171,8 @@ export const pageApi = {
 export const newsletterApi = {
   subscribe: (data) => api.post('/newsletter/subscribe', data),
   getAll: (params) => api.get('/newsletter', { params }),
+  toggle: (id) => api.patch(`/newsletter/${id}/toggle`),
+  delete: (id) => api.delete(`/newsletter/${id}`),
 };
 
 // Tickets

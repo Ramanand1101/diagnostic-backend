@@ -32,6 +32,20 @@ exports.subscribe = asyncHandler(async (req, res) => {
   res.status(201).json(item);
 });
 
+exports.toggleSubscription = asyncHandler(async (req, res) => {
+  const item = await Newsletter.findById(req.params.id);
+  if (!item) return res.status(404).json({ message: 'Subscriber not found' });
+  item.subscribed = !item.subscribed;
+  await item.save();
+  res.json(item);
+});
+
+exports.deleteSubscriber = asyncHandler(async (req, res) => {
+  const item = await Newsletter.findByIdAndDelete(req.params.id);
+  if (!item) return res.status(404).json({ message: 'Subscriber not found' });
+  res.json({ message: 'Deleted' });
+});
+
 exports.listSubscribers = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, q } = req.query;
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
