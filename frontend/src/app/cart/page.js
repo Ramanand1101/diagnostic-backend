@@ -430,7 +430,19 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Age <span className="text-red-500">*</span></label>
-          <input required type="number" min="1" max="120" value={form.patientAge} onChange={F('patientAge')} className="input text-sm" placeholder="Age" />
+          <input required type="number" min="1" max="100" value={form.patientAge}
+            onKeyDown={(e) => {
+              if (['Backspace','Delete','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key) || e.ctrlKey || e.metaKey) return;
+              if (!/^\d$/.test(e.key)) { e.preventDefault(); return; }
+              const el = e.target;
+              const next = el.value.slice(0, el.selectionStart) + e.key + el.value.slice(el.selectionEnd);
+              if (Number(next) > 100) e.preventDefault();
+            }}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === '' || Number(v) <= 100) F('patientAge')(e);
+            }}
+            className="input text-sm" placeholder="Age (1–100)" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Phone Number <span className="text-red-500">*</span></label>
