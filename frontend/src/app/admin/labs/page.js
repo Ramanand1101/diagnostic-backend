@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { labApi, brandApi } from '@/lib/api';
+import { labApi, brandApi, userApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
@@ -17,6 +17,7 @@ function LabForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState({
     name: initial?.name || '',
     brand: initial?.brand?._id || initial?.brand || '',
+    owner: initial?.owner?._id || initial?.owner || '',
     address: initial?.address || '',
     area: initial?.area || '',
     city: initial?.city || '',
@@ -32,9 +33,11 @@ function LabForm({ initial, onSave, onClose }) {
   const [loading, setLoading] = useState(false);
   const [brands, setBrands] = useState([]);
   const [cityBrands, setCityBrands] = useState([]);
+  const [labUsers, setLabUsers] = useState([]);
 
   useEffect(() => {
     brandApi.getAll({ limit: 200 }).then((r) => setBrands(r.data.items || []));
+    userApi.getAll({ role: 'lab', limit: 200 }).then((r) => setLabUsers(r.data.items || r.data.users || []));
   }, []);
 
   useEffect(() => {
@@ -61,6 +64,7 @@ function LabForm({ initial, onSave, onClose }) {
     try {
       const payload = { ...form };
       if (!payload.brand) payload.brand = null;
+      if (!payload.owner) payload.owner = null;
       if (initial?._id) await labApi.update(initial._id, payload);
       else await labApi.create(payload);
       toast.success(initial ? 'Lab updated!' : 'Lab created!');
@@ -93,6 +97,25 @@ function LabForm({ initial, onSave, onClose }) {
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Owner / Lab User assignment */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Assign Lab Owner (User)
+          <span className="text-xs text-gray-400 font-normal ml-1">— which lab-role user manages this lab</span>
+        </label>
+        <select value={form.owner || ''} onChange={(e) => set('owner', e.target.value)} className="input bg-white">
+          <option value="">— Unassigned —</option>
+          {labUsers.map((u) => (
+            <option key={u._id} value={u._id}>
+              {u.name} ({u.email || u.mobile || u._id})
+            </option>
+          ))}
+        </select>
+        {labUsers.length === 0 && (
+          <p className="text-xs text-gray-400 mt-1">No users with role &quot;lab&quot; found. Go to Users → change a user&apos;s role to &quot;lab&quot; first.</p>
+        )}
       </div>
 
       {/* City-brand hint — shows after city is typed */}
@@ -413,6 +436,7 @@ export default function AdminLabsPage() {
                   </th>
                   <th className="table-header">Name</th>
                   <th className="table-header">Brand / Chain</th>
+                  <th className="table-header">Owner</th>
                   <th className="table-header">City</th>
                   <th className="table-header">Status</th>
                   <th className="table-header">Home Collection</th>
@@ -446,6 +470,21 @@ export default function AdminLabsPage() {
                           {lab.brand.name || lab.brand}
                         </button>
                       ) : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+                    <td className="table-cell">
+                      {lab.owner ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-full bg-secondary-100 text-secondary-700 flex items-center justify-center text-[9px] font-bold">
+                            {(lab.owner.name || '?')[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-gray-800 leading-tight">{lab.owner.name}</p>
+                            <p className="text-[10px] text-gray-400 leading-tight">{lab.owner.email || lab.owner.mobile || ''}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-red-400 font-medium bg-red-50 px-2 py-0.5 rounded-full">Unassigned</span>
+                      )}
                     </td>
                     <td className="table-cell">{lab.city}</td>
                     <td className="table-cell"><Badge status={lab.verificationStatus} /></td>
