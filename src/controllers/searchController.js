@@ -352,9 +352,39 @@ exports.globalSearch = asyncHandler(async (req, res) => {
 });
 
 exports.reindexLabs = asyncHandler(async (req, res) => {
+  const count = await _doReindexLabs();
+  res.json({ message: 'Labs reindexed', count });
+});
+
+const SYNONYM_RULES = [
+  { objectID: 'syn_cbc',        type: 'synonym', synonyms: ['cbc', 'complete blood count', 'haemogram', 'cbp'] },
+  { objectID: 'syn_lft',        type: 'synonym', synonyms: ['lft', 'liver function test', 'liver function'] },
+  { objectID: 'syn_kft',        type: 'synonym', synonyms: ['kft', 'rft', 'kidney function test', 'renal profile', 'renal function'] },
+  { objectID: 'syn_thyroid',    type: 'synonym', synonyms: ['tft', 'tsh', 'thyroid', 'thyroid profile', 'thyroid function test'] },
+  { objectID: 'syn_hba1c',      type: 'synonym', synonyms: ['hba1c', 'a1c', 'glycosylated haemoglobin', 'glycated haemoglobin'] },
+  { objectID: 'syn_vitd',       type: 'synonym', synonyms: ['vitamin d', 'vit d', 'vit d3', '25 oh', 'cholecalciferol'] },
+  { objectID: 'syn_vitb12',     type: 'synonym', synonyms: ['vitamin b12', 'vit b12', 'b12', 'cobalamin'] },
+  { objectID: 'syn_lipid',      type: 'synonym', synonyms: ['lipid', 'lipid profile', 'cholesterol test', 'lipid panel'] },
+  { objectID: 'syn_dengue',     type: 'synonym', synonyms: ['dengue', 'ns1', 'dengue antigen', 'dengue test'] },
+  { objectID: 'syn_typhoid',    type: 'synonym', synonyms: ['typhoid', 'widal', 'salmonella'] },
+  { objectID: 'syn_malaria',    type: 'synonym', synonyms: ['malaria', 'malarial', 'mp', 'malarial parasite'] },
+  { objectID: 'syn_hiv',        type: 'synonym', synonyms: ['hiv', 'aids', 'retroviral'] },
+  { objectID: 'syn_esr',        type: 'synonym', synonyms: ['esr', 'erythrocyte sedimentation rate'] },
+  { objectID: 'syn_crp',        type: 'synonym', synonyms: ['crp', 'c reactive protein', 'c-reactive protein'] },
+  { objectID: 'syn_psa',        type: 'synonym', synonyms: ['psa', 'prostate specific antigen', 'prostate test'] },
+  { objectID: 'syn_uric',       type: 'synonym', synonyms: ['uric acid', 'gout test', 'urate'] },
+  { objectID: 'syn_sugar',      type: 'synonym', synonyms: ['blood sugar', 'glucose', 'sugar test', 'fasting sugar'] },
+  { objectID: 'syn_tb',         type: 'synonym', synonyms: ['tb', 'tuberculosis', 'mtb', 'tb pcr', 'tb gold'] },
+  { objectID: 'syn_pregnancy',  type: 'synonym', synonyms: ['pregnancy test', 'beta hcg', 'hcg', 'pregnancy'] },
+  { objectID: 'syn_syphilis',   type: 'synonym', synonyms: ['syphilis', 'vdrl', 'rpr', 'tpha'] },
+  { objectID: 'syn_hepatitisb', type: 'synonym', synonyms: ['hepatitis b', 'hbsag', 'hbv', 'hbs ag'] },
+  { objectID: 'syn_hepatitisc', type: 'synonym', synonyms: ['hepatitis c', 'hcv', 'hcv ab'] },
+  { objectID: 'syn_pcr',        type: 'synonym', synonyms: ['pcr', 'rt-pcr', 'molecular test', 'dna test', 'rna test'] },
+];
+
+async function _doReindexLabs() {
   const labs = await Lab.find();
   const records = labs.map(labRecord);
-
   await setIndexSettings('labs', {
     searchableAttributes: ['name', 'city', 'address', 'description', 'badges', 'accreditation'],
     attributesForFaceting: [
@@ -363,16 +393,13 @@ exports.reindexLabs = asyncHandler(async (req, res) => {
     ],
     customRanking: ['desc(ratingAvg)', 'desc(reviewCount)'],
   });
-
-  // replaceAllObjects atomically swaps the entire index — removes any stale labs not in MongoDB
   await replaceAllObjects('labs', records);
-  res.json({ message: 'Labs reindexed', count: records.length });
-});
+  return records.length;
+}
 
-exports.reindexProducts = asyncHandler(async (req, res) => {
+async function _doReindexProducts() {
   const products = await Product.find().populate('lab', 'name slug city state address area pincode').lean();
   const records = products.map(productRecord);
-
   await setIndexSettings('products', {
     searchableAttributes: ['name', 'tags', 'description', 'type', 'sampleType'],
     attributesForFaceting: [
@@ -385,53 +412,42 @@ exports.reindexProducts = asyncHandler(async (req, res) => {
     minWordSizefor1Typo: 3,
     minWordSizefor2Typos: 7,
   });
-
-  // Push synonym rules so abbreviations resolve to full test names
   if (hasAlgoliaConfig()) {
     const { getClient, indexName } = require('../config/algolia');
     const client = getClient();
-    const synonymRules = [
-      { objectID: 'syn_cbc',      type: 'synonym', synonyms: ['cbc', 'complete blood count', 'haemogram', 'cbp'] },
-      { objectID: 'syn_lft',      type: 'synonym', synonyms: ['lft', 'liver function test', 'liver function'] },
-      { objectID: 'syn_kft',      type: 'synonym', synonyms: ['kft', 'rft', 'kidney function test', 'renal profile', 'renal function'] },
-      { objectID: 'syn_thyroid',  type: 'synonym', synonyms: ['tft', 'tsh', 'thyroid', 'thyroid profile', 'thyroid function test'] },
-      { objectID: 'syn_hba1c',    type: 'synonym', synonyms: ['hba1c', 'a1c', 'glycosylated haemoglobin', 'glycated haemoglobin'] },
-      { objectID: 'syn_vitd',     type: 'synonym', synonyms: ['vitamin d', 'vit d', 'vit d3', '25 oh', 'cholecalciferol'] },
-      { objectID: 'syn_vitb12',   type: 'synonym', synonyms: ['vitamin b12', 'vit b12', 'b12', 'cobalamin'] },
-      { objectID: 'syn_lipid',    type: 'synonym', synonyms: ['lipid', 'lipid profile', 'cholesterol test', 'lipid panel'] },
-      { objectID: 'syn_dengue',   type: 'synonym', synonyms: ['dengue', 'ns1', 'dengue antigen', 'dengue test'] },
-      { objectID: 'syn_typhoid',  type: 'synonym', synonyms: ['typhoid', 'widal', 'salmonella'] },
-      { objectID: 'syn_malaria',  type: 'synonym', synonyms: ['malaria', 'malarial', 'mp', 'malarial parasite'] },
-      { objectID: 'syn_hiv',      type: 'synonym', synonyms: ['hiv', 'aids', 'retroviral'] },
-      { objectID: 'syn_esr',      type: 'synonym', synonyms: ['esr', 'erythrocyte sedimentation rate'] },
-      { objectID: 'syn_crp',      type: 'synonym', synonyms: ['crp', 'c reactive protein', 'c-reactive protein'] },
-      { objectID: 'syn_psa',      type: 'synonym', synonyms: ['psa', 'prostate specific antigen', 'prostate test'] },
-      { objectID: 'syn_uric',     type: 'synonym', synonyms: ['uric acid', 'gout test', 'urate'] },
-      { objectID: 'syn_sugar',    type: 'synonym', synonyms: ['blood sugar', 'glucose', 'sugar test', 'fasting sugar'] },
-      { objectID: 'syn_tb',       type: 'synonym', synonyms: ['tb', 'tuberculosis', 'mtb', 'tb pcr', 'tb gold'] },
-      { objectID: 'syn_pregnancy', type: 'synonym', synonyms: ['pregnancy test', 'beta hcg', 'hcg', 'pregnancy'] },
-      { objectID: 'syn_syphilis', type: 'synonym', synonyms: ['syphilis', 'vdrl', 'rpr', 'tpha'] },
-      { objectID: 'syn_hepatitisb', type: 'synonym', synonyms: ['hepatitis b', 'hbsag', 'hbv', 'hbs ag'] },
-      { objectID: 'syn_hepatitisc', type: 'synonym', synonyms: ['hepatitis c', 'hcv', 'hcv ab'] },
-      { objectID: 'syn_pcr',      type: 'synonym', synonyms: ['pcr', 'rt-pcr', 'molecular test', 'dna test', 'rna test'] },
-    ];
-    await client.saveSynonyms({ indexName: indexName('products'), synonyms: synonymRules, forwardToReplicas: true });
+    await client.saveSynonyms({ indexName: indexName('products'), synonyms: SYNONYM_RULES, forwardToReplicas: true });
   }
+  await replaceAllObjects('products', records);
+  return records.length;
+}
 
-  await syncObjects('products', records);
-  res.json({ message: 'Products reindexed', count: records.length });
-});
-
-exports.reindexPages = asyncHandler(async (req, res) => {
+async function _doReindexPages() {
   const Page = require('../models/Page');
   const pages = await Page.find({ isPublished: true });
   const records = pages.map(pageRecord);
-
   await setIndexSettings('pages', {
     searchableAttributes: ['title', 'seoTitle', 'seoDescription', 'content'],
     attributesForFaceting: ['filterOnly(isPublished)'],
   });
+  await replaceAllObjects('pages', records);
+  return records.length;
+}
 
-  await syncObjects('pages', records);
-  res.json({ message: 'Pages reindexed', count: records.length });
+exports.reindexProducts = asyncHandler(async (req, res) => {
+  const count = await _doReindexProducts();
+  res.json({ message: 'Products reindexed', count });
+});
+
+exports.reindexPages = asyncHandler(async (req, res) => {
+  const count = await _doReindexPages();
+  res.json({ message: 'Pages reindexed', count });
+});
+
+exports.reindexAll = asyncHandler(async (req, res) => {
+  const [labs, products, pages] = await Promise.all([
+    _doReindexLabs(),
+    _doReindexProducts(),
+    _doReindexPages(),
+  ]);
+  res.json({ message: 'Full reindex complete', labs, products, pages });
 });

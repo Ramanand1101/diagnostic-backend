@@ -256,8 +256,10 @@ export const searchApi = {
   search: (params) => api.get('/search', { params }),
   suggest: (params) => api.get('/search/suggest', { params }),
   popular: (params) => api.get('/search/popular', { params }),
+  reindexAll: () => api.post('/search/reindex/all'),
   reindexLabs: () => api.post('/search/reindex/labs'),
   reindexProducts: () => api.post('/search/reindex/products'),
+  reindexPages: () => api.post('/search/reindex/pages'),
 };
 
 // Hero Slides

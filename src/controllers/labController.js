@@ -1,6 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const Lab = require('../models/Lab');
-const { syncObjects, deleteObject } = require('../services/algoliaSync');
+const { syncObjects, deleteObject, deleteObjects } = require('../services/algoliaSync');
 const makeSlug = require('../utils/slug');
 const { parseCSV } = require('../utils/csvParser');
 
@@ -137,6 +137,8 @@ exports.bulkDeleteLabs = asyncHandler(async (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ message: 'ids array required' });
   const result = await Lab.deleteMany({ _id: { $in: ids } });
+  // Keep Algolia in sync — remove deleted labs so they never show as stale results
+  try { await deleteObjects('labs', ids.map(String)); } catch {}
   res.json({ deleted: result.deletedCount });
 });
 

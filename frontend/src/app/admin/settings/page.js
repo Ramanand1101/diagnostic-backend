@@ -26,9 +26,17 @@ export default function AdminSettingsPage() {
   const handleReindex = async (type) => {
     setReindexing(type);
     try {
-      if (type === 'labs') await searchApi.reindexLabs();
-      else if (type === 'products') await searchApi.reindexProducts();
-      toast.success(`${type} reindexed in Algolia!`);
+      let res;
+      if (type === 'all')      res = await searchApi.reindexAll();
+      else if (type === 'labs')     res = await searchApi.reindexLabs();
+      else if (type === 'products') res = await searchApi.reindexProducts();
+      else if (type === 'pages')    res = await searchApi.reindexPages();
+      const d = res?.data;
+      if (type === 'all') {
+        toast.success(`Full reindex done — Labs: ${d.labs}, Products: ${d.products}, Pages: ${d.pages}`);
+      } else {
+        toast.success(`${type} reindexed — ${d.count} records synced`);
+      }
     } catch (err) { toast.error(getErrorMessage(err)); } finally { setReindexing(''); }
   };
 
@@ -57,8 +65,19 @@ export default function AdminSettingsPage() {
 
       {/* Algolia reindex */}
       <div className="card">
-        <h2 className="font-semibold text-gray-900 mb-4">Search Indexing (Algolia)</h2>
+        <h2 className="font-semibold text-gray-900 mb-1">Search Indexing (Algolia)</h2>
+        <p className="text-xs text-gray-400 mb-4">
+          Use <strong>Reindex All</strong> whenever labs/products are added or deleted — clears stale data from Algolia completely.
+        </p>
         <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => handleReindex('all')}
+            disabled={!!reindexing}
+            className="btn-primary flex items-center gap-2 text-sm"
+          >
+            <FiRefreshCw className={reindexing === 'all' ? 'animate-spin' : ''} />
+            {reindexing === 'all' ? 'Reindexing…' : 'Reindex All (Fresh)'}
+          </button>
           {['labs', 'products', 'pages'].map((type) => (
             <button
               key={type}
@@ -67,7 +86,7 @@ export default function AdminSettingsPage() {
               className="btn-secondary flex items-center gap-2 text-sm"
             >
               <FiRefreshCw className={reindexing === type ? 'animate-spin' : ''} />
-              Reindex {type}
+              {reindexing === type ? 'Reindexing…' : `Reindex ${type}`}
             </button>
           ))}
         </div>

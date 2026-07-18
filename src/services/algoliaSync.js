@@ -19,6 +19,12 @@ async function replaceAllObjects(index, objects) {
   return client.replaceAllObjects({ indexName: indexName(index), objects });
 }
 
+async function deleteObjects(index, objectIDs) {
+  if (!hasAlgoliaConfig()) return null;
+  const client = getClient();
+  return client.deleteObjects({ indexName: indexName(index), objectIDs });
+}
+
 async function setIndexSettings(index, settings) {
   if (!hasAlgoliaConfig()) return null;
   const client = getClient();
@@ -34,4 +40,4 @@ async function searchIndex(index, query, params = {}) {
   });
 }
 
-module.exports = { syncObjects, deleteObject, replaceAllObjects, setIndexSettings, searchIndex };
+module.exports = { syncObjects, deleteObject, deleteObjects, replaceAllObjects, setIndexSettings, searchIndex };
