@@ -59,6 +59,7 @@ export default function FeaturedLabsSection() {
               <h2 className="text-2xl font-bold text-gray-900">
                 {city ? `Top Labs in ${city}` : 'Top Diagnostic Labs'}
               </h2>
+              
               {city && totalInCity > 6 && (
                 <span className="text-xs bg-primary-100 text-primary-700 font-semibold px-2 py-0.5 rounded-full">
                   {totalInCity}+ labs
