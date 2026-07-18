@@ -115,6 +115,8 @@ export const productApi = {
   bulkPrice: (ids, salePrice, discountPercent) => api.patch('/products/bulk-price', { ids, salePrice, discountPercent }),
   setPrice: (id, data) => api.patch(`/products/${id}/set-price`, data),
   exportCsv: (params) => api.get('/products/export-csv', { params, responseType: 'blob' }),
+  labDemoCsv: () => api.get('/products/lab-demo-csv', { responseType: 'blob' }),
+  labBulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/products/lab-bulk-csv', fd); },
 };
 
 // Bookings
@@ -272,6 +274,15 @@ export const heroSlideApi = {
 export const uploadApi = {
   prescription: (data) =>
     api.post('/uploads/prescription', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+};
+
+// Lab Change Requests
+export const labChangeRequestApi = {
+  submit: (data) => api.post('/lab-change-requests', data),
+  getMine: () => api.get('/lab-change-requests/mine'),
+  list: (params) => api.get('/lab-change-requests', { params }),
+  approve: (id) => api.patch(`/lab-change-requests/${id}/approve`),
+  reject: (id, adminNote) => api.patch(`/lab-change-requests/${id}/reject`, { adminNote }),
 };
 
 // Home Page CMS

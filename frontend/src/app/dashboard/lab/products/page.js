@@ -1,11 +1,11 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { labApi, productApi, categoryApi } from '@/lib/api';
+import { useState, useEffect, useRef } from 'react';
+import { labApi, productApi, categoryApi, testMasterApi } from '@/lib/api';
 import { formatCurrency, getErrorMessage } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 import Spinner, { PageLoader } from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
-import { FiPlus, FiEdit2, FiTrash2, FiX, FiSave, FiPackage, FiDollarSign, FiLock } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiX, FiSave, FiPackage, FiDollarSign, FiLock, FiSearch, FiZap, FiUploadCloud, FiDownload, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 
 const EMPTY_PRODUCT = {
   name: '', price: '', salePrice: '',
@@ -65,6 +65,100 @@ function SetPriceModal({ product, onSave, onClose }) {
   );
 }
 
+// ── Bulk Upload Section ──────────────────────────────────────────────────────
+function BulkUploadSection({ onSuccess }) {
+  const [open, setOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState(null);
+  const fileRef = useRef(null);
+
+  const downloadDemo = async () => {
+    try {
+      const res = await productApi.labDemoCsv();
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'lab-tests-template.csv'; a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error('Could not download template'); }
+  };
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setUploading(true);
+    setResult(null);
+    try {
+      const res = await productApi.labBulkCsv(file);
+      setResult(res.data);
+      if (res.data.created > 0) {
+        toast.success(`${res.data.created} test(s) uploaded!`);
+        onSuccess();
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 overflow-hidden">
+      <button onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+        <span className="flex items-center gap-2"><FiUploadCloud className="text-primary-500" /> Bulk Upload Tests via CSV</span>
+        <span className="text-xs text-gray-400">{open ? '▲ Hide' : '▼ Expand'}</span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-gray-200">
+          {/* Instructions */}
+          <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-800 mt-3">
+            <p className="font-semibold mb-1">CSV Columns:</p>
+            <p className="font-mono text-[11px] bg-blue-100 px-2 py-1 rounded">
+              name, price, salePrice, reportTime, sampleType, fastingRequired, homeCollection, description, category, tags
+            </p>
+            <p className="mt-1.5 text-blue-600">Tags use semicolons: <code>cbc;blood;anemia</code></p>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={downloadDemo}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 border border-gray-200 bg-white rounded-lg hover:border-primary-300 transition-colors text-gray-700">
+              <FiDownload size={13} className="text-primary-500" /> Download Template
+            </button>
+            <button onClick={() => fileRef.current?.click()} disabled={uploading}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-60">
+              <FiUploadCloud size={13} /> {uploading ? 'Uploading…' : 'Upload CSV File'}
+            </button>
+            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+          </div>
+
+          {/* Result */}
+          {result && (
+            <div className={`rounded-lg p-3 text-sm ${result.created > 0 ? 'bg-green-50 border border-green-100' : 'bg-gray-50 border border-gray-100'}`}>
+              <div className="flex items-center gap-2 font-medium mb-1">
+                <FiCheckCircle className="text-green-500" size={14} />
+                {result.created} test(s) created out of {result.total} rows
+              </div>
+              {result.errors?.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs font-semibold text-red-600 flex items-center gap-1 mb-1">
+                    <FiAlertTriangle size={11} /> {result.errors.length} error(s):
+                  </p>
+                  <ul className="space-y-0.5">
+                    {result.errors.map((e, i) => (
+                      <li key={i} className="text-xs text-red-600">Row {e.row}: {e.error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LabProductsPage() {
   const [lab, setLab] = useState(null);
   const [products, setProducts] = useState([]);
@@ -78,6 +172,10 @@ export default function LabProductsPage() {
   const [deleting, setDeleting] = useState(null);
   const [priceModal, setPriceModal] = useState(null); // admin-added product
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'admin' | 'mine'
+  const [masterSuggestions, setMasterSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const masterTimer = useRef(null);
+  const nameRef = useRef(null);
 
   useEffect(() => {
     const init = async () => {
@@ -103,6 +201,34 @@ export default function LabProductsPage() {
   const handle = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((f) => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const handleNameChange = (e) => {
+    const val = e.target.value;
+    setForm((f) => ({ ...f, name: val }));
+    clearTimeout(masterTimer.current);
+    if (val.length < 2) { setMasterSuggestions([]); setShowSuggestions(false); return; }
+    masterTimer.current = setTimeout(async () => {
+      try {
+        const res = await testMasterApi.search(val);
+        const items = res.data.items || res.data || [];
+        setMasterSuggestions(items.slice(0, 8));
+        setShowSuggestions(items.length > 0);
+      } catch { setMasterSuggestions([]); }
+    }, 250);
+  };
+
+  const pickMasterTest = (test) => {
+    setForm((f) => ({
+      ...f,
+      name: test.name,
+      description: test.description || f.description,
+      sampleType: test.sampleType || f.sampleType,
+      category: test.category?._id || test.category || f.category,
+      subcategory: test.subcategory?._id || test.subcategory || f.subcategory,
+    }));
+    setShowSuggestions(false);
+    setMasterSuggestions([]);
   };
 
   const openAdd = () => { setForm(EMPTY_PRODUCT); setEditing(null); setShowForm(true); };
@@ -201,6 +327,13 @@ export default function LabProductsPage() {
         )}
       </div>
 
+      {/* Bulk Upload section */}
+      <BulkUploadSection onSuccess={async () => {
+        const [labRes, prodRes] = await Promise.all([labApi.getMine(), productApi.getAll({ lab: lab._id, limit: 200 })]);
+        setLab(labRes.data);
+        setProducts(prodRes.data.items || []);
+      }} />
+
       {/* Alert for unpriced admin tests */}
       {unpricedAdminTests.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
@@ -235,9 +368,50 @@ export default function LabProductsPage() {
             <button onClick={closeForm} className="text-gray-400 hover:text-gray-600"><FiX /></button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-              <input name="name" required value={form.name} onChange={handle} className="input" placeholder="e.g. Complete Blood Count (CBC)" />
+            {/* Name with master test autocomplete */}
+            <div className="relative">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">Name *</label>
+                <span className="flex items-center gap-1 text-xs text-primary-600">
+                  <FiZap size={10} /> Auto-fill from master list
+                </span>
+              </div>
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+                <input
+                  ref={nameRef}
+                  name="name"
+                  required
+                  value={form.name}
+                  onChange={handleNameChange}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  onFocus={() => masterSuggestions.length > 0 && setShowSuggestions(true)}
+                  className="input pl-9"
+                  placeholder="Type test name — suggestions will appear…"
+                  autoComplete="off"
+                />
+              </div>
+              {showSuggestions && masterSuggestions.length > 0 && (
+                <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                  <div className="px-3 py-1.5 bg-primary-50 border-b border-gray-100">
+                    <p className="text-[11px] text-primary-700 font-medium">Master Test List — click to auto-fill</p>
+                  </div>
+                  {masterSuggestions.map((t) => (
+                    <button key={t._id} type="button" onMouseDown={() => pickMasterTest(t)}
+                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-primary-50 text-left transition-colors border-b border-gray-50 last:border-0">
+                      <div className="w-7 h-7 rounded-lg bg-primary-100 flex items-center justify-center shrink-0">
+                        <FiZap size={12} className="text-primary-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{t.name}</p>
+                        <p className="text-[11px] text-gray-400 truncate">
+                          {[t.category?.name, t.sampleType].filter(Boolean).join(' · ') || 'No category'}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

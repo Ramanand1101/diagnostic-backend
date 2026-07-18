@@ -5,7 +5,7 @@ import {
   FiGrid, FiUsers, FiMapPin, FiPackage, FiTag, FiCalendar,
   FiFileText, FiPercent, FiStar, FiBook, FiFile, FiMail,
   FiSettings, FiHelpCircle, FiImage, FiUploadCloud, FiLayers,
-  FiBriefcase, FiUserCheck, FiPhoneCall, FiActivity, FiList, FiLayout,
+  FiBriefcase, FiUserCheck, FiPhoneCall, FiActivity, FiList, FiLayout, FiFilePlus,
 } from 'react-icons/fi';
 import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 
@@ -42,6 +42,7 @@ const navSections = [
     items: [
       { href: '/admin/bookings', label: 'Bookings', icon: FiCalendar },
       { href: '/admin/reports', label: 'Reports', icon: FiFileText },
+      { href: '/admin/lab-changes', label: 'Lab Profile Changes', icon: FiFilePlus },
       { href: '/admin/users', label: 'Users', icon: FiUsers },
       { href: '/admin/reviews', label: 'Reviews', icon: FiStar },
       { href: '/admin/tickets', label: 'Tickets', icon: FiHelpCircle },

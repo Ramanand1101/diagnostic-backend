@@ -1,12 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { labApi } from '@/lib/api';
+import { labApi, labChangeRequestApi } from '@/lib/api';
 import { getErrorMessage } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 import Spinner, { PageLoader } from '@/components/ui/Spinner';
 import {
   FiMapPin, FiPhone, FiMail, FiGlobe, FiClock,
-  FiSave, FiNavigation, FiCheckCircle, FiAlertCircle,
+  FiSave, FiNavigation, FiCheckCircle, FiAlertCircle, FiClock as FiPending, FiXCircle,
 } from 'react-icons/fi';
 
 const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -53,10 +53,15 @@ export default function MyLabPage() {
   const [form, setForm] = useState(EMPTY);
   const [schedule, setSchedule] = useState(DEFAULT_SCHEDULE);
   const [isNew, setIsNew] = useState(false);
+  const [pendingRequest, setPendingRequest] = useState(null);
 
   useEffect(() => {
-    labApi.getMine()
-      .then((res) => {
+    Promise.all([
+      labApi.getMine(),
+      labChangeRequestApi.getMine().catch(() => ({ data: null })),
+    ]).then(([labRes, reqRes]) => {
+      setPendingRequest(reqRes.data || null);
+      const res = labRes;
         if (res.data) {
           setLab(res.data);
           setForm({
@@ -85,8 +90,7 @@ export default function MyLabPage() {
         } else {
           setIsNew(true);
         }
-      })
-      .catch(() => setIsNew(true))
+      }).catch(() => setIsNew(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -157,16 +161,18 @@ export default function MyLabPage() {
         accreditation: form.accreditation.split(',').map((s) => s.trim()).filter(Boolean),
       };
 
-      let res;
       if (isNew || !lab) {
-        res = await labApi.create(payload);
+        const res = await labApi.create(payload);
         setIsNew(false);
-        toast.success('Lab profile created!');
+        setLab(res.data);
+        toast.success('Lab profile created! Waiting for admin approval.');
       } else {
-        res = await labApi.update(lab._id, payload);
-        toast.success('Lab profile updated!');
+        // Existing lab — send for admin approval
+        await labChangeRequestApi.submit(payload);
+        const reqRes = await labChangeRequestApi.getMine().catch(() => ({ data: null }));
+        setPendingRequest(reqRes.data || null);
+        toast.success('Changes submitted! Admin will review and apply them.');
       }
-      setLab(res.data);
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -196,6 +202,26 @@ export default function MyLabPage() {
       {isNew && (
         <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 text-sm text-primary-800">
           You haven&apos;t set up your lab profile yet. Fill in the details below and submit for admin approval.
+        </div>
+      )}
+
+      {pendingRequest && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <FiClock className="text-amber-600 mt-0.5 shrink-0" size={18} />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-800">Changes pending admin approval</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              You submitted changes on {new Date(pendingRequest.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}.
+              They will appear on your profile once admin approves.
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {Object.keys(pendingRequest.changes || {}).map((field) => (
+                <span key={field} className="text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium capitalize">
+                  {field}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -411,7 +437,7 @@ export default function MyLabPage() {
 
         <button type="submit" disabled={saving} className="btn-primary w-full py-3 flex items-center justify-center gap-2">
           {saving ? <Spinner size="sm" /> : <FiSave />}
-          {saving ? 'Saving...' : isNew ? 'Submit Lab Profile' : 'Save Changes'}
+          {saving ? 'Submitting...' : isNew ? 'Submit Lab Profile' : 'Submit Changes for Approval'}
         </button>
       </form>
     </div>

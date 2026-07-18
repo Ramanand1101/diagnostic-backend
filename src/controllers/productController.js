@@ -369,7 +369,7 @@ exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
 // PATCH /api/v1/products/:id/set-price — lab owner sets price for a product on their lab
 exports.setPrice = asyncHandler(async (req, res) => {
   const Lab = require('../models/Lab');
-  const lab = await Lab.findOne({ owner: req.user._id });
+  const lab = await Lab.findOne({ owners: req.user._id });
   if (!lab) return res.status(403).json({ message: 'Lab profile not found' });
 
   const product = await Product.findOne({ _id: req.params.id, lab: lab._id });
@@ -450,4 +450,88 @@ exports.exportCsv = asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename="products-export-${Date.now()}.csv"`);
   res.send(csv);
+});
+
+// GET /api/v1/products/lab-demo-csv — lab user: download template
+exports.labDemoCsv = (req, res) => {
+  const rows = [
+    'name,price,salePrice,reportTime,sampleType,fastingRequired,homeCollection,description,category,tags',
+    'Complete Blood Count (CBC),500,399,Same day,Blood,true,false,Full blood analysis including RBC WBC platelets,Pathology,cbc;blood',
+    'Urine Routine Examination,200,149,Same day,Urine,false,false,Complete urine analysis,Pathology,urine;routine',
+    'Thyroid Profile (T3 T4 TSH),800,599,Within 24 hours,Blood,false,false,Checks thyroid hormone levels,Hormones,thyroid;tsh',
+    'Lipid Profile,600,449,Same day,Blood,true,false,Cholesterol and triglyceride panel,Cardiology,cholesterol;lipid',
+    'HbA1c (Glycated Haemoglobin),700,549,Same day,Blood,false,false,3-month average blood sugar indicator,Diabetes,hba1c;diabetes',
+  ].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="lab-tests-template.csv"');
+  res.send(rows);
+};
+
+// POST /api/v1/products/lab-bulk-csv — lab user: upload tests for their own lab
+exports.labBulkCsv = asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'CSV file is required.' });
+
+  const Lab = require('../models/Lab');
+  const Category = require('../models/Category');
+
+  const lab = await Lab.findOne({ owners: req.user._id });
+  if (!lab) return res.status(403).json({ message: 'No lab found for your account' });
+
+  const { rows } = parseCSV(req.file.buffer);
+  if (!rows.length) return res.status(400).json({ message: 'CSV has no data rows.' });
+
+  const created = [];
+  const errors = [];
+  const algoliaRows = [];
+
+  for (const [i, row] of rows.entries()) {
+    if (!row.name) { errors.push({ row: i + 2, error: 'name is required' }); continue; }
+    if (!row.price) { errors.push({ row: i + 2, error: 'price is required' }); continue; }
+
+    try {
+      // Resolve category
+      let categoryId = null;
+      const catName = (row.category || '').trim();
+      if (catName) {
+        let cat = await Category.findOne({ name: new RegExp(`^${catName}$`, 'i') });
+        if (!cat) cat = await Category.create({ name: catName, slug: makeSlug(catName) });
+        categoryId = cat._id;
+      }
+
+      const labSuffix = String(lab._id).slice(-6);
+      const slug = makeSlug(`${row.name}-${labSuffix}-${Date.now()}`);
+      const tags = (row.tags || '').split(/[;,]/).map((t) => t.trim()).filter(Boolean);
+
+      const product = await Product.create({
+        name: row.name,
+        slug,
+        lab: lab._id,
+        price: Number(row.price) || 0,
+        salePrice: row.saleprice ? Number(row.saleprice) : undefined,
+        reportTime: row.reporttime || '',
+        sampleType: row.sampletype || '',
+        homeCollection: row.homecollection === 'true' || row.homecollection === '1',
+        fastingRequired: row.fastingrequired === 'true' || row.fastingrequired === '1',
+        description: row.description || '',
+        category: categoryId,
+        tags,
+        isActive: true,
+        addedByAdmin: false,
+      });
+
+      algoliaRows.push({ objectID: String(product._id), name: product.name, lab: lab.name });
+      created.push(product._id);
+    } catch (err) {
+      errors.push({ row: i + 2, error: err.message });
+    }
+  }
+
+  try { if (algoliaRows.length) await syncObjects('products', algoliaRows); } catch {}
+
+  res.json({
+    message: `${created.length} test(s) uploaded successfully`,
+    created: created.length,
+    errors,
+    total: rows.length,
+  });
 });
