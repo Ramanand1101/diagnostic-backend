@@ -136,7 +136,7 @@ function DescriptionPanel({ product }) {
 
 // ── Lab Group Card ─────────────────────────────────────────────────────────────
 function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapProduct, activeProductId }) {
-  const { addItem, items } = useCart();
+  const { addItem, removeItem, items } = useCart();
   const initial = (labInfo.name || '?')[0].toUpperCase();
   const total = products.reduce((sum, p) => sum + (p.salePrice || p.price || 0), 0);
   const allInCart = products.every((p) => items.some((i) => i._id === p._id));
@@ -284,11 +284,19 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
                   {discount && <p className="text-[10px] text-gray-400 line-through">₹{p.price?.toLocaleString('en-IN')}</p>}
                 </div>
                 {inCart ? (
-                  <Link href="/cart" onClick={(e) => e.stopPropagation()}
-                    className="flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 text-white text-[11px] font-semibold px-2 py-1.5 sm:px-2.5 rounded-lg transition-colors whitespace-nowrap min-w-[32px]">
-                    <FiCheck className="text-[10px]" />
-                    <span className="hidden sm:inline">In Cart</span>
-                  </Link>
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Link href="/cart"
+                      className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-[10px] font-semibold px-2 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                      <FiCheck className="text-[9px]" />
+                      <span>View Cart</span>
+                    </Link>
+                    <button
+                      onClick={() => { removeItem(p._id); toast.success(`${p.name} removed`, { icon: '🗑️' }); }}
+                      className="flex items-center gap-1 bg-white border border-red-300 text-red-500 hover:bg-red-50 text-[10px] font-semibold px-2 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                      <FiX className="text-[9px]" />
+                      <span>Remove</span>
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={(e) => { e.stopPropagation(); addItem(p); toast.success(`${p.name} added!`, { icon: '🛒' }); }}
