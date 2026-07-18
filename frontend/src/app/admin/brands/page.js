@@ -441,27 +441,32 @@ export default function AdminBrandsPage() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
-  const VIEW_ICONS = [
-    { id: 'tiles', icon: FiGrid, label: 'Tiles' },
-    { id: 'details', icon: FiList, label: 'Details' },
-    { id: 'folder', icon: FiFolder, label: 'Folder' },
+  const VIEWS = [
+    { id: 'tiles',   icon: FiGrid,   label: 'Grid' },
+    { id: 'details', icon: FiList,   label: 'Table' },
+    { id: 'folder',  icon: FiFolder, label: 'Compact' },
   ];
 
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Brands / Chains</h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage lab chains and their home visit settings.</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* View switcher */}
-          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-            {VIEW_ICONS.map(({ id, icon: Icon, label }) => (
-              <button key={id} onClick={() => setView(id)} title={label}
-                className={`p-2 rounded-lg transition-colors ${view === id ? 'bg-white shadow-sm text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}>
-                <Icon size={15} />
+          {/* View switcher — labeled buttons */}
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
+            {VIEWS.map(({ id, icon: Icon, label }) => (
+              <button key={id} onClick={() => setView(id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  view === id
+                    ? 'bg-white shadow-sm text-primary-600 border border-gray-200'
+                    : 'text-gray-400 hover:text-gray-700'
+                }`}>
+                <Icon size={13} />
+                <span>{label}</span>
               </button>
             ))}
           </div>

@@ -10,8 +10,109 @@ import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
 import {
   FiPlus, FiCheckCircle, FiXCircle, FiEdit, FiStar,
-  FiSearch, FiUploadCloud, FiDownload, FiEye, FiMail, FiPhone, FiMapPin, FiLayers,
+  FiSearch, FiUploadCloud, FiDownload, FiEye, FiMail, FiPhone, FiMapPin, FiLayers, FiChevronDown, FiX,
 } from 'react-icons/fi';
+
+// ── Searchable multi-select for Lab Assistants ────────────────────────────────
+function AssistantSelect({ users, selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const ref = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
+
+  const filtered = users.filter((u) =>
+    !q || u.name?.toLowerCase().includes(q.toLowerCase()) || u.email?.toLowerCase().includes(q.toLowerCase()) || u.mobile?.includes(q)
+  );
+
+  const toggle = (id) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  const remove = (id, e) => { e.stopPropagation(); onChange(selected.filter((x) => x !== id)); };
+  const selectedUsers = users.filter((u) => selected.includes(u._id));
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger box */}
+      <div onClick={() => setOpen((v) => !v)}
+        className="min-h-[40px] input flex items-center flex-wrap gap-1.5 cursor-pointer pr-8 relative bg-white">
+        {selectedUsers.length === 0 && (
+          <span className="text-gray-400 text-sm">Search & select lab assistants…</span>
+        )}
+        {selectedUsers.map((u) => (
+          <span key={u._id} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-medium">
+            <span className="w-4 h-4 rounded-full bg-blue-300 text-blue-900 flex items-center justify-center text-[9px] font-bold shrink-0">
+              {u.name?.[0]?.toUpperCase()}
+            </span>
+            {u.name}
+            <button type="button" onClick={(e) => remove(u._id, e)} className="ml-0.5 hover:text-red-600">
+              <FiX size={10} />
+            </button>
+          </span>
+        ))}
+        <FiChevronDown size={14} className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          {/* Search */}
+          <div className="p-2 border-b border-gray-100">
+            <div className="relative">
+              <FiSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+              <input ref={inputRef} type="text" value={q} onChange={(e) => setQ(e.target.value)}
+                placeholder="Search by name, email or mobile…"
+                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-primary-400"
+                onClick={(e) => e.stopPropagation()} />
+            </div>
+          </div>
+          {/* List */}
+          <div className="max-h-48 overflow-y-auto">
+            {users.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">No lab-role users found</p>
+            ) : filtered.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">No match for &quot;{q}&quot;</p>
+            ) : (
+              filtered.map((u) => {
+                const checked = selected.includes(u._id);
+                return (
+                  <div key={u._id} onClick={() => toggle(u._id)}
+                    className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors ${checked ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${checked ? 'bg-primary-600 border-primary-600' : 'border-gray-300'}`}>
+                      {checked && <span className="text-white text-[9px] font-bold">✓</span>}
+                    </div>
+                    <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center text-[11px] font-bold text-primary-700 shrink-0">
+                      {u.name?.[0]?.toUpperCase() || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{u.name}</p>
+                      <p className="text-[11px] text-gray-400 truncate">{u.email || u.mobile || ''}</p>
+                    </div>
+                    {checked && <span className="text-xs text-blue-500 font-medium shrink-0">Selected</span>}
+                  </div>
+                );
+              })
+            )}
+          </div>
+          {/* Footer */}
+          {selected.length > 0 && (
+            <div className="px-3 py-2 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+              <span className="text-xs text-gray-500">{selected.length} selected</span>
+              <button type="button" onClick={() => { onChange([]); setOpen(false); }}
+                className="text-xs text-red-500 hover:text-red-700">Clear all</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Reusable dynamic list editor (phones / emails)
 function MultiField({ label, values, onChange, placeholder, type = 'text' }) {
@@ -127,49 +228,19 @@ function LabForm({ initial, onSave, onClose }) {
         </div>
       </div>
 
-      {/* Lab Assistants / Owners multi-select */}
-      <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium text-gray-700">
-            Lab Assistants
-            <span className="text-xs text-gray-400 font-normal ml-1">— select one or more users who manage this lab</span>
-          </label>
-          {form.owners.length > 0 && (
-            <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-medium">
-              {form.owners.length} selected
-            </span>
-          )}
-        </div>
-        {labUsers.length === 0 ? (
-          <p className="text-xs text-gray-400">No users with role &quot;lab&quot; found. Go to Users → change a user&apos;s role to &quot;lab&quot; first.</p>
-        ) : (
-          <div className="max-h-40 overflow-y-auto space-y-1 bg-white rounded-lg border border-blue-100 p-2">
-            {labUsers.map((u) => {
-              const checked = form.owners.includes(u._id);
-              const toggle = () => set('owners', checked
-                ? form.owners.filter((id) => id !== u._id)
-                : [...form.owners, u._id]
-              );
-              return (
-                <label key={u._id} className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'}`}>
-                  <input type="checkbox" checked={checked} onChange={toggle} className="w-4 h-4 rounded text-primary-600 shrink-0" />
-                  <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-[10px] font-bold text-primary-700 shrink-0">
-                    {u.name?.[0]?.toUpperCase() || '?'}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{u.name}</p>
-                    <p className="text-[11px] text-gray-400 truncate">{u.email || u.mobile || ''}</p>
-                  </div>
-                  {checked && <span className="ml-auto text-blue-500 text-xs shrink-0">✓</span>}
-                </label>
-              );
-            })}
-          </div>
-        )}
-        {form.owners.length > 0 && (
-          <button type="button" onClick={() => set('owners', [])} className="mt-1.5 text-xs text-gray-400 hover:text-red-500">
-            Clear all
-          </button>
+      {/* Lab Assistants — searchable dropdown */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Lab Assistants
+          <span className="text-xs text-gray-400 font-normal ml-1">— select one or more users who manage this lab</span>
+        </label>
+        <AssistantSelect
+          users={labUsers}
+          selected={form.owners}
+          onChange={(v) => set('owners', v)}
+        />
+        {labUsers.length === 0 && (
+          <p className="text-xs text-gray-400 mt-1">No users with role &quot;lab&quot; found. Go to Users → change a user&apos;s role to &quot;lab&quot; first.</p>
         )}
       </div>
 
