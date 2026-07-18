@@ -5,7 +5,7 @@ import { formatCurrency, getErrorMessage } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 import Spinner, { PageLoader } from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
-import { FiPlus, FiEdit2, FiTrash2, FiX, FiSave, FiPackage, FiDollarSign, FiLock, FiSearch, FiZap, FiUploadCloud, FiDownload, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiX, FiSave, FiPackage, FiDollarSign, FiLock, FiSearch, FiZap, FiUploadCloud, FiDownload, FiCheckCircle, FiAlertTriangle, FiRefreshCw } from 'react-icons/fi';
 
 const EMPTY_PRODUCT = {
   name: '', price: '', salePrice: '',
@@ -175,6 +175,7 @@ export default function LabProductsPage() {
   const [masterSuggestions, setMasterSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [masterPicked, setMasterPicked] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const masterTimer = useRef(null);
   const nameRef = useRef(null);
 
@@ -226,12 +227,42 @@ export default function LabProductsPage() {
       name: test.name,
       description: test.description || f.description,
       sampleType: test.sampleType || f.sampleType,
+      reportTime: test.reportTime || f.reportTime,
+      fastingRequired: test.fastingRequired ?? f.fastingRequired,
+      homeCollection: test.homeCollection ?? f.homeCollection,
       category: test.category?._id || test.category || f.category,
       subcategory: test.subcategory?._id || test.subcategory || f.subcategory,
     }));
     setMasterPicked(true);
     setShowSuggestions(false);
     setMasterSuggestions([]);
+  };
+
+  const syncFromMaster = async () => {
+    if (!form.name.trim()) return;
+    setSyncing(true);
+    try {
+      const r = await testMasterApi.search(form.name.trim());
+      const items = r.data.items || r.data || [];
+      const match = items.find((t) => t.name.toLowerCase() === form.name.trim().toLowerCase()) || items[0];
+      if (!match) { toast.error('No matching test found in Test Master'); return; }
+      setForm((f) => ({
+        ...f,
+        name: match.name,
+        description: match.description || f.description,
+        sampleType: match.sampleType || f.sampleType,
+        reportTime: match.reportTime || f.reportTime,
+        fastingRequired: match.fastingRequired ?? f.fastingRequired,
+        homeCollection: match.homeCollection ?? f.homeCollection,
+        category: match.category?._id || match.category || f.category,
+        subcategory: match.subcategory?._id || match.subcategory || f.subcategory,
+      }));
+      toast.success('Synced from Test Master!');
+    } catch {
+      toast.error('Could not sync from Test Master');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const openAdd = () => { setForm(EMPTY_PRODUCT); setEditing(null); setMasterPicked(false); setShowForm(true); };
@@ -381,15 +412,24 @@ export default function LabProductsPage() {
             <div className="relative">
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-sm font-medium text-gray-700">Name *</label>
-                {masterPicked ? (
-                  <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                    <FiCheckCircle size={11} /> Selected from master list
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs text-primary-600">
-                    <FiZap size={10} /> Must select from master list
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {editing && (
+                    <button type="button" onClick={syncFromMaster} disabled={syncing}
+                      className="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-800 font-medium transition-colors disabled:opacity-50">
+                      <FiRefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
+                      {syncing ? 'Syncing…' : 'Sync from Master'}
+                    </button>
+                  )}
+                  {masterPicked ? (
+                    <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                      <FiCheckCircle size={11} /> From master list
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-primary-600">
+                      <FiZap size={10} /> Must select from master list
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="relative">
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
