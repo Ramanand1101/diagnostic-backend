@@ -8,6 +8,7 @@ const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 
 router.get('/', lab.listLabs);
 router.get('/cities', lab.getCities);
 router.get('/demo-csv', lab.labDemoCsv);
+router.get('/export-csv', protect, allowRoles('superadmin', 'subadmin'), lab.exportLabsCsv);
 router.get('/nearby', lab.nearbyLabs);
 router.get('/compare', lab.compareLabs);
 router.get('/mine', protect, allowRoles('lab'), lab.getMyLab);

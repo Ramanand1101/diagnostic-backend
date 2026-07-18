@@ -13,8 +13,10 @@ router.get('/by-city', c.byCity);
 router.get('/', c.list);
 router.post('/upload-logo', ...admin, logoUpload.single('logo'), c.uploadLogo);
 router.post('/bulk-csv', ...admin, csvUpload.single('file'), c.bulkCsv);
+router.delete('/bulk-delete', ...admin, c.bulkDelete);
 router.post('/', ...admin, c.create);
 router.put('/:id', ...admin, c.update);
+router.patch('/:id/home-collection', ...admin, c.setHomeCollection);
 router.delete('/:id', protect, allowRoles('superadmin'), c.remove);
 
 module.exports = router;

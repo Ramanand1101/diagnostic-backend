@@ -63,10 +63,41 @@ exports.listUsers = asyncHandler(async (req, res) => {
   res.json({ items: users, total, page: Number(page), limit: safeLimit });
 });
 
+exports.updateRole = asyncHandler(async (req, res) => {
+  const VALID_ROLES = ['superadmin', 'subadmin', 'lab', 'customer'];
+  const { role } = req.body;
+  if (!VALID_ROLES.includes(role))
+    return res.status(400).json({ message: `Invalid role. Allowed: ${VALID_ROLES.join(', ')}` });
+
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  // Only superadmin can promote to superadmin
+  if (role === 'superadmin' && req.user.role !== 'superadmin')
+    return res.status(403).json({ message: 'Only superadmin can assign superadmin role' });
+
+  // Cannot demote another superadmin unless you are one
+  if (user.role === 'superadmin' && req.user.role !== 'superadmin')
+    return res.status(403).json({ message: 'Cannot change a superadmin\'s role' });
+
+  user.role = role;
+  await user.save();
+  res.json({ message: `Role updated to ${role}`, user: { _id: user._id, name: user.name, role: user.role } });
+});
+
 exports.deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ message: 'User not found' });
   if (user.role === 'superadmin') return res.status(403).json({ message: 'Cannot delete superadmin' });
   await User.findByIdAndDelete(req.params.id);
   res.json({ message: 'User deleted' });
+});
+
+exports.bulkDeleteUsers = asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0)
+    return res.status(400).json({ message: 'ids array is required' });
+  // Never delete superadmins via bulk
+  const result = await User.deleteMany({ _id: { $in: ids }, role: { $ne: 'superadmin' } });
+  res.json({ message: `${result.deletedCount} user(s) deleted` });
 });

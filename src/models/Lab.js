@@ -18,6 +18,8 @@ const labSchema = new mongoose.Schema({
   pincode: String,
   phone: String,
   email: String,
+  phones: [String],
+  emails: [String],
   website: String,
   lat: Number,
   lng: Number,

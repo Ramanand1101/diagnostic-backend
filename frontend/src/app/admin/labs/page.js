@@ -13,6 +13,33 @@ import {
   FiSearch, FiUploadCloud, FiDownload, FiEye, FiMail, FiPhone, FiMapPin, FiLayers,
 } from 'react-icons/fi';
 
+// Reusable dynamic list editor (phones / emails)
+function MultiField({ label, values, onChange, placeholder, type = 'text' }) {
+  const add = () => onChange([...values, '']);
+  const remove = (i) => onChange(values.filter((_, idx) => idx !== i));
+  const update = (i, v) => onChange(values.map((x, idx) => idx === i ? v : x));
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="block text-sm font-medium text-gray-700">{label}</label>
+        <button type="button" onClick={add} className="text-xs text-primary-600 hover:underline flex items-center gap-0.5">
+          <FiPlus size={10} /> Add
+        </button>
+      </div>
+      <div className="space-y-2">
+        {values.map((v, i) => (
+          <div key={i} className="flex gap-2">
+            <input type={type} value={v} onChange={(e) => update(i, e.target.value)}
+              className="input flex-1" placeholder={placeholder} />
+            <button type="button" onClick={() => remove(i)} className="text-red-400 hover:text-red-600 px-2">✕</button>
+          </div>
+        ))}
+        {values.length === 0 && <p className="text-xs text-gray-400">No extra {label.toLowerCase()} added</p>}
+      </div>
+    </div>
+  );
+}
+
 function LabForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState({
     name: initial?.name || '',
@@ -29,6 +56,8 @@ function LabForm({ initial, onSave, onClose }) {
     featured: initial?.featured || false,
     description: initial?.description || '',
     accreditation: initial?.accreditation || [],
+    phones: initial?.phones || [],
+    emails: initial?.emails || [],
   });
   const [loading, setLoading] = useState(false);
   const [brands, setBrands] = useState([]);
@@ -170,6 +199,12 @@ function LabForm({ initial, onSave, onClose }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input type="text" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" placeholder="lab@example.com" />
         </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <MultiField label="Extra Phone Numbers" values={form.phones}
+          onChange={(v) => set('phones', v)} placeholder="+91 98765 43210" type="tel" />
+        <MultiField label="Extra Emails" values={form.emails}
+          onChange={(v) => set('emails', v)} placeholder="alt@lab.com" type="email" />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -355,9 +390,24 @@ export default function AdminLabsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Labs Management</h1>
-        <button onClick={() => setModal({ type: 'add' })} className="btn-primary flex items-center gap-2 text-sm">
-          <FiPlus /> Add Lab
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              try {
+                const res = await labApi.exportCsv();
+                const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+                const a = document.createElement('a'); a.href = url; a.download = 'labs-export.csv'; a.click();
+                URL.revokeObjectURL(url);
+              } catch { toast.error('Export failed'); }
+            }}
+            className="flex items-center gap-2 text-sm px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <FiDownload size={14} /> Download All CSV
+          </button>
+          <button onClick={() => setModal({ type: 'add' })} className="btn-primary flex items-center gap-2 text-sm">
+            <FiPlus /> Add Lab
+          </button>
+        </div>
       </div>
 
       {/* CSV Upload */}

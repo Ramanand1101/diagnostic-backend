@@ -197,3 +197,57 @@ exports.bulkUploadLabsCsv = asyncHandler(async (req, res) => {
 
   res.json({ created: created.length, errors, total: rows.length });
 });
+
+// GET /api/v1/labs/export-csv — admin: download all labs as CSV
+exports.exportLabsCsv = asyncHandler(async (req, res) => {
+  const { q, city, brand, approved } = req.query;
+  const filter = {};
+  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { city: new RegExp(q, 'i') }];
+  if (city) filter.city = new RegExp(city, 'i');
+  if (brand) filter.brand = brand;
+  if (approved !== undefined) filter.approved = approved === 'true';
+
+  const labs = await Lab.find(filter)
+    .populate('brand', 'name')
+    .populate('owner', 'name email mobile')
+    .sort('-createdAt')
+    .limit(10000)
+    .lean();
+
+  const escape = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const headers = [
+    'name','brand','city','state','address','area','pincode',
+    'phone','email','phones','emails',
+    'homeCollection','featured','accreditation',
+    'verificationStatus','approved','ratingAvg','reviewCount',
+    'sampleCollectionTime','reportDeliveryTime','description',
+    'ownerName','ownerEmail','ownerMobile',
+    'createdAt',
+  ];
+
+  const rows = labs.map((l) => [
+    l.name, l.brand?.name || '', l.city || '', l.state || '',
+    l.address || '', l.area || '', l.pincode || '',
+    l.phone || '', l.email || '',
+    (l.phones || []).join('|'), (l.emails || []).join('|'),
+    l.homeCollection ? 'Yes' : 'No',
+    l.featured ? 'Yes' : 'No',
+    (l.accreditation || []).join('|'),
+    l.verificationStatus || '', l.approved ? 'Yes' : 'No',
+    l.ratingAvg || 0, l.reviewCount || 0,
+    l.sampleCollectionTime || '', l.reportDeliveryTime || '',
+    l.description || '',
+    l.owner?.name || '', l.owner?.email || '', l.owner?.mobile || '',
+    l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : '',
+  ].map(escape).join(','));
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="labs-export.csv"');
+  res.send(csv);
+});

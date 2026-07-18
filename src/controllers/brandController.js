@@ -137,3 +137,25 @@ exports.bulkCsv = asyncHandler(async (req, res) => {
 
   res.json({ created, updated, errors, total: rows.length });
 });
+
+// DELETE /brands/bulk-delete
+exports.bulkDelete = asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ message: 'ids array required' });
+  await Brand.deleteMany({ _id: { $in: ids } });
+  await Lab.updateMany({ brand: { $in: ids } }, { $unset: { brand: '' } });
+  res.json({ deleted: ids.length });
+});
+
+// PATCH /brands/:id/home-collection — toggle homeCollection on brand + all its labs
+exports.setHomeCollection = asyncHandler(async (req, res) => {
+  const { homeCollection } = req.body;
+  const brand = await Brand.findByIdAndUpdate(
+    req.params.id,
+    { homeCollection: !!homeCollection },
+    { new: true }
+  );
+  if (!brand) return res.status(404).json({ message: 'Brand not found' });
+  await Lab.updateMany({ brand: req.params.id }, { homeCollection: !!homeCollection });
+  res.json({ brand, labsUpdated: true });
+});

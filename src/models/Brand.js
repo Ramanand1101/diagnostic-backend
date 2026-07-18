@@ -8,6 +8,9 @@ const brandSchema = new mongoose.Schema({
   website: String,
   phone: String,
   email: String,
+  phones: [String],
+  emails: [String],
+  homeCollection: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 

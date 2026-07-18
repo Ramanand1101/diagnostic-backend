@@ -47,6 +47,8 @@ export const userApi = {
   updateMe: (data) => api.put('/users/me', data),
   changePassword: (data) => api.put('/users/me/change-password', data),
   getAll: (params) => api.get('/users', { params }),
+  updateRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
+  bulkDelete: (ids) => api.delete('/users/bulk-delete', { data: { ids } }),
   deleteUser: (id) => api.delete(`/users/${id}`),
 };
 
@@ -66,6 +68,7 @@ export const labApi = {
   demoCsv: () => api.get('/labs/demo-csv', { responseType: 'blob' }),
   demoCsvUrl: () => `${BASE_URL}/labs/demo-csv`,
   bulkDelete: (ids) => api.delete('/labs/bulk-delete', { data: { ids } }),
+  exportCsv: (params) => api.get('/labs/export-csv', { params, responseType: 'blob' }),
 };
 
 // Categories
@@ -92,6 +95,8 @@ export const brandApi = {
   demoCsv: () => api.get('/brands/demo-csv', { responseType: 'blob' }),
   bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/brands/bulk-csv', fd); },
   uploadLogo: (formData) => api.post('/brands/upload-logo', formData),
+  bulkDelete: (ids) => api.delete('/brands/bulk-delete', { data: { ids } }),
+  setHomeCollection: (id, homeCollection) => api.patch(`/brands/${id}/home-collection`, { homeCollection }),
 };
 
 // Products
