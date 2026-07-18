@@ -15,23 +15,10 @@ import {
 import toast from 'react-hot-toast';
 
 // ── Time slot picker ──────────────────────────────────────────────────────────
-const MORNING_SLOTS = [
-  '06:00 AM – 07:00 AM', '07:00 AM – 08:00 AM', '08:00 AM – 09:00 AM',
-  '09:00 AM – 10:00 AM', '10:00 AM – 11:00 AM', '11:00 AM – 12:00 PM',
-];
-const AFTERNOON_SLOTS = [
-  '12:00 PM – 01:00 PM', '01:00 PM – 02:00 PM', '02:00 PM – 03:00 PM',
-  '03:00 PM – 04:00 PM',
-];
-const EVENING_SLOTS = [
-  '04:00 PM – 05:00 PM', '05:00 PM – 06:00 PM', '06:00 PM – 07:00 PM',
-  '07:00 PM – 08:00 PM', '08:00 PM – 09:00 PM',
-];
-
 const SLOT_GROUPS = [
-  { label: 'Morning Slots (AM)', emoji: '☀️', color: 'text-amber-600', slots: MORNING_SLOTS },
-  { label: 'Afternoon Slots (PM)', emoji: '🌤️', color: 'text-blue-600', slots: AFTERNOON_SLOTS },
-  { label: 'Evening Slots', emoji: '🌙', color: 'text-indigo-600', slots: EVENING_SLOTS },
+  { label: 'Morning Slots (AM)',   emoji: '☀️',  color: 'text-amber-600',  slots: ['06:00 AM – 07:00 AM','07:00 AM – 08:00 AM','08:00 AM – 09:00 AM','09:00 AM – 10:00 AM','10:00 AM – 11:00 AM','11:00 AM – 12:00 PM'] },
+  { label: 'Afternoon Slots (PM)', emoji: '🌤️', color: 'text-blue-600',   slots: ['12:00 PM – 01:00 PM','01:00 PM – 02:00 PM','02:00 PM – 03:00 PM','03:00 PM – 04:00 PM'] },
+  { label: 'Evening Slots',        emoji: '🌙',  color: 'text-indigo-600', slots: ['04:00 PM – 05:00 PM','05:00 PM – 06:00 PM','06:00 PM – 07:00 PM','07:00 PM – 08:00 PM','08:00 PM – 09:00 PM'] },
 ];
 
 // Returns true if the slot's start time has already passed (only for today's date)
@@ -434,13 +421,10 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
             onKeyDown={(e) => {
               if (['Backspace','Delete','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key) || e.ctrlKey || e.metaKey) return;
               if (!/^\d$/.test(e.key)) { e.preventDefault(); return; }
-              const el = e.target;
-              const next = el.value.slice(0, el.selectionStart) + e.key + el.value.slice(el.selectionEnd);
-              if (Number(next) > 100) e.preventDefault();
+              if (Number(e.target.value.slice(0, e.target.selectionStart) + e.key + e.target.value.slice(e.target.selectionEnd)) > 100) e.preventDefault();
             }}
             onChange={(e) => {
-              const v = e.target.value;
-              if (v === '' || Number(v) <= 100) F('patientAge')(e);
+              if (e.target.value === '' || Number(e.target.value) <= 100) F('patientAge')(e);
             }}
             className="input text-sm" placeholder="Age (1–100)" />
         </div>
@@ -571,11 +555,11 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
 // ── Add More Tests mini search bar ───────────────────────────────────────────
 function AddMoreSearch({ cartCity }) {
   const router = useRouter();
-  const [q, setQ] = useState('');
+  const [addQuery, setAddQuery] = useState('');
   const inputRef = useRef(null);
 
   const go = () => {
-    const trimmed = q.trim();
+    const trimmed = addQuery.trim();
     if (!trimmed) return;
     const params = new URLSearchParams();
     params.set('test', trimmed);
@@ -591,8 +575,8 @@ function AddMoreSearch({ cartCity }) {
         <input
           ref={inputRef}
           type="text"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
+          value={addQuery}
+          onChange={(e) => setAddQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && go()}
           placeholder="Type test name and press Enter…"
           className="w-full text-sm border border-primary-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
@@ -616,7 +600,6 @@ export default function CartPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const isRestricted = user && (user.role === 'superadmin' || user.role === 'subadmin' || user.role === 'lab');
-  const multiLab = groups.length > 1;
 
   const groups = Object.values(
     items.reduce((acc, item) => {
@@ -749,7 +732,7 @@ export default function CartPage() {
                     Bookings can only be placed by patient/customer accounts.
                   </p>
                 </div>
-              ) : multiLab ? (
+              ) : groups.length > 1 ? (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-5">
                   <div className="flex items-start gap-3 mb-4">
                     <div className="text-2xl shrink-0">⚠️</div>
