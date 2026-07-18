@@ -428,7 +428,8 @@ export default function AdminLabsPage() {
   const fetchLabs = useCallback(() => {
     setLoading(true);
     const params = { page, limit, q: q || undefined };
-    if (filterStatus) params.approved = filterStatus === 'approved';
+    if (filterStatus === 'approved') params.approved = 'true';
+    else if (filterStatus === 'pending') params.approved = 'false';
     if (filterFeatured) params.featured = 'true';
     if (filterBrand) params.brand = filterBrand;
     labApi.getAll(params)

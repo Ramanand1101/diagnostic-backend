@@ -174,6 +174,7 @@ export default function LabProductsPage() {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'admin' | 'mine'
   const [masterSuggestions, setMasterSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [masterPicked, setMasterPicked] = useState(false);
   const masterTimer = useRef(null);
   const nameRef = useRef(null);
 
@@ -206,6 +207,7 @@ export default function LabProductsPage() {
   const handleNameChange = (e) => {
     const val = e.target.value;
     setForm((f) => ({ ...f, name: val }));
+    setMasterPicked(false); // user is typing freely — not from master list
     clearTimeout(masterTimer.current);
     if (val.length < 2) { setMasterSuggestions([]); setShowSuggestions(false); return; }
     masterTimer.current = setTimeout(async () => {
@@ -227,11 +229,12 @@ export default function LabProductsPage() {
       category: test.category?._id || test.category || f.category,
       subcategory: test.subcategory?._id || test.subcategory || f.subcategory,
     }));
+    setMasterPicked(true);
     setShowSuggestions(false);
     setMasterSuggestions([]);
   };
 
-  const openAdd = () => { setForm(EMPTY_PRODUCT); setEditing(null); setShowForm(true); };
+  const openAdd = () => { setForm(EMPTY_PRODUCT); setEditing(null); setMasterPicked(false); setShowForm(true); };
   const openEdit = (p) => {
     const catId = p.category?._id || p.category || '';
     if (catId) categoryApi.getSubcategories(catId).then((r) => setSubcategories(r.data.items || []));
@@ -243,14 +246,20 @@ export default function LabProductsPage() {
       category: catId, subcategory: p.subcategory?._id || p.subcategory || '',
       tags: (p.tags || []).join(', '),
     });
+    setMasterPicked(true); // existing tests are already valid; re-pick only if name is changed
     setEditing(p);
     setShowForm(true);
   };
-  const closeForm = () => { setShowForm(false); setEditing(null); };
+  const closeForm = () => { setShowForm(false); setEditing(null); setMasterPicked(false); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!lab) { toast.error('Set up your lab profile first'); return; }
+    if (!masterPicked) {
+      toast.error('Please select a test from the master list — custom names are not allowed');
+      nameRef.current?.focus();
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -368,13 +377,19 @@ export default function LabProductsPage() {
             <button onClick={closeForm} className="text-gray-400 hover:text-gray-600"><FiX /></button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name with master test autocomplete */}
+            {/* Name with master test autocomplete — ONLY master list names allowed */}
             <div className="relative">
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-sm font-medium text-gray-700">Name *</label>
-                <span className="flex items-center gap-1 text-xs text-primary-600">
-                  <FiZap size={10} /> Auto-fill from master list
-                </span>
+                {masterPicked ? (
+                  <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                    <FiCheckCircle size={11} /> Selected from master list
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-xs text-primary-600">
+                    <FiZap size={10} /> Must select from master list
+                  </span>
+                )}
               </div>
               <div className="relative">
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
@@ -386,11 +401,19 @@ export default function LabProductsPage() {
                   onChange={handleNameChange}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                   onFocus={() => masterSuggestions.length > 0 && setShowSuggestions(true)}
-                  className="input pl-9"
-                  placeholder="Type test name — suggestions will appear…"
+                  className={`input pl-9 pr-8 ${masterPicked ? 'border-green-400 focus:border-green-500 focus:ring-green-200' : form.name.length > 0 ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-200' : ''}`}
+                  placeholder="Type test name — then pick from suggestions…"
                   autoComplete="off"
                 />
+                {masterPicked && (
+                  <FiCheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={15} />
+                )}
               </div>
+              {!masterPicked && form.name.length > 0 && !showSuggestions && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <FiAlertTriangle size={11} /> Type more to see suggestions, then select one from the list
+                </p>
+              )}
               {showSuggestions && masterSuggestions.length > 0 && (
                 <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
                   <div className="px-3 py-1.5 bg-primary-50 border-b border-gray-100">
@@ -481,7 +504,7 @@ export default function LabProductsPage() {
               <Toggle label="Active" name="isActive" checked={form.isActive} onChange={handle} />
             </div>
             <div className="flex gap-3 pt-2">
-              <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2 flex-1 justify-center">
+              <button type="submit" disabled={saving || !masterPicked} className="btn-primary flex items-center gap-2 flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed">
                 {saving ? <Spinner size="sm" /> : <FiSave />}
                 {saving ? 'Saving...' : editing ? 'Update' : 'Add Test / Package'}
               </button>

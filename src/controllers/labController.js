@@ -45,7 +45,8 @@ exports.listLabs = asyncHandler(async (req, res) => {
   if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { city: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }, { brand: new RegExp(q, 'i') }];
   if (city) filter.city = new RegExp(city, 'i');
   if (brand) filter.brand = new RegExp(brand, 'i');
-  if (approved !== undefined) filter.approved = approved === 'true';
+  if (approved === 'true') filter.approved = true;
+  else if (approved === 'false') filter.approved = { $ne: true }; // includes false AND docs where field missing
   if (featured !== undefined) filter.featured = featured === 'true';
   if (homeCollection !== undefined) filter.homeCollection = homeCollection === 'true';
 
