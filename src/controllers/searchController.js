@@ -90,33 +90,32 @@ async function mongoSearch(q, type, city, limit) {
   if (type === 'all' || type === 'labs') {
     const filter = {
       approved: true,
-      $or: [
-        { name: regex }, { city: regex },
-        { description: regex }, { address: regex },
-        { badges: regex }, { accreditation: regex },
-      ],
+      name: regex, // match only on lab name
     };
     if (cityRegex) filter.city = cityRegex;
     result.labs = await Lab.find(filter).populate('brand', 'name slug logo').limit(limit).lean();
   }
 
   if (type === 'all' || type === 'products') {
-    const filter = {
-      isActive: true,
-      $or: [
-        { name: regex }, { description: regex },
-        { tags: regex }, { sampleType: regex },
-      ],
+    const labPopulate = {
+      path: 'lab',
+      select: 'name slug city state address area pincode homeCollection ratingAvg verificationStatus accreditation brand',
+      populate: { path: 'brand', select: 'name slug logo' },
     };
-    if (cityLabIds) filter.lab = { $in: cityLabIds };
-    result.products = await Product.find(filter)
-      .populate({
-        path: 'lab',
-        select: 'name slug city state address area pincode homeCollection ratingAvg verificationStatus accreditation brand',
-        populate: { path: 'brand', select: 'name slug logo' },
-      })
-      .limit(limit)
-      .lean();
+    const baseFilter = { isActive: true, ...(cityLabIds ? { lab: { $in: cityLabIds } } : {}) };
+
+    // Cascading: exact name → prefix name → partial name (never description/tags)
+    const exactRegex  = new RegExp(`^${escapeRegex(q)}$`, 'i');
+    const prefixRegex = new RegExp(`^${escapeRegex(q)}`,  'i');
+    const partialRegex = new RegExp(escapeRegex(q), 'i');
+
+    let products = await Product.find({ ...baseFilter, name: exactRegex }).populate(labPopulate).limit(limit).lean();
+    if (!products.length)
+      products = await Product.find({ ...baseFilter, name: prefixRegex }).populate(labPopulate).limit(limit).lean();
+    if (!products.length)
+      products = await Product.find({ ...baseFilter, name: partialRegex }).populate(labPopulate).limit(limit).lean();
+
+    result.products = products;
   }
 
   if (type === 'all' || type === 'pages') {
@@ -309,7 +308,11 @@ exports.globalSearch = asyncHandler(async (req, res) => {
       }
       if (type === 'all' || type === 'products') {
         // fetch extra so JS filtering still returns enough results
-        const r = await searchIndex('products', q, { hitsPerPage: limit * 2 });
+        const r = await searchIndex('products', q, {
+          hitsPerPage: limit * 2,
+          typoTolerance: false,       // no fuzzy matching — exact/prefix only
+          queryType: 'prefixLast',    // prefix allowed only on the last word
+        });
         const hits = (r.hits || []).filter((p) => p.isActive !== false).slice(0, limit);
         // If lab is stored as a bare ObjectID string (not populated), Algolia data is stale — use MongoDB
         const needsReindex = hits.length > 0 && hits.some((p) => typeof p.lab === 'string');

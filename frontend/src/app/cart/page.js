@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/layout/Navbar';
@@ -10,7 +10,7 @@ import { bookingApi, userApi, authApi } from '@/lib/api';
 import { getErrorMessage } from '@/utils/helpers';
 import {
   FiTrash2, FiShoppingCart, FiMapPin, FiArrowLeft,
-  FiCheckCircle, FiAlertCircle, FiLoader,
+  FiCheckCircle, FiAlertCircle, FiLoader, FiSearch, FiPlus,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -556,6 +556,47 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
   );
 }
 
+// ── Add More Tests mini search bar ───────────────────────────────────────────
+function AddMoreSearch({ cartCity }) {
+  const router = useRouter();
+  const [q, setQ] = useState('');
+  const inputRef = useRef(null);
+
+  const go = () => {
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    const params = new URLSearchParams();
+    params.set('test', trimmed);
+    if (cartCity) params.set('city', cartCity);
+    router.push(`/search?${params.toString()}`);
+  };
+
+  return (
+    <div className="flex items-center gap-2 bg-primary-50 border border-primary-100 rounded-xl px-3 py-2.5 mb-4">
+      <FiPlus className="text-primary-500 shrink-0" size={15} />
+      <span className="text-xs font-semibold text-primary-700 shrink-0">Add another test:</span>
+      <div className="relative flex-1">
+        <input
+          ref={inputRef}
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && go()}
+          placeholder="Type test name and press Enter…"
+          className="w-full text-sm border border-primary-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={go}
+        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shrink-0"
+      >
+        <FiSearch size={12} /> Search
+      </button>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CartPage() {
   const { items, removeItem, clearCart } = useCart();
@@ -573,6 +614,17 @@ export default function CartPage() {
   const total    = items.reduce((sum, i) => sum + (i.salePrice || i.price || 0), 0);
   const mrpTotal = items.reduce((sum, i) => sum + (i.price || 0), 0);
   const savings  = mrpTotal - total;
+
+  // Smart back URL — rebuild search from cart items (test names + city)
+  const cartCity = items[0]?.lab?.city || '';
+  const backUrl = useMemo(() => {
+    if (items.length === 0) return '/search';
+    const params = new URLSearchParams();
+    const testNames = [...new Set(items.map((i) => i.name).filter(Boolean))];
+    testNames.forEach((name) => params.append('test', name));
+    if (cartCity) params.set('city', cartCity);
+    return `/search?${params.toString()}`;
+  }, [items, cartCity]);
 
   if (items.length === 0) {
     return (
@@ -598,9 +650,9 @@ export default function CartPage() {
         <div className="max-w-5xl mx-auto px-4 py-8">
 
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <Link href="/search" className="text-gray-400 hover:text-gray-600 transition-colors">
+              <Link href={backUrl} className="text-gray-400 hover:text-primary-600 transition-colors" title="Back to search results">
                 <FiArrowLeft className="text-xl" />
               </Link>
               <div>
@@ -612,6 +664,9 @@ export default function CartPage() {
               Clear all
             </button>
           </div>
+
+          {/* Add more tests search bar */}
+          <AddMoreSearch cartCity={cartCity} />
 
           {/* TOP: Cart items (left) + Price summary (right, sticky) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6">
