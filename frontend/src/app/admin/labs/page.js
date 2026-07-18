@@ -8,9 +8,10 @@ import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
+import Link from 'next/link';
 import {
   FiPlus, FiCheckCircle, FiXCircle, FiEdit, FiStar,
-  FiSearch, FiUploadCloud, FiDownload, FiEye, FiMail, FiPhone, FiMapPin, FiLayers, FiChevronDown, FiX,
+  FiSearch, FiUploadCloud, FiDownload, FiEye, FiMail, FiPhone, FiMapPin, FiLayers, FiChevronDown, FiX, FiFilePlus,
 } from 'react-icons/fi';
 
 // ── Searchable multi-select for Lab Assistants ────────────────────────────────
@@ -639,7 +640,16 @@ export default function AdminLabsPage() {
                       )}
                     </td>
                     <td className="table-cell">{lab.city}</td>
-                    <td className="table-cell"><Badge status={lab.verificationStatus} /></td>
+                    <td className="table-cell">
+                      <div className="flex flex-col gap-1">
+                        <Badge status={lab.verificationStatus} />
+                        {lab.changesPending && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1 w-fit">
+                            <FiFilePlus size={9} /> Changes Pending
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="table-cell">{lab.homeCollection ? 'Yes' : 'No'}</td>
                     <td className="table-cell">
                       <button onClick={() => handleToggleFeatured(lab)}
@@ -650,6 +660,12 @@ export default function AdminLabsPage() {
                     <td className="table-cell">{formatDate(lab.createdAt)}</td>
                     <td className="table-cell">
                       <div className="flex items-center gap-2">
+                        {lab.changesPending && (
+                          <Link href="/admin/lab-changes" title="Review profile changes"
+                            className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors font-medium">
+                            <FiFilePlus size={12} /> Review
+                          </Link>
+                        )}
                         {lab.verificationStatus !== 'verified' && (
                           <button onClick={() => handleApprove(lab._id)} title="Approve" className="text-green-500 hover:text-green-700"><FiCheckCircle /></button>
                         )}

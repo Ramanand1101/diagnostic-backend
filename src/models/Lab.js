@@ -27,6 +27,7 @@ const labSchema = new mongoose.Schema({
   openingHours: String,
   homeCollection: { type: Boolean, default: false },
   approved: { type: Boolean, default: false },
+  changesPending: { type: Boolean, default: false, index: true },
   verificationStatus: {
     type: String,
     enum: ['pending', 'verified', 'rejected'],

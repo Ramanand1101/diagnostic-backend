@@ -39,6 +39,9 @@ exports.submit = asyncHandler(async (req, res) => {
     status: 'pending',
   });
 
+  // Mark lab as having pending changes so it appears in admin "Pending Approval" filter
+  await Lab.findByIdAndUpdate(lab._id, { changesPending: true });
+
   res.status(201).json({ message: 'Change request submitted for admin approval', request });
 });
 
@@ -79,10 +82,10 @@ exports.approve = asyncHandler(async (req, res) => {
   if (!changeReq) return res.status(404).json({ message: 'Change request not found' });
   if (changeReq.status !== 'pending') return res.status(400).json({ message: 'Already reviewed' });
 
-  // Apply changes to Lab
+  // Apply changes to Lab and clear pending flag
   const lab = await Lab.findByIdAndUpdate(
     changeReq.lab._id,
-    { $set: changeReq.changes },
+    { $set: { ...changeReq.changes, changesPending: false } },
     { new: true, runValidators: true }
   );
 
@@ -110,6 +113,9 @@ exports.reject = asyncHandler(async (req, res) => {
   changeReq.reviewedAt = new Date();
   changeReq.adminNote = req.body.adminNote || '';
   await changeReq.save();
+
+  // Clear pending flag on the lab
+  await Lab.findByIdAndUpdate(changeReq.lab, { changesPending: false });
 
   res.json({ message: 'Change request rejected', changeReq });
 });
