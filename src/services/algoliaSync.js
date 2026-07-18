@@ -12,6 +12,13 @@ async function deleteObject(index, objectID) {
   return client.deleteObject({ indexName: indexName(index), objectID });
 }
 
+// Atomic full replace — removes stale records not in `objects`
+async function replaceAllObjects(index, objects) {
+  if (!hasAlgoliaConfig()) return null;
+  const client = getClient();
+  return client.replaceAllObjects({ indexName: indexName(index), objects });
+}
+
 async function setIndexSettings(index, settings) {
   if (!hasAlgoliaConfig()) return null;
   const client = getClient();
@@ -27,4 +34,4 @@ async function searchIndex(index, query, params = {}) {
   });
 }
 
-module.exports = { syncObjects, deleteObject, setIndexSettings, searchIndex };
+module.exports = { syncObjects, deleteObject, replaceAllObjects, setIndexSettings, searchIndex };

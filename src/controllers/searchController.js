@@ -2,7 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Lab = require('../models/Lab');
 const Product = require('../models/Product');
 const { hasAlgoliaConfig } = require('../config/algolia');
-const { searchIndex, syncObjects, setIndexSettings } = require('../services/algoliaSync');
+const { searchIndex, syncObjects, replaceAllObjects, setIndexSettings } = require('../services/algoliaSync');
 
 // ─── Algolia record builders ────────────────────────────────────────────────
 
@@ -364,7 +364,8 @@ exports.reindexLabs = asyncHandler(async (req, res) => {
     customRanking: ['desc(ratingAvg)', 'desc(reviewCount)'],
   });
 
-  await syncObjects('labs', records);
+  // replaceAllObjects atomically swaps the entire index — removes any stale labs not in MongoDB
+  await replaceAllObjects('labs', records);
   res.json({ message: 'Labs reindexed', count: records.length });
 });
 

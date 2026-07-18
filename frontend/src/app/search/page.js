@@ -9,9 +9,10 @@ import { searchApi } from '@/lib/api';
 import { useCart } from '@/context/CartContext';
 import {
   FiSearch, FiX, FiMapPin, FiClock,
-  FiChevronDown, FiChevronUp, FiFilter, FiShoppingCart, FiCheck,
+  FiChevronDown, FiChevronUp, FiChevronRight, FiFilter, FiShoppingCart, FiCheck,
   FiDroplet, FiHome, FiAlertCircle, FiInfo, FiExternalLink,
 } from 'react-icons/fi';
+import { MdOutlineScience } from 'react-icons/md';
 import toast from 'react-hot-toast';
 
 // ── Sidebar filter section ────────────────────────────────────────────────────
@@ -397,6 +398,11 @@ function SearchContent() {
   const [mobileSheet, setMobileSheet] = useState(false);
   const debounceRef = useRef(null);
   const isOwnNavRef = useRef(false);
+  const [liveResults, setLiveResults] = useState([]);
+  const [showDrop, setShowDrop] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const searchWrapRef = useRef(null);
+  const suggestTimerRef = useRef(null);
 
   useEffect(() => {
     if (isOwnNavRef.current) { isOwnNavRef.current = false; return; }
@@ -407,9 +413,9 @@ function SearchContent() {
   }, [searchParams]);
 
   const runSearch = useCallback(async (q, c, tests = []) => {
-    // Always include both chips (tests) AND live inputVal in the search
+    // Include inputVal only when meaningful (≥2 chars) to avoid single-letter noise
     const queries = [...tests];
-    if (q.trim() && !queries.some((t) => t.toLowerCase() === q.trim().toLowerCase())) {
+    if (q.trim().length >= 2 && !queries.some((t) => t.toLowerCase() === q.trim().toLowerCase())) {
       queries.push(q.trim());
     }
     if (queries.length === 0) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
@@ -443,12 +449,12 @@ function SearchContent() {
   }, []);
 
   const effectiveQuery = multiTests.length > 0
-    ? (inputVal.trim() ? [...multiTests, inputVal.trim()].join(', ') : multiTests.join(', '))
+    ? (inputVal.trim().length >= 2 ? [...multiTests, inputVal.trim()].join(', ') : multiTests.join(', '))
     : inputVal;
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
-    const hasQuery = multiTests.length > 0 || inputVal.trim();
+    const hasQuery = multiTests.length > 0 || inputVal.trim().length >= 2;
     if (!hasQuery) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
     debounceRef.current = setTimeout(() => {
       runSearch(inputVal, city, multiTests);
@@ -471,6 +477,40 @@ function SearchContent() {
     if (city.trim()) params.set('city', city.trim());
     router.replace(`/search?${params.toString()}`, { scroll: false });
   };
+
+  /* ── Autocomplete suggest dropdown ── */
+  useEffect(() => {
+    clearTimeout(suggestTimerRef.current);
+    if (inputVal.trim().length < 2) {
+      setLiveResults([]);
+      setShowDrop(false);
+      return;
+    }
+    suggestTimerRef.current = setTimeout(async () => {
+      setSuggesting(true);
+      try {
+        const res = await searchApi.suggest({ q: inputVal.trim(), city, limit: 8 });
+        setLiveResults(res.data.tests || []);
+        setShowDrop(true);
+      } catch {
+        setLiveResults([]);
+      } finally {
+        setSuggesting(false);
+      }
+    }, 280);
+    return () => clearTimeout(suggestTimerRef.current);
+  }, [inputVal, city]);
+
+  /* ── Close dropdown on outside click ── */
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) {
+        setShowDrop(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const products = results.products || [];
   const labs = results.labs || [];
@@ -502,6 +542,12 @@ function SearchContent() {
   const hasResults = products.length > 0 || labs.length > 0;
   const clearFilters = () => { setSelectedLabs(new Set()); setSelectedLocations(new Set()); };
 
+  const pickSuggestion = (name) => {
+    if (!multiTests.includes(name)) setMultiTests((prev) => [...prev, name]);
+    setInputVal('');
+    setShowDrop(false);
+  };
+
   const sidebar = (
     <div className="space-y-1">
       <div className="flex items-center justify-between mb-3">
@@ -531,12 +577,16 @@ function SearchContent() {
           <div className="max-w-7xl mx-auto space-y-2 sm:space-y-0 sm:flex sm:gap-3">
 
             {/* Search input — full width on mobile, flex-1 on sm+ */}
-            <div className="relative min-w-0 sm:flex-1">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <div className="relative min-w-0 sm:flex-1" ref={searchWrapRef}>
+              {suggesting
+                ? <div className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+                : <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              }
               <input
                 type="text"
                 value={inputVal}
                 onChange={(e) => setInputVal(e.target.value)}
+                onFocus={() => { if (inputVal.trim().length >= 2 && liveResults.length > 0) setShowDrop(true); }}
                 placeholder={multiTests.length > 0 ? 'Type another test to search alongside…' : 'Search tests, packages, labs...'}
                 className="input pl-9 pr-9 w-full"
                 autoFocus
@@ -544,10 +594,65 @@ function SearchContent() {
               />
               {inputVal && (
                 <button
-                  onClick={() => { setInputVal(''); }}
+                  onClick={() => { setInputVal(''); setShowDrop(false); }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <FiX className="text-sm" />
                 </button>
+              )}
+
+              {/* ── Autocomplete dropdown ── */}
+              {showDrop && (liveResults.length > 0 || suggesting) && (
+                <div className="absolute top-full mt-1.5 left-0 right-0 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden max-h-[340px] overflow-y-auto">
+                  {suggesting && liveResults.length === 0 && (
+                    <div className="px-4 py-4 text-sm text-gray-400 flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                      Searching…
+                    </div>
+                  )}
+                  {liveResults.length > 0 && (
+                    <>
+                      <p className="px-4 pt-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                        Tests &amp; Packages{city ? ` in ${city}` : ''}
+                        {multiTests.length > 0 && ' — tap to add'}
+                      </p>
+                      {liveResults.map((t) => {
+                        const already = multiTests.includes(t.name);
+                        return (
+                          <button key={t.name} type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => pickSuggestion(t.name)}
+                            className={`w-full flex items-center gap-3 px-4 py-2.5 transition text-left ${already ? 'bg-sky-50 opacity-70' : 'hover:bg-sky-50'}`}>
+                            <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center shrink-0">
+                              <MdOutlineScience className="text-sky-600 text-base" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">{t.name}</p>
+                              <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
+                                {t.labCount != null && (
+                                  <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded font-medium">
+                                    {t.labCount} lab{t.labCount !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                                {t.minPrice != null && (
+                                  <><span>·</span><span className="font-medium text-gray-600">
+                                    {t.minPrice === t.maxPrice
+                                      ? `₹${t.minPrice.toLocaleString('en-IN')}`
+                                      : `₹${t.minPrice.toLocaleString('en-IN')} – ₹${t.maxPrice.toLocaleString('en-IN')}`}
+                                  </span></>
+                                )}
+                                {t.reportTime && <><span>·</span><span>{t.reportTime}</span></>}
+                              </p>
+                            </div>
+                            {already
+                              ? <span className="text-[10px] text-sky-500 font-semibold shrink-0">Added ✓</span>
+                              : <FiChevronRight size={14} className="text-gray-300 shrink-0" />
+                            }
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
               )}
             </div>
 
