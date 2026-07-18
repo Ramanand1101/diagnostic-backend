@@ -50,27 +50,29 @@ exports.listLabs = asyncHandler(async (req, res) => {
   if (homeCollection !== undefined) filter.homeCollection = homeCollection === 'true';
 
   const skip = (Number(page) - 1) * safeLimit;
-  const items = await Lab.find(filter).populate('brand', 'name slug logo').populate('owner', 'name email mobile').sort(sort).skip(skip).limit(safeLimit);
+  const items = await Lab.find(filter).populate('brand', 'name slug logo').populate('owners', 'name email mobile').sort(sort).skip(skip).limit(safeLimit);
   const total = await Lab.countDocuments(filter);
   res.json({ items, page: Number(page), limit: safeLimit, total });
 });
 
 exports.getLabBySlug = asyncHandler(async (req, res) => {
   const lab = await Lab.findOne({ slug: req.params.slug })
-    .populate('owner', 'name email mobile role')
+    .populate('owners', 'name email mobile role')
     .populate('brand', 'name slug logo website');
   if (!lab) return res.status(404).json({ message: 'Lab not found' });
   res.json(lab);
 });
 
 exports.getMyLab = asyncHandler(async (req, res) => {
-  const lab = await Lab.findOne({ owner: req.user._id });
+  const lab = await Lab.findOne({ owners: req.user._id })
+    .populate('owners', 'name email mobile')
+    .populate('brand', 'name slug logo');
   res.json(lab || null);
 });
 
 exports.createLab = asyncHandler(async (req, res) => {
   if (!req.body.slug && req.body.name) req.body.slug = makeSlug(req.body.name);
-  if (req.user.role === 'lab') req.body.owner = req.user._id;
+  if (req.user.role === 'lab') req.body.owners = [req.user._id];
   const lab = await Lab.create(req.body);
   console.log('Created Lab:', lab);
   await syncObjects('labs', [labRecord(lab)]);
@@ -83,7 +85,7 @@ exports.updateLab = asyncHandler(async (req, res) => {
 
   // Lab role users can only update their own lab
   const filter = req.user.role === 'lab'
-    ? { _id: req.params.id, owner: req.user._id }
+    ? { _id: req.params.id, owners: req.user._id }
     : { _id: req.params.id };
 
   const lab = await Lab.findOneAndUpdate(filter, payload, { new: true, runValidators: true });
@@ -209,7 +211,7 @@ exports.exportLabsCsv = asyncHandler(async (req, res) => {
 
   const labs = await Lab.find(filter)
     .populate('brand', 'name')
-    .populate('owner', 'name email mobile')
+    .populate('owners', 'name email mobile')
     .sort('-createdAt')
     .limit(10000)
     .lean();
@@ -226,7 +228,7 @@ exports.exportLabsCsv = asyncHandler(async (req, res) => {
     'homeCollection','featured','accreditation',
     'verificationStatus','approved','ratingAvg','reviewCount',
     'sampleCollectionTime','reportDeliveryTime','description',
-    'ownerName','ownerEmail','ownerMobile',
+    'ownerNames','ownerEmails','ownerMobiles',
     'createdAt',
   ];
 
@@ -242,7 +244,9 @@ exports.exportLabsCsv = asyncHandler(async (req, res) => {
     l.ratingAvg || 0, l.reviewCount || 0,
     l.sampleCollectionTime || '', l.reportDeliveryTime || '',
     l.description || '',
-    l.owner?.name || '', l.owner?.email || '', l.owner?.mobile || '',
+    (l.owners || []).map((o) => o.name).join('|'),
+    (l.owners || []).map((o) => o.email).filter(Boolean).join('|'),
+    (l.owners || []).map((o) => o.mobile).filter(Boolean).join('|'),
     l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : '',
   ].map(escape).join(','));
 

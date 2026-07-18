@@ -44,7 +44,7 @@ function LabForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState({
     name: initial?.name || '',
     brand: initial?.brand?._id || initial?.brand || '',
-    owner: initial?.owner?._id || initial?.owner || '',
+    owners: (initial?.owners || []).map((o) => o?._id || o).filter(Boolean),
     address: initial?.address || '',
     area: initial?.area || '',
     city: initial?.city || '',
@@ -93,7 +93,6 @@ function LabForm({ initial, onSave, onClose }) {
     try {
       const payload = { ...form };
       if (!payload.brand) payload.brand = null;
-      if (!payload.owner) payload.owner = null;
       if (initial?._id) await labApi.update(initial._id, payload);
       else await labApi.create(payload);
       toast.success(initial ? 'Lab updated!' : 'Lab created!');
@@ -128,22 +127,49 @@ function LabForm({ initial, onSave, onClose }) {
         </div>
       </div>
 
-      {/* Owner / Lab User assignment */}
+      {/* Lab Assistants / Owners multi-select */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Assign Lab Owner (User)
-          <span className="text-xs text-gray-400 font-normal ml-1">— which lab-role user manages this lab</span>
-        </label>
-        <select value={form.owner || ''} onChange={(e) => set('owner', e.target.value)} className="input bg-white">
-          <option value="">— Unassigned —</option>
-          {labUsers.map((u) => (
-            <option key={u._id} value={u._id}>
-              {u.name} ({u.email || u.mobile || u._id})
-            </option>
-          ))}
-        </select>
-        {labUsers.length === 0 && (
-          <p className="text-xs text-gray-400 mt-1">No users with role &quot;lab&quot; found. Go to Users → change a user&apos;s role to &quot;lab&quot; first.</p>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-gray-700">
+            Lab Assistants
+            <span className="text-xs text-gray-400 font-normal ml-1">— select one or more users who manage this lab</span>
+          </label>
+          {form.owners.length > 0 && (
+            <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-medium">
+              {form.owners.length} selected
+            </span>
+          )}
+        </div>
+        {labUsers.length === 0 ? (
+          <p className="text-xs text-gray-400">No users with role &quot;lab&quot; found. Go to Users → change a user&apos;s role to &quot;lab&quot; first.</p>
+        ) : (
+          <div className="max-h-40 overflow-y-auto space-y-1 bg-white rounded-lg border border-blue-100 p-2">
+            {labUsers.map((u) => {
+              const checked = form.owners.includes(u._id);
+              const toggle = () => set('owners', checked
+                ? form.owners.filter((id) => id !== u._id)
+                : [...form.owners, u._id]
+              );
+              return (
+                <label key={u._id} className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'}`}>
+                  <input type="checkbox" checked={checked} onChange={toggle} className="w-4 h-4 rounded text-primary-600 shrink-0" />
+                  <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-[10px] font-bold text-primary-700 shrink-0">
+                    {u.name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{u.name}</p>
+                    <p className="text-[11px] text-gray-400 truncate">{u.email || u.mobile || ''}</p>
+                  </div>
+                  {checked && <span className="ml-auto text-blue-500 text-xs shrink-0">✓</span>}
+                </label>
+              );
+            })}
+          </div>
+        )}
+        {form.owners.length > 0 && (
+          <button type="button" onClick={() => set('owners', [])} className="mt-1.5 text-xs text-gray-400 hover:text-red-500">
+            Clear all
+          </button>
         )}
       </div>
 
@@ -486,7 +512,7 @@ export default function AdminLabsPage() {
                   </th>
                   <th className="table-header">Name</th>
                   <th className="table-header">Brand / Chain</th>
-                  <th className="table-header">Owner</th>
+                  <th className="table-header">Lab Assistants</th>
                   <th className="table-header">City</th>
                   <th className="table-header">Status</th>
                   <th className="table-header">Home Collection</th>
@@ -522,15 +548,19 @@ export default function AdminLabsPage() {
                       ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
                     <td className="table-cell">
-                      {lab.owner ? (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-secondary-100 text-secondary-700 flex items-center justify-center text-[9px] font-bold">
-                            {(lab.owner.name || '?')[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-gray-800 leading-tight">{lab.owner.name}</p>
-                            <p className="text-[10px] text-gray-400 leading-tight">{lab.owner.email || lab.owner.mobile || ''}</p>
-                          </div>
+                      {(lab.owners || []).length > 0 ? (
+                        <div className="space-y-1">
+                          {(lab.owners || []).map((o, i) => (
+                            <div key={o._id || i} className="flex items-center gap-1.5">
+                              <div className="w-5 h-5 rounded-full bg-secondary-100 text-secondary-700 flex items-center justify-center text-[9px] font-bold shrink-0">
+                                {(o.name || '?')[0].toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-800 leading-tight">{o.name}</p>
+                                <p className="text-[10px] text-gray-400 leading-tight">{o.email || o.mobile || ''}</p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <span className="text-[10px] text-red-400 font-medium bg-red-50 px-2 py-0.5 rounded-full">Unassigned</span>
