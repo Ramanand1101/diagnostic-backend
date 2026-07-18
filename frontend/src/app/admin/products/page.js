@@ -7,7 +7,7 @@ import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiDollarSign, FiDownload, FiRefreshCw } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiDollarSign, FiDownload } from 'react-icons/fi';
 
 function formatReportTime(val) {
   if (!val) return '';
@@ -34,7 +34,30 @@ function ProductForm({ initial, labs, onSave, onClose }) {
     isFeatured: initial?.isFeatured || false,
   });
   const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+
+  // Auto-populate from test master when editing an existing product
+  useEffect(() => {
+    if (!initial?.name) return;
+    testMasterApi.search(initial.name.trim())
+      .then((r) => {
+        const items = r.data.items || [];
+        const match = items.find((t) => t.name.toLowerCase() === initial.name.trim().toLowerCase()) || items[0];
+        if (!match) return;
+        setNameQuery(match.name);
+        setForm((f) => ({
+          ...f,
+          name: match.name,
+          sampleType: match.sampleType || f.sampleType,
+          reportTime: match.reportTime || f.reportTime,
+          fastingRequired: match.fastingRequired ?? f.fastingRequired,
+          homeCollection: match.homeCollection ?? f.homeCollection,
+          description: match.description || f.description,
+          category: match.category?._id || match.category || f.category,
+          subcategory: match.subcategory?._id || match.subcategory || '',
+        }));
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // TestMaster autocomplete
   const [nameQuery, setNameQuery] = useState(initial?.name || '');
@@ -82,34 +105,6 @@ function ProductForm({ initial, labs, onSave, onClose }) {
     setShowSuggestions(false);
   };
 
-  const syncFromMaster = async () => {
-    if (!nameQuery.trim()) return;
-    setSyncing(true);
-    try {
-      const r = await testMasterApi.search(nameQuery.trim());
-      const items = r.data.items || [];
-      const match = items.find((t) => t.name.toLowerCase() === nameQuery.trim().toLowerCase()) || items[0];
-      if (!match) { toast.error('No matching test found in Test Master'); return; }
-      setNameQuery(match.name);
-      setForm((f) => ({
-        ...f,
-        name: match.name,
-        category: match.category?._id || match.category || f.category,
-        subcategory: match.subcategory?._id || match.subcategory || '',
-        sampleType: match.sampleType || f.sampleType,
-        reportTime: match.reportTime || f.reportTime,
-        fastingRequired: match.fastingRequired ?? f.fastingRequired,
-        homeCollection: match.homeCollection ?? f.homeCollection,
-        description: match.description || f.description,
-      }));
-      toast.success('Synced from Test Master!');
-    } catch {
-      toast.error('Could not sync from Test Master');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -137,21 +132,12 @@ function ProductForm({ initial, labs, onSave, onClose }) {
       <div className="grid grid-cols-2 gap-4">
         {/* Name with TestMaster autocomplete */}
         <div className="col-span-2 relative">
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700">
-              Test Name *
-              <span className="ml-2 text-xs font-normal text-primary-500">
-                — Choose from Test Master List
-              </span>
-            </label>
-            {initial?._id && (
-              <button type="button" onClick={syncFromMaster} disabled={syncing}
-                className="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-800 font-medium transition-colors disabled:opacity-50">
-                <FiRefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
-                {syncing ? 'Syncing…' : 'Sync from Master'}
-              </button>
-            )}
-          </div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Test Name *
+            <span className="ml-2 text-xs font-normal text-primary-500">
+              — Choose from Test Master List
+            </span>
+          </label>
           <input
             required
             autoComplete="off"
