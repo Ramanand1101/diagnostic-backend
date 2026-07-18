@@ -12,6 +12,10 @@ exports.createBooking = asyncHandler(async (req, res) => {
   const payload = req.body;
   const user = req.user;
 
+  if (user && (user.role === 'superadmin' || user.role === 'subadmin' || user.role === 'lab')) {
+    return res.status(403).json({ message: 'Admin and lab accounts cannot place bookings.' });
+  }
+
   const items = payload.items || [];
   let subtotal = 0;
 

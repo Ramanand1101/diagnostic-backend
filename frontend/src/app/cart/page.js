@@ -612,7 +612,10 @@ function AddMoreSearch({ cartCity }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CartPage() {
   const { items, removeItem, clearCart } = useCart();
+  const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+
+  const isRestricted = user && (user.role === 'superadmin' || user.role === 'subadmin' || user.role === 'lab');
 
   const groups = Object.values(
     items.reduce((acc, item) => {
@@ -735,15 +738,29 @@ export default function CartPage() {
           {/* BOTTOM: Patient & Slot form — same width as cart items (lg:col-span-2) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-3">
-              <BookingForm
-                groups={groups}
-                onSuccess={clearCart}
-                submitting={submitting}
-                setSubmitting={setSubmitting}
-              />
-              <p className="text-xs text-center text-gray-400">
-                By confirming, you agree to our terms &amp; conditions
-              </p>
+              {isRestricted ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
+                  <div className="text-3xl mb-3">🚫</div>
+                  <p className="font-semibold text-amber-800 text-sm mb-1">
+                    {user.role === 'lab' ? 'Lab accounts cannot place bookings' : 'Admin accounts cannot place bookings'}
+                  </p>
+                  <p className="text-xs text-amber-600">
+                    Bookings can only be placed by patient/customer accounts.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <BookingForm
+                    groups={groups}
+                    onSuccess={clearCart}
+                    submitting={submitting}
+                    setSubmitting={setSubmitting}
+                  />
+                  <p className="text-xs text-center text-gray-400">
+                    By confirming, you agree to our terms &amp; conditions
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
