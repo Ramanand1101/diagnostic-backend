@@ -22,21 +22,41 @@ function DiffRow({ field, current, proposed }) {
   const label = FIELD_LABELS[field] || field;
   const fmt = (v) => {
     if (v === null || v === undefined || v === '') return <span className="text-gray-300 italic text-xs">empty</span>;
-    if (typeof v === 'boolean') return v ? '✅ Yes' : '❌ No';
-    if (Array.isArray(v)) return v.join(', ') || <span className="text-gray-300 italic text-xs">empty</span>;
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    if (Array.isArray(v)) return v.length ? v.join(', ') : <span className="text-gray-300 italic text-xs">empty</span>;
     return String(v);
   };
   return (
-    <tr className="border-b border-gray-50">
-      <td className="py-2 px-3 text-xs font-semibold text-gray-600 w-36 shrink-0">{label}</td>
-      <td className="py-2 px-3 text-sm text-gray-500 bg-red-50 rounded-l">{fmt(current)}</td>
-      <td className="py-2 px-3 text-sm text-gray-900 font-medium bg-green-50 rounded-r">{fmt(proposed)}</td>
+    <tr className="border-b border-gray-50 last:border-0">
+      <td className="py-2.5 px-3 text-xs font-semibold text-gray-600 w-40 align-top">{label}</td>
+      <td className="py-2.5 px-3 text-sm bg-red-50 align-top">
+        <span className="text-red-700 line-through opacity-80">{fmt(current)}</span>
+      </td>
+      <td className="py-2.5 px-1 text-gray-400 text-xs align-middle text-center w-4">→</td>
+      <td className="py-2.5 px-3 text-sm bg-green-50 align-top">
+        <span className="text-green-800 font-medium">{fmt(proposed)}</span>
+      </td>
     </tr>
   );
 }
 
+function LabStatusBadge({ status }) {
+  const map = {
+    verified: 'bg-green-100 text-green-700',
+    rejected: 'bg-red-100 text-red-600',
+    pending: 'bg-yellow-100 text-yellow-700',
+  };
+  const label = { verified: '✓ Verified', rejected: '✗ Rejected', pending: '⏳ Pending' };
+  if (!status) return null;
+  return (
+    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${map[status] || 'bg-gray-100 text-gray-500'}`}>
+      {label[status] || status}
+    </span>
+  );
+}
+
 function RequestCard({ req, onReviewed }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(req.status === 'pending'); // auto-expand diff for pending
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -73,15 +93,21 @@ function RequestCard({ req, onReviewed }) {
             <FiMapPin className="text-primary-600" />
           </div>
           <div>
-            <p className="font-semibold text-gray-900">{req.lab?.name || 'Unknown Lab'}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-gray-900">{req.lab?.name || 'Unknown Lab'}</p>
+              <LabStatusBadge status={req.lab?.verificationStatus} />
+            </div>
             <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
               <span className="flex items-center gap-1"><FiUser size={11} />{req.requestedBy?.name} ({req.requestedBy?.email})</span>
               <span className="flex items-center gap-1"><FiCalendar size={11} />{formatDate(req.createdAt)}</span>
               <span className="flex items-center gap-1"><FiMapPin size={11} />{req.lab?.city}</span>
             </p>
             <div className="flex flex-wrap gap-1 mt-1.5">
+              <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">
+                {changedFields.length} field{changedFields.length !== 1 ? 's' : ''} changed
+              </span>
               {changedFields.map((f) => (
-                <span key={f} className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
+                <span key={f} className="text-[10px] bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full font-medium">
                   {FIELD_LABELS[f] || f}
                 </span>
               ))}
@@ -103,10 +129,11 @@ function RequestCard({ req, onReviewed }) {
           <div className="mt-3 rounded-xl overflow-hidden border border-gray-100">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50">
-                  <th className="py-2 px-3 text-xs font-semibold text-gray-500 text-left w-36">Field</th>
-                  <th className="py-2 px-3 text-xs font-semibold text-red-600 text-left bg-red-50">Current Value</th>
-                  <th className="py-2 px-3 text-xs font-semibold text-green-600 text-left bg-green-50">Proposed Change</th>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="py-2 px-3 text-xs font-semibold text-gray-500 text-left w-40">Field</th>
+                  <th className="py-2 px-3 text-xs font-semibold text-red-600 text-left bg-red-50">Current (old)</th>
+                  <th className="w-4"></th>
+                  <th className="py-2 px-3 text-xs font-semibold text-green-600 text-left bg-green-50">Proposed (new)</th>
                 </tr>
               </thead>
               <tbody>

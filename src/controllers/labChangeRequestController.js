@@ -15,18 +15,27 @@ exports.submit = asyncHandler(async (req, res) => {
   const lab = await Lab.findOne({ owners: req.user._id });
   if (!lab) return res.status(404).json({ message: 'No lab found for your account' });
 
-  // Only track changes to tracked fields
+  // Only store fields that actually changed
+  const normalize = (v) => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'boolean') return String(v);
+    if (Array.isArray(v)) return JSON.stringify(v);
+    return String(v).trim();
+  };
+
   const changes = {};
   const currentValues = {};
   TRACKED_FIELDS.forEach((f) => {
-    if (req.body[f] !== undefined) {
-      changes[f] = req.body[f];
-      currentValues[f] = lab[f] ?? null;
-    }
+    if (req.body[f] === undefined) return; // not sent in payload
+    const oldVal = lab[f] ?? null;
+    const newVal = req.body[f];
+    if (normalize(oldVal) === normalize(newVal)) return; // no actual change
+    changes[f] = newVal;
+    currentValues[f] = oldVal;
   });
 
   if (Object.keys(changes).length === 0)
-    return res.status(400).json({ message: 'No trackable fields in request' });
+    return res.status(400).json({ message: 'No changes detected — values are same as current' });
 
   // Cancel any existing pending request for this lab
   await LabChangeRequest.deleteMany({ lab: lab._id, status: 'pending' });
@@ -64,7 +73,7 @@ exports.list = asyncHandler(async (req, res) => {
 
   const [items, total] = await Promise.all([
     LabChangeRequest.find(filter)
-      .populate('lab', 'name city slug')
+      .populate('lab', 'name city slug verificationStatus approved')
       .populate('requestedBy', 'name email mobile')
       .populate('reviewedBy', 'name')
       .sort('-createdAt')
