@@ -17,6 +17,13 @@ exports.createBooking = asyncHandler(async (req, res) => {
   }
 
   const items = payload.items || [];
+
+  // All items must belong to the same lab
+  const labIds = [...new Set(items.map((i) => String(i.lab || '')).filter(Boolean))];
+  if (labIds.length > 1) {
+    return res.status(400).json({ message: 'All items in a booking must be from the same lab.' });
+  }
+
   let subtotal = 0;
 
   for (const item of items) {

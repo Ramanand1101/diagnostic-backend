@@ -616,6 +616,7 @@ export default function CartPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const isRestricted = user && (user.role === 'superadmin' || user.role === 'subadmin' || user.role === 'lab');
+  const multiLab = groups.length > 1;
 
   const groups = Object.values(
     items.reduce((acc, item) => {
@@ -747,6 +748,33 @@ export default function CartPage() {
                   <p className="text-xs text-amber-600">
                     Bookings can only be placed by patient/customer accounts.
                   </p>
+                </div>
+              ) : multiLab ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-5">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="text-2xl shrink-0">⚠️</div>
+                    <div>
+                      <p className="font-semibold text-red-800 text-sm">One lab at a time only</p>
+                      <p className="text-xs text-red-600 mt-0.5">
+                        You have tests from {groups.length} different labs. Please keep tests from only one lab to proceed with booking.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {groups.map((g) => (
+                      <div key={g.labId} className="flex items-center justify-between bg-white border border-red-100 rounded-lg px-3 py-2.5">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">{g.labName}</p>
+                          <p className="text-xs text-gray-400">{g.items.length} test{g.items.length !== 1 ? 's' : ''}</p>
+                        </div>
+                        <button
+                          onClick={() => g.items.forEach((i) => removeItem(i._id))}
+                          className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors font-medium">
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <>

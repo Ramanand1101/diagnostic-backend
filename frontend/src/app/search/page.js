@@ -737,16 +737,35 @@ function SearchContent() {
             </div>
 
           ) : !hasResults ? (
-            <div className="text-center py-20 sm:py-24 text-gray-500 px-4">
-              <p className="text-base sm:text-lg font-semibold">No results for &ldquo;{effectiveQuery}&rdquo;{city.trim() ? ` in ${city}` : ''}</p>
-              <p className="text-xs sm:text-sm text-gray-400 mt-1">Try a different search term or city</p>
-              {city.trim() && (
-                <button onClick={() => { setCity(''); runSearch(inputVal, ''); }}
-                  className="mt-3 text-sm text-primary-600 hover:underline">
-                  Search all cities
-                </button>
-              )}
-            </div>
+            city.trim() ? (
+              <div className="text-center py-20 sm:py-24 px-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-50 mb-4">
+                  <FiMapPin className="text-3xl text-amber-400" />
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-1">
+                  Service not available in {city}
+                </h2>
+                <p className="text-sm text-gray-400 max-w-xs mx-auto mb-5">
+                  We don&apos;t have any partner labs in <span className="font-semibold text-gray-600">{city}</span> yet. Try searching in a nearby city or browse all cities.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={() => { setCity(''); runSearch(inputVal, '', multiTests); }}
+                    className="px-5 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-xl transition-colors">
+                    Search all cities
+                  </button>
+                  <Link href="/labs" className="px-5 py-2 border border-gray-200 text-gray-600 hover:border-gray-300 text-sm font-medium rounded-xl transition-colors">
+                    Browse all labs
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-20 sm:py-24 text-gray-500 px-4">
+                <FiSearch className="text-4xl mx-auto mb-3 opacity-20" />
+                <p className="text-base sm:text-lg font-semibold">No results for &ldquo;{effectiveQuery}&rdquo;</p>
+                <p className="text-xs sm:text-sm text-gray-400 mt-1">Try a different search term</p>
+              </div>
+            )
 
           ) : (
             <div className="flex gap-4 lg:gap-5">
