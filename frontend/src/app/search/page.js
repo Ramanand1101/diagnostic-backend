@@ -403,7 +403,6 @@ function SearchContent() {
   const [suggesting, setSuggesting] = useState(false);
   const searchWrapRef = useRef(null);
   const suggestTimerRef = useRef(null);
-  const showDropRef = useRef(false);
 
   useEffect(() => {
     if (isOwnNavRef.current) { isOwnNavRef.current = false; return; }
@@ -453,15 +452,14 @@ function SearchContent() {
     ? (inputVal.trim().length >= 2 ? [...multiTests, inputVal.trim()].join(', ') : multiTests.join(', '))
     : inputVal;
 
-  useEffect(() => { showDropRef.current = showDrop; }, [showDrop]);
-
   useEffect(() => {
     clearTimeout(debounceRef.current);
+    // When chips exist, input is autocomplete-only — user must pick from dropdown
+    // When no chips, input is the live search
+    const qToSearch = multiTests.length > 0 ? '' : inputVal;
     const hasQuery = multiTests.length > 0 || inputVal.trim().length >= 2;
     if (!hasQuery) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
     debounceRef.current = setTimeout(() => {
-      // If autocomplete dropdown is open, search only chips — don't include partial typed text
-      const qToSearch = showDropRef.current ? '' : inputVal;
       runSearch(qToSearch, city, multiTests);
       isOwnNavRef.current = true;
       const params = new URLSearchParams();
