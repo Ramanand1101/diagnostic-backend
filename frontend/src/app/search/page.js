@@ -440,10 +440,22 @@ function SearchContent() {
 
   const effectiveQuery = multiTests.length > 0 ? multiTests.join(', ') : inputVal;
 
+  // Add typed test as a new chip (Enter key handler)
+  const addChip = () => {
+    const trimmed = inputVal.trim();
+    if (!trimmed || multiTests.includes(trimmed)) { setInputVal(''); return; }
+    setMultiTests((prev) => [...prev, trimmed]);
+    setInputVal('');
+  };
+
   useEffect(() => {
     clearTimeout(debounceRef.current);
     const hasQuery = multiTests.length > 0 || inputVal.trim();
     if (!hasQuery) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
+
+    // When chips exist and user is just typing (staging next chip), don't re-search
+    if (multiTests.length > 0 && inputVal.trim()) return;
+
     debounceRef.current = setTimeout(() => {
       runSearch(inputVal, city, multiTests);
       isOwnNavRef.current = true;
@@ -531,17 +543,38 @@ function SearchContent() {
                 type="text"
                 value={inputVal}
                 onChange={(e) => setInputVal(e.target.value)}
-                placeholder="Search tests, packages, labs..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (multiTests.length > 0 && inputVal.trim()) addChip();
+                  }
+                }}
+                placeholder={multiTests.length > 0 ? 'Type another test & press Enter to add…' : 'Search tests, packages, labs...'}
                 className="input pl-9 pr-9 w-full"
                 autoFocus
                 autoComplete="off"
               />
               {inputVal && (
                 <button
-                  onClick={() => { setInputVal(''); setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); }}
+                  onClick={() => { setInputVal(''); }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <FiX className="text-sm" />
                 </button>
+              )}
+              {/* Hint when typing alongside existing chips */}
+              {multiTests.length > 0 && inputVal.trim() && (
+                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-primary-200 rounded-xl shadow-lg px-3 py-2.5 flex items-center justify-between gap-2">
+                  <span className="text-sm text-gray-700">
+                    Add <strong className="text-primary-700">&ldquo;{inputVal.trim()}&rdquo;</strong> to search?
+                  </span>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); addChip(); }}
+                    className="text-xs font-semibold px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shrink-0"
+                  >
+                    + Add (Enter)
+                  </button>
+                </div>
               )}
             </div>
 
