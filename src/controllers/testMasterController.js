@@ -65,6 +65,52 @@ exports.update = async (req, res) => {
       .populate('category', 'name')
       .populate('subcategory', 'name');
     if (!test) return res.status(404).json({ message: 'Test not found' });
+
+    // Cascade: sync description + metadata to all products with the same name
+    const Product = require('../models/Product');
+    const { syncObjects } = require('../services/algoliaSync');
+
+    const nameRegex = new RegExp(`^${test.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+    const productUpdate = {};
+    if (req.body.description !== undefined) productUpdate.description = test.description;
+    if (req.body.sampleType  !== undefined) productUpdate.sampleType  = test.sampleType;
+    if (req.body.reportTime  !== undefined) productUpdate.reportTime  = test.reportTime;
+    if (req.body.fastingRequired !== undefined) productUpdate.fastingRequired = test.fastingRequired;
+    if (req.body.homeCollection  !== undefined) productUpdate.homeCollection  = test.homeCollection;
+
+    if (Object.keys(productUpdate).length) {
+      await Product.updateMany({ name: nameRegex }, { $set: productUpdate });
+
+      // Re-index updated products in Algolia
+      try {
+        const updated = await Product.find({ name: nameRegex })
+          .populate({ path: 'lab', select: 'name slug city state address area pincode homeCollection ratingAvg verificationStatus' })
+          .lean();
+        if (updated.length) {
+          const records = updated.map((p) => ({
+            objectID: String(p._id),
+            id: String(p._id),
+            type: p.type,
+            name: p.name,
+            slug: p.slug,
+            description: p.description || '',
+            price: p.price,
+            salePrice: p.salePrice || null,
+            reportTime: p.reportTime || '',
+            sampleType: p.sampleType || '',
+            homeCollection: !!p.homeCollection,
+            fastingRequired: !!p.fastingRequired,
+            tags: p.tags || [],
+            category: p.category ? String(p.category) : null,
+            lab: p.lab ? { _id: String(p.lab._id), name: p.lab.name, slug: p.lab.slug, city: p.lab.city, state: p.lab.state || '', address: p.lab.address || '', area: p.lab.area || '', pincode: p.lab.pincode || '' } : null,
+            isFeatured: !!p.isFeatured,
+            isActive: !!p.isActive,
+          }));
+          await syncObjects('products', records);
+        }
+      } catch { /* algolia optional */ }
+    }
+
     res.json(test);
   } catch (err) {
     res.status(400).json({ message: err.message });
