@@ -4,7 +4,7 @@ import { userApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
-import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiUser, FiTool } from 'react-icons/fi';
+import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiUser, FiTool, FiDownload } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 
@@ -177,9 +177,24 @@ export default function AdminUsersPage() {
           <h1 className="text-2xl font-bold text-gray-900">Users</h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage user accounts and assign roles.</p>
         </div>
-        <span className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-400">
-          {total} total users
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              try {
+                const res = await userApi.exportCsv();
+                const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+                const a = document.createElement('a'); a.href = url; a.download = 'users-export.csv'; a.click();
+                URL.revokeObjectURL(url);
+              } catch { toast.error('Export failed'); }
+            }}
+            className="flex items-center gap-2 text-sm px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <FiDownload size={14} /> Download CSV
+          </button>
+          <span className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-400">
+            {total} total users
+          </span>
+        </div>
       </div>
 
       {/* Role stat cards */}

@@ -138,6 +138,33 @@ exports.bulkCsv = asyncHandler(async (req, res) => {
   res.json({ created, updated, errors, total: rows.length });
 });
 
+// GET /brands/export-csv
+exports.exportCsv = asyncHandler(async (req, res) => {
+  const brands = await Brand.find({}).sort('name').lean();
+  const ids = brands.map((b) => b._id);
+  const counts = await Lab.aggregate([
+    { $match: { brand: { $in: ids } } },
+    { $group: { _id: '$brand', total: { $sum: 1 } } },
+  ]);
+  const countMap = {};
+  counts.forEach((c) => { countMap[String(c._id)] = c.total; });
+
+  const header = 'name,website,phone,email,description,isActive,labCount';
+  const rows = brands.map((b) => [
+    `"${(b.name || '').replace(/"/g, '""')}"`,
+    `"${(b.website || '').replace(/"/g, '""')}"`,
+    `"${(b.phone || '').replace(/"/g, '""')}"`,
+    `"${(b.email || '').replace(/"/g, '""')}"`,
+    `"${(b.description || '').replace(/"/g, '""')}"`,
+    b.isActive ? 'true' : 'false',
+    countMap[String(b._id)] || 0,
+  ].join(','));
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="brands-export.csv"');
+  res.send([header, ...rows].join('\n'));
+});
+
 // DELETE /brands/bulk-delete
 exports.bulkDelete = asyncHandler(async (req, res) => {
   const { ids } = req.body;

@@ -7,7 +7,7 @@ import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiList } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiList, FiDownload } from 'react-icons/fi';
 
 const REPORT_PRESETS = ['Same day', '4 hours', '8 hours', '12 hours', '24 hours', '48 hours', '2-3 days'];
 const SAMPLE_PRESETS = ['Blood', 'Urine', 'Stool', 'Saliva', 'Swab', 'Multiple'];
@@ -204,9 +204,24 @@ export default function TestMasterPage() {
             Central library of test names. Use these when adding products — lab sets the price.
           </p>
         </div>
-        <button onClick={() => setModal({ type: 'add' })} className="btn-primary flex items-center gap-2 text-sm">
-          <FiPlus /> Add Test
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              try {
+                const res = await testMasterApi.exportCsv();
+                const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+                const a = document.createElement('a'); a.href = url; a.download = 'test-master-export.csv'; a.click();
+                URL.revokeObjectURL(url);
+              } catch { toast.error('Export failed'); }
+            }}
+            className="flex items-center gap-2 text-sm px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <FiDownload size={14} /> Download CSV
+          </button>
+          <button onClick={() => setModal({ type: 'add' })} className="btn-primary flex items-center gap-2 text-sm">
+            <FiPlus /> Add Test
+          </button>
+        </div>
       </div>
 
       {/* CSV Upload */}

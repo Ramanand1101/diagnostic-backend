@@ -10,6 +10,7 @@ const logoUpload = makePublicUpload(process.env.AWS_S3_LOGOS_PREFIX || 'logos/br
 
 router.get('/demo-csv', c.demoCsv);
 router.get('/by-city', c.byCity);
+router.get('/export-csv', ...admin, c.exportCsv);
 router.get('/', c.list);
 router.post('/upload-logo', ...admin, logoUpload.single('logo'), c.uploadLogo);
 router.post('/bulk-csv', ...admin, csvUpload.single('file'), c.bulkCsv);

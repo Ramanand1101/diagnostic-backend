@@ -24,8 +24,9 @@ const SLOT_GROUPS = [
 // Returns true if the slot's start time has already passed (only for today's date)
 function isSlotPast(slot, slotDate) {
   if (!slotDate) return false;
-  const today = new Date().toISOString().split('T')[0];
-  if (slotDate !== today) return false;
+  const _d = new Date();
+  const _today = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
+  if (slotDate !== _today) return false;
 
   // Parse slot start — e.g. '06:00 AM – 07:00 AM' → '06:00 AM'
   const startStr = slot.split('–')[0].trim();
@@ -289,7 +290,8 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
   }, [form, user, initialized]);
 
   const F = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
-  const today = new Date().toISOString().split('T')[0];
+  const _td = new Date();
+  const today = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
   const hasHome = groups.some((g) => g.items[0]?.lab?.homeCollection || g.items.some((i) => i.homeCollection));
 
   const handleSubmit = async (e) => {
@@ -651,8 +653,9 @@ export default function CartPage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <Link href={backUrl} className="text-gray-400 hover:text-primary-600 transition-colors" title="Back to search results">
-                <FiArrowLeft className="text-xl" />
+              <Link href={backUrl} className="flex items-center gap-2 text-gray-500 hover:text-primary-600 transition-colors font-medium text-sm" title="Back to search results">
+                <FiArrowLeft className="text-base" />
+                Back to Search
               </Link>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Your Cart</h1>

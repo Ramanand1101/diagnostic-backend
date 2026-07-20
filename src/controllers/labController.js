@@ -168,6 +168,8 @@ exports.bulkUploadLabsCsv = asyncHandler(async (req, res) => {
   const Brand = require('../models/Brand');
   for (const [i, row] of rows.entries()) {
     if (!row.name) { errors.push({ row: i + 2, error: 'name is required' }); continue; }
+    if (!row.phone) { errors.push({ row: i + 2, error: 'phone is required' }); continue; }
+    if (!row.email) { errors.push({ row: i + 2, error: 'email is required' }); continue; }
     try {
       // Resolve brand by name
       let brandId = null;

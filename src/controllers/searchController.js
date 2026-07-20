@@ -80,10 +80,17 @@ async function mongoSearch(q, type, city, limit) {
   const cityRegex = city ? new RegExp(escapeRegex(city), 'i') : null;
   const result = { labs: [], products: [], pages: [] };
 
+  // Pre-fetch inactive brand IDs to exclude their labs
+  const Brand = require('../models/Brand');
+  const inactiveBrands = await Brand.find({ isActive: false }).select('_id').lean();
+  const inactiveBrandIds = inactiveBrands.map((b) => b._id);
+
   // When city is given, find matching lab IDs once and reuse for both labs + products
   let cityLabIds = null;
   if (cityRegex) {
-    const cityLabs = await Lab.find({ city: cityRegex, approved: true }).select('_id').lean();
+    const cityFilter = { city: cityRegex, approved: true };
+    if (inactiveBrandIds.length) cityFilter.$or = [{ brand: { $nin: inactiveBrandIds } }, { brand: null }];
+    const cityLabs = await Lab.find(cityFilter).select('_id').lean();
     cityLabIds = cityLabs.map((l) => l._id);
   }
 
@@ -92,6 +99,7 @@ async function mongoSearch(q, type, city, limit) {
       approved: true,
       name: regex, // match only on lab name
     };
+    if (inactiveBrandIds.length) filter.$or = [{ brand: { $nin: inactiveBrandIds } }, { brand: null }];
     if (cityRegex) filter.city = cityRegex;
     result.labs = await Lab.find(filter).populate('brand', 'name slug logo').limit(limit).lean();
   }
@@ -193,9 +201,15 @@ exports.popular = asyncHandler(async (req, res) => {
   const city  = String(req.query.city  || '').trim();
   const limit = Math.min(Number(req.query.limit || 10), 20);
 
+  const Brand = require('../models/Brand');
+  const inactiveBrands = await Brand.find({ isActive: false }).select('_id').lean();
+  const inactiveBrandIds = inactiveBrands.map((b) => b._id);
+
   let cityLabIds = null;
   if (city) {
-    const cityLabs = await Lab.find({ city: new RegExp(city, 'i'), approved: true }).select('_id').lean();
+    const cityFilter = { city: new RegExp(city, 'i'), approved: true };
+    if (inactiveBrandIds.length) cityFilter.$or = [{ brand: { $nin: inactiveBrandIds } }, { brand: null }];
+    const cityLabs = await Lab.find(cityFilter).select('_id').lean();
     cityLabIds = cityLabs.map((l) => l._id);
     if (!cityLabIds.length) return res.json({ tests: [] });
   }
@@ -239,13 +253,19 @@ exports.suggest = asyncHandler(async (req, res) => {
 
   if (q.length < 2) return res.json({ tests: [], labs: [] });
 
+  const Brand = require('../models/Brand');
+  const inactiveBrands = await Brand.find({ isActive: false }).select('_id').lean();
+  const inactiveBrandIds = inactiveBrands.map((b) => b._id);
+
   const terms = expandQuery(q);
   const orPatterns = terms.map((t) => ({ name: new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }));
 
   // Optional city filter — get lab IDs once
   let cityLabIds = null;
   if (city) {
-    const cityLabs = await Lab.find({ city: new RegExp(city, 'i'), approved: true }).select('_id').lean();
+    const cityFilter = { city: new RegExp(city, 'i'), approved: true };
+    if (inactiveBrandIds.length) cityFilter.$or = [{ brand: { $nin: inactiveBrandIds } }, { brand: null }];
+    const cityLabs = await Lab.find(cityFilter).select('_id').lean();
     cityLabIds = cityLabs.map((l) => l._id);
     if (!cityLabIds.length) return res.json({ tests: [], labs: [] });
   }
@@ -268,9 +288,10 @@ exports.suggest = asyncHandler(async (req, res) => {
     { $limit: limit },
   ]);
 
-  // Also fetch a few matching labs
+  // Also fetch a few matching labs (exclude inactive brands)
   const labFilter = { approved: true, $or: terms.map((t) => ({ name: new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') })) };
   if (city) labFilter.city = new RegExp(city, 'i');
+  if (inactiveBrandIds.length) labFilter.$and = [{ $or: [{ brand: { $nin: inactiveBrandIds } }, { brand: null }] }];
   const labs = await Lab.find(labFilter).select('name slug city ratingAvg').limit(4).lean();
 
   res.json({

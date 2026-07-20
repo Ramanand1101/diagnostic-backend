@@ -101,3 +101,18 @@ exports.bulkDeleteUsers = asyncHandler(async (req, res) => {
   const result = await User.deleteMany({ _id: { $in: ids }, role: { $ne: 'superadmin' } });
   res.json({ message: `${result.deletedCount} user(s) deleted` });
 });
+
+exports.exportCsv = asyncHandler(async (req, res) => {
+  const users = await User.find({}).sort({ createdAt: -1 }).select('name email mobile role createdAt').lean();
+  const header = 'name,email,mobile,role,createdAt';
+  const rows = users.map((u) => [
+    `"${(u.name || '').replace(/"/g, '""')}"`,
+    `"${(u.email || '').replace(/"/g, '""')}"`,
+    `"${(u.mobile || '').replace(/"/g, '""')}"`,
+    u.role || 'customer',
+    u.createdAt ? new Date(u.createdAt).toISOString().split('T')[0] : '',
+  ].join(','));
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="users-export.csv"');
+  res.send([header, ...rows].join('\n'));
+});

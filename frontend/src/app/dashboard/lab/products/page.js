@@ -480,10 +480,6 @@ export default function LabProductsPage() {
                 </select>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea name="description" value={form.description} onChange={handle} rows={2} className="input resize-none" />
-            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹) *</label>
@@ -504,18 +500,6 @@ export default function LabProductsPage() {
                   </button>
                 ))}
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sample Type</label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {['Blood', 'Urine', 'Stool', 'Saliva', 'Swab', 'Multiple'].map((opt) => (
-                  <button key={opt} type="button" onClick={() => setForm((f) => ({ ...f, sampleType: f.sampleType === opt ? '' : opt }))}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${form.sampleType === opt ? 'bg-secondary-500 text-white border-secondary-500' : 'bg-white text-gray-600 border-gray-200 hover:border-secondary-300'}`}>
-                    {opt}
-                  </button>
-                ))}
-              </div>
-              <input name="sampleType" value={['Blood','Urine','Stool','Saliva','Swab','Multiple'].includes(form.sampleType) ? '' : form.sampleType} onChange={handle} className="input text-sm" placeholder="Or type custom..." />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>

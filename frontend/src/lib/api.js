@@ -50,6 +50,7 @@ export const userApi = {
   updateRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
   bulkDelete: (ids) => api.delete('/users/bulk-delete', { data: { ids } }),
   deleteUser: (id) => api.delete(`/users/${id}`),
+  exportCsv: () => api.get('/users/export-csv', { responseType: 'blob' }),
 };
 
 // Labs
@@ -97,6 +98,7 @@ export const brandApi = {
   uploadLogo: (formData) => api.post('/brands/upload-logo', formData),
   bulkDelete: (ids) => api.delete('/brands/bulk-delete', { data: { ids } }),
   setHomeCollection: (id, homeCollection) => api.patch(`/brands/${id}/home-collection`, { homeCollection }),
+  exportCsv: () => api.get('/brands/export-csv', { responseType: 'blob' }),
 };
 
 // Products
@@ -208,6 +210,7 @@ export const testMasterApi = {
   delete: (id) => api.delete(`/test-master/${id}`),
   demoCsv: () => api.get('/test-master/demo-csv', { responseType: 'blob' }),
   bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/test-master/bulk-csv', fd); },
+  exportCsv: () => api.get('/test-master/export-csv', { responseType: 'blob' }),
 };
 
 // Lab CRM (for lab role — filtered to own lab)

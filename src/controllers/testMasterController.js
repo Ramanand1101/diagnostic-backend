@@ -97,6 +97,36 @@ exports.demoCsv = (req, res) => {
   res.send(csv);
 };
 
+// GET /api/v1/test-master/export-csv
+exports.exportCsv = async (req, res) => {
+  try {
+    const tests = await require('../models/TestMaster').find({})
+      .sort({ name: 1 })
+      .populate('category', 'name')
+      .populate('subcategory', 'name')
+      .lean();
+
+    const header = 'name,category,subcategory,sampleType,reportTime,fastingRequired,homeCollection,isActive,description';
+    const rows = tests.map((t) => [
+      `"${(t.name || '').replace(/"/g, '""')}"`,
+      `"${(t.category?.name || '').replace(/"/g, '""')}"`,
+      `"${(t.subcategory?.name || '').replace(/"/g, '""')}"`,
+      `"${(t.sampleType || '').replace(/"/g, '""')}"`,
+      `"${(t.reportTime || '').replace(/"/g, '""')}"`,
+      t.fastingRequired ? 'true' : 'false',
+      t.homeCollection ? 'true' : 'false',
+      t.isActive !== false ? 'true' : 'false',
+      `"${(t.description || '').replace(/"/g, '""')}"`,
+    ].join(','));
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="test-master-export.csv"');
+    res.send([header, ...rows].join('\n'));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // POST /api/v1/test-master/bulk-csv
 exports.bulkCsv = async (req, res) => {
   try {

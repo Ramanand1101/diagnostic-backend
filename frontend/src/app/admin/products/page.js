@@ -212,14 +212,6 @@ function ProductForm({ initial, labs, onSave, onClose }) {
             placeholder="Type number (e.g. 24) → auto becomes '24 hours'"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Sample Type</label>
-          <input value={form.sampleType} onChange={(e) => setForm({ ...form, sampleType: e.target.value })} className="input" placeholder="e.g. Blood" />
-        </div>
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-          <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input" rows={3} />
-        </div>
         {/* Price fields */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">

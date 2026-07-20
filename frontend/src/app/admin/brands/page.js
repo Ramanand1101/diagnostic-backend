@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import {
   FiPlus, FiEdit, FiTrash2, FiMapPin, FiGlobe, FiLayers,
   FiUploadCloud, FiX, FiHome, FiGrid, FiList, FiFolder,
-  FiPhone, FiMail, FiCheckSquare, FiSquare,
+  FiPhone, FiMail, FiCheckSquare, FiSquare, FiDownload,
 } from 'react-icons/fi';
 
 // ── Multi-value field (phones / emails) ──────────────────────────────────────
@@ -83,6 +83,8 @@ function BrandForm({ initial, onSave, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return toast.error('Brand name is required');
+    if (!form.phone.trim()) return toast.error('Primary phone is required');
+    if (!form.email.trim()) return toast.error('Primary email is required');
     setLoading(true);
     try {
       if (initial?._id) await brandApi.update(initial._id, form);
@@ -143,13 +145,13 @@ function BrandForm({ initial, onSave, onClose }) {
       {/* Primary contact */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Primary Phone</label>
-          <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)}
+          <label className="block text-sm font-medium text-gray-700 mb-1">Primary Phone *</label>
+          <input required type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)}
             className="input" placeholder="1800-xxx-xxxx" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Primary Email</label>
-          <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)}
+          <label className="block text-sm font-medium text-gray-700 mb-1">Primary Email *</label>
+          <input required type="email" value={form.email} onChange={(e) => set('email', e.target.value)}
             className="input" placeholder="contact@brand.com" />
         </div>
       </div>
@@ -470,6 +472,19 @@ export default function AdminBrandsPage() {
               </button>
             ))}
           </div>
+          <button
+            onClick={async () => {
+              try {
+                const res = await brandApi.exportCsv();
+                const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+                const a = document.createElement('a'); a.href = url; a.download = 'brands-export.csv'; a.click();
+                URL.revokeObjectURL(url);
+              } catch { toast.error('Export failed'); }
+            }}
+            className="flex items-center gap-2 text-sm px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <FiDownload size={14} /> Download CSV
+          </button>
           <button onClick={() => setModal({ type: 'add' })} className="btn-primary flex items-center gap-2 text-sm">
             <FiPlus /> Add Brand
           </button>

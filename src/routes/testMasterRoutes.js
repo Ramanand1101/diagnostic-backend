@@ -8,6 +8,7 @@ const admin = [protect, allowRoles('superadmin', 'subadmin')];
 const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.get('/demo-csv', c.demoCsv);
+router.get('/export-csv', ...admin, c.exportCsv);
 router.get('/search', c.search);                          // public — used in product form autocomplete
 router.get('/', ...admin, c.list);
 router.post('/bulk-csv', ...admin, csvUpload.single('file'), c.bulkCsv);

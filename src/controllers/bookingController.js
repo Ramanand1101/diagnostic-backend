@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Booking = require('../models/Booking');
 const Coupon = require('../models/Coupon');
 const Product = require('../models/Product');
+const User = require('../models/User');
 const { sendMail } = require('../config/email');
 
 function bookingNo() {
@@ -84,7 +85,8 @@ exports.createBooking = asyncHandler(async (req, res) => {
   // Send booking confirmation email (non-blocking)
   try {
     const populated = await Booking.findById(booking._id).populate('lab', 'name address city phone');
-    const toEmail = user.email || payload.guest?.email;
+    const userRecord = await User.findById(user._id).select('name email mobile').lean();
+    const toEmail = userRecord?.email || user.email || payload.guest?.email;
     if (toEmail) {
       const lab = populated.lab;
       const itemsHtml = booking.items.map((i) =>
@@ -101,7 +103,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
               <p style="color:#bae6fd;margin:4px 0 0;font-size:14px">Booking ID: <strong>${booking.bookingNo}</strong></p>
             </div>
             <div style="background:#fff;padding:24px 32px;border:1px solid #e5e7eb;border-top:none">
-              <p style="margin:0 0 16px">Hi <strong>${user.name || 'there'}</strong>,<br>Your lab test booking has been confirmed.</p>
+              <p style="margin:0 0 16px">Hi <strong>${userRecord?.name || user.name || 'there'}</strong>,<br>Your lab test booking has been confirmed.</p>
               ${lab ? `<div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
                 <p style="margin:0;font-weight:600;font-size:15px">${lab.name}</p>
                 ${labAddress ? `<p style="margin:4px 0 0;color:#64748b;font-size:13px">📍 ${labAddress}</p>` : ''}

@@ -191,6 +191,9 @@ function LabForm({ initial, onSave, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.phone.trim()) return toast.error('Phone number is required');
+    if (!form.email.trim()) return toast.error('Email address is required');
+    if (form.pincode && !/^\d{6}$/.test(form.pincode)) return toast.error('Pincode must be exactly 6 digits');
     setLoading(true);
     try {
       const payload = { ...form };
@@ -281,21 +284,34 @@ function LabForm({ initial, onSave, onClose }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-          <input value={form.state} onChange={(e) => set('state', e.target.value)} className="input" placeholder="Uttar Pradesh" />
+          <select value={form.state} onChange={(e) => set('state', e.target.value)} className="input">
+            <option value="">Select state</option>
+            {['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry'].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
-          <input value={form.pincode || ''} onChange={(e) => set('pincode', e.target.value)} className="input" placeholder="226010" maxLength={6} />
+          <input
+            value={form.pincode || ''}
+            onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 6); set('pincode', v); }}
+            onKeyDown={(e) => { if (!/[\d\b]/.test(e.key) && !['ArrowLeft','ArrowRight','Delete','Tab'].includes(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault(); }}
+            className="input"
+            placeholder="226010"
+            maxLength={6}
+            inputMode="numeric"
+          />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-          <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" placeholder="9876543210" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+          <input required type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" placeholder="9876543210" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input type="text" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" placeholder="lab@example.com" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+          <input required type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" placeholder="lab@example.com" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -399,6 +415,17 @@ function LabViewModal({ lab, onClose, onEdit }) {
           <p className="font-medium">{lab.ratingAvg ? `${lab.ratingAvg} ★` : '—'}</p>
         </div>
       </div>
+
+      {lab.accreditation?.length > 0 && (
+        <div>
+          <p className="text-xs text-gray-400 mb-1.5">Accreditation / Certifications</p>
+          <div className="flex flex-wrap gap-1.5">
+            {lab.accreditation.map((a) => (
+              <span key={a} className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{a}</span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {lab.description && (
         <p className="text-sm text-gray-600 leading-relaxed">{lab.description}</p>

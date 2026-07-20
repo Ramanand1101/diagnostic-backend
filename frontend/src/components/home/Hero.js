@@ -25,6 +25,7 @@ export default function HeroSlider() {
   // search bar
   const [query, setQuery] = useState('');
   const [popularTests, setPopularTests] = useState([]);
+  const [popularLoading, setPopularLoading] = useState(false);
   const [selectedTests, setSelectedTests] = useState([]); // chip array
   const [liveResults, setLiveResults] = useState({ tests: [], labs: [] });
   const [showDrop, setShowDrop] = useState(false);
@@ -67,10 +68,12 @@ export default function HeroSlider() {
 
   /* ── Fetch popular tests when city is selected ── */
   useEffect(() => {
-    if (!city) { setPopularTests([]); return; }
+    if (!city) { setPopularTests([]); setPopularLoading(false); return; }
+    setPopularLoading(true);
     searchApi.popular({ city, limit: 10 })
       .then((res) => setPopularTests(res.data.tests || []))
-      .catch(() => {});
+      .catch(() => setPopularTests([]))
+      .finally(() => setPopularLoading(false));
   }, [city]);
 
   /* ── Auto-play ── */
@@ -380,12 +383,17 @@ export default function HeroSlider() {
 
                 {showPopular && popularTests.length === 0 && (
                   <div className="px-4 py-5 text-center text-sm text-gray-400">
-                    {city ? 'Loading popular tests…' : (
-                      <span>
-                        <button type="button" onClick={() => setCityModalOpen(true)} className="text-sky-600 font-semibold hover:underline">Select your city</button>
-                        {' '}to see popular tests nearby
-                      </span>
-                    )}
+                    {city
+                      ? popularLoading
+                        ? 'Loading popular tests…'
+                        : <span>Service not available in <strong>{city}</strong>.{' '}
+                            <button type="button" onClick={() => setCityModalOpen(true)} className="text-sky-600 font-semibold hover:underline">Try a different city</button>
+                          </span>
+                      : <span>
+                          <button type="button" onClick={() => setCityModalOpen(true)} className="text-sky-600 font-semibold hover:underline">Select your city</button>
+                          {' '}to see popular tests nearby
+                        </span>
+                    }
                   </div>
                 )}
 
