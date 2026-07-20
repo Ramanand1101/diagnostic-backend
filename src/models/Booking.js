@@ -47,6 +47,8 @@ const bookingSchema = new mongoose.Schema({
   coupon: String,
   notes: String,
   prescriptionUrl: String,
+  cancelledByName: String,
+  cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reminderSent: { type: Boolean, default: false },
   isDeleted: { type: Boolean, default: false },
   deletedAt: Date

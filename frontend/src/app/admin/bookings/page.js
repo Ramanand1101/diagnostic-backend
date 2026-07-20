@@ -275,6 +275,7 @@ export default function AdminBookingsPage() {
                 <tr>
                   <th className="table-header">Booking #</th>
                   <th className="table-header">Customer</th>
+                  <th className="table-header">Lab</th>
                   <th className="table-header">Date</th>
                   <th className="table-header">Status</th>
                   <th className="table-header">Payment</th>
@@ -286,7 +287,21 @@ export default function AdminBookingsPage() {
                 {bookings.map((b) => (
                   <tr key={b._id} className="hover:bg-gray-50">
                     <td className="table-cell font-mono font-medium text-xs">{b.bookingNo}</td>
-                    <td className="table-cell">{b.user?.name || b.guest?.name || '-'}</td>
+                    <td className="table-cell">
+                      <p className="font-medium text-gray-800 text-sm">{b.user?.name || b.guest?.name || '—'}</p>
+                      {b.user?.mobile && <p className="text-xs text-gray-400">{b.user.mobile}</p>}
+                      {b.cancelledByName && (
+                        <p className="text-xs text-red-500 mt-0.5">✕ Cancelled by: {b.cancelledByName}</p>
+                      )}
+                    </td>
+                    <td className="table-cell">
+                      {b.lab ? (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-700 leading-tight">{b.lab.name}</p>
+                          {b.lab.city && <p className="text-xs text-gray-400">{b.lab.city}</p>}
+                        </div>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
                     <td className="table-cell">{formatDate(b.slotDate)}</td>
                     <td className="table-cell"><Badge status={b.status} /></td>
                     <td className="table-cell"><Badge status={b.paymentStatus} /></td>
@@ -313,7 +328,7 @@ export default function AdminBookingsPage() {
                   </tr>
                 ))}
                 {bookings.length === 0 && (
-                  <tr><td colSpan={7} className="table-cell text-center text-gray-400 py-10">{showDeleted ? 'No deleted bookings' : 'No bookings found'}</td></tr>
+                  <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-10">{showDeleted ? 'No deleted bookings' : 'No bookings found'}</td></tr>
                 )}
               </tbody>
             </table>
@@ -327,10 +342,14 @@ export default function AdminBookingsPage() {
         {viewBooking && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><p className="text-gray-400">Customer</p><p className="font-medium">{viewBooking.user?.name || viewBooking.guest?.name}</p></div>
+              <div><p className="text-gray-400">Customer</p><p className="font-medium">{viewBooking.user?.name || viewBooking.guest?.name}</p>{viewBooking.user?.mobile && <p className="text-xs text-gray-400">{viewBooking.user.mobile}</p>}</div>
+              <div><p className="text-gray-400">Lab</p><p className="font-medium">{viewBooking.lab?.name || '—'}</p>{viewBooking.lab?.city && <p className="text-xs text-gray-400">{viewBooking.lab.city}</p>}</div>
               <div><p className="text-gray-400">Total</p><p className="font-medium">{formatCurrency(viewBooking.total)}</p></div>
               <div><p className="text-gray-400">Date</p><p className="font-medium">{formatDate(viewBooking.slotDate)}</p></div>
               <div><p className="text-gray-400">Visit</p><p className="font-medium capitalize">{viewBooking.visitType}</p></div>
+              {viewBooking.cancelledByName && (
+                <div><p className="text-gray-400">Cancelled By</p><p className="font-medium text-red-600">{viewBooking.cancelledByName}</p></div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Update Status</label>

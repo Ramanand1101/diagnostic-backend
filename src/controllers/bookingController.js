@@ -196,7 +196,12 @@ exports.getBooking = asyncHandler(async (req, res) => {
 });
 
 exports.updateBookingStatus = asyncHandler(async (req, res) => {
-  const booking = await Booking.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
+  const update = { status: req.body.status };
+  if (req.body.status === 'cancelled') {
+    update.cancelledBy = req.user._id;
+    update.cancelledByName = req.user.name || req.user.email || 'Unknown';
+  }
+  const booking = await Booking.findByIdAndUpdate(req.params.id, update, { new: true });
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
   res.json(booking);
 });

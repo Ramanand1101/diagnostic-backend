@@ -197,16 +197,16 @@ export default function HeroSlider({ heroContent }) {
         </div>
 
         {/* Overlay — pointer-events-none except form */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-20 px-4 sm:px-12 lg:px-24 pointer-events-none">
+        <div className="absolute inset-0 flex flex-col items-center justify-start pt-5 sm:justify-center sm:pt-0 z-20 px-4 sm:px-12 lg:px-24 pointer-events-none">
           <h1
-            className="text-white font-bold text-xl sm:text-2xl md:text-4xl text-center drop-shadow-lg mb-1 sm:mb-2 rich-html"
+            className="text-white font-bold text-lg sm:text-2xl md:text-4xl text-center drop-shadow-lg mb-2 sm:mb-2 rich-html leading-snug"
             dangerouslySetInnerHTML={{ __html: hc.title }}
           />
           <div
-            className="text-slate-200 text-[11px] sm:text-sm md:text-base text-center mb-1 sm:mb-2 drop-shadow max-w-2xl rich-html"
+            className="hidden sm:block text-slate-200 text-[11px] sm:text-sm md:text-base text-center mb-1 sm:mb-2 drop-shadow max-w-2xl rich-html"
             dangerouslySetInnerHTML={{ __html: hc.subtitle }}
           />
-          <p className="text-slate-300 text-[10px] sm:text-xs text-center mb-3 sm:mb-5 drop-shadow">
+          <p className="hidden sm:block text-slate-300 text-[10px] sm:text-xs text-center mb-3 sm:mb-5 drop-shadow">
             {hc.tagline}
           </p>
 
@@ -491,6 +491,15 @@ export default function HeroSlider({ heroContent }) {
 
       </div>
       </div>{/* end padded wrapper */}
+
+      {/* Mobile-only: subtitle + tagline shown below the hero card */}
+      <div className="sm:hidden px-4 pt-3 pb-1 text-center space-y-1">
+        <div
+          className="text-gray-600 text-xs leading-relaxed rich-html"
+          dangerouslySetInnerHTML={{ __html: hc.subtitle }}
+        />
+        <p className="text-gray-400 text-[11px]">{hc.tagline}</p>
+      </div>
 
       {/* Promo bar */}
       {hc.promoVisible !== false && (
