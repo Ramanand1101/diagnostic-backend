@@ -344,13 +344,14 @@ const DEFAULT_FORM = {
   addressLine1: '', addressArea: '', addressCity: '', addressState: '', addressPincode: '',
 };
 
-function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
+function BookingForm({ groups, onReadyForPayment }) {
   const router = useRouter();
   const { user, refreshUser, login } = useAuth();
 
   const [form, setForm] = useState(DEFAULT_FORM);
   const [pincodeValid, setPincodeValid] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Load saved form — works for both guests and logged-in users
   useEffect(() => {
@@ -410,7 +411,7 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
 
     setSubmitting(true);
 
-    // Auto-register guest and log them in before booking
+    // Auto-register guest and log them in before payment
     let activeUser = user;
     if (!activeUser) {
       if (!form.email) {
@@ -441,62 +442,22 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
       }
     }
 
-    try {
-      for (const group of groups) {
-        const subtotal = group.items.reduce((sum, i) => sum + (i.salePrice || i.price), 0);
-        await bookingApi.create({
-          lab: group.labId,
-          items: group.items.map((i) => ({
-            product: i._id,
-            name: i.name,
-            qty: 1,
-            price: i.salePrice || i.price,
-          })),
-          patients: [{
-            name: form.patientName,
-            age: +form.patientAge,
-            gender: form.patientGender,
-            relation: 'self',
-            phone: form.phone,
-            email: form.email,
-          }],
-          slotDate: form.slotDate,
-          slotTime: form.slotTime,
-          visitType: form.visitType,
-          address: form.visitType === 'home' ? {
-            line1: form.addressLine1,
-            area: form.addressArea,
-            city: form.addressCity,
-            state: form.addressState,
-            pincode: form.addressPincode,
-          } : undefined,
-          subtotal,
-          total: subtotal,
-          paymentMethod: 'cash',
-        });
-      }
-      // Save phone to profile if not already set
-      if (!activeUser.mobile && form.phone) {
-        try {
-          await userApi.updateMe({ mobile: form.phone });
-          await refreshUser();
-        } catch {}
-      }
-
-      // Clear persisted form
+    // Save phone to profile if not already set
+    if (!activeUser.mobile && form.phone) {
       try {
-        sessionStorage.removeItem(FORM_KEY(activeUser._id || activeUser.id));
-        sessionStorage.removeItem('cart_form_guest');
+        await userApi.updateMe({ mobile: form.phone });
+        await refreshUser();
       } catch {}
-
-      toast.success('Booking confirmed! Check your dashboard.');
-      onSuccess();
-      router.push('/dashboard/bookings');
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    } finally {
-      setSubmitting(false);
     }
+
+    // Clear persisted form
+    try {
+      sessionStorage.removeItem(FORM_KEY(activeUser._id || activeUser.id));
+      sessionStorage.removeItem('cart_form_guest');
+    } catch {}
+
+    onReadyForPayment(form, activeUser);
+    setSubmitting(false);
   };
 
   return (
@@ -651,10 +612,8 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
         className="w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold text-sm transition-colors mt-2"
       >
         {submitting
-          ? (user ? 'Confirming…' : 'Creating account & booking…')
-          : user
-            ? `Confirm Booking${groups.length > 1 ? ` (${groups.length} labs)` : ''}`
-            : `Create Account & Confirm Booking`}
+          ? (user ? 'Checking details…' : 'Creating account…')
+          : 'Proceed to Payment →'}
       </button>
     </form>
   );
@@ -701,11 +660,302 @@ function AddMoreSearch({ cartCity }) {
   );
 }
 
+// ── Payment Screen ────────────────────────────────────────────────────────────
+const BANKS = [
+  'State Bank of India','HDFC Bank','ICICI Bank','Axis Bank',
+  'Kotak Mahindra Bank','Bank of Baroda','Punjab National Bank',
+  'Yes Bank','IndusInd Bank','Federal Bank',
+];
+
+function PaymentScreen({ form, groups, total, onSuccess, onBack }) {
+  const [payTab, setPayTab] = useState('upi');
+  const [upiId, setUpiId] = useState('');
+  const [cardNo, setCardNo] = useState('');
+  const [cardName, setCardName] = useState(form.patientName || '');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [bank, setBank] = useState('');
+  const [processing, setProcessing] = useState(false);
+
+  const labName = groups[0]?.labName || 'Lab';
+  const itemCount = groups.reduce((s, g) => s + g.items.length, 0);
+  const slotLabel = form.slotDate
+    ? new Date(form.slotDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+    : '';
+
+  const fmtCard = (v) => v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
+  const fmtExpiry = (v) => { const d = v.replace(/\D/g, '').slice(0, 4); return d.length >= 2 ? `${d.slice(0,2)}/${d.slice(2)}` : d; };
+
+  const canPay = payTab === 'upi'        ? upiId.includes('@')
+               : payTab === 'card'       ? cardNo.replace(/\s/g,'').length === 16 && cardExpiry.length === 5 && cardCvv.length === 3
+               : /* netbanking */          !!bank;
+
+  const handlePay = async () => {
+    setProcessing(true);
+    await new Promise((r) => setTimeout(r, 2200));
+    try {
+      const created = [];
+      for (const group of groups) {
+        const subtotal = group.items.reduce((s, i) => s + (i.salePrice || i.price), 0);
+        const res = await bookingApi.create({
+          lab: group.labId,
+          items: group.items.map((i) => ({ product: i._id, name: i.name, qty: 1, price: i.salePrice || i.price })),
+          patients: [{ name: form.patientName, age: +form.patientAge, gender: form.patientGender, relation: 'self', phone: form.phone, email: form.email }],
+          slotDate: form.slotDate,
+          slotTime: form.slotTime,
+          visitType: form.visitType,
+          address: form.visitType === 'home'
+            ? { line1: form.addressLine1, area: form.addressArea, city: form.addressCity, state: form.addressState, pincode: form.addressPincode }
+            : undefined,
+          subtotal,
+          total: subtotal,
+          paymentMethod: 'online',
+          paymentStatus: 'paid',
+          status: 'confirmed',
+        });
+        created.push(res.data);
+      }
+      onSuccess(created);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+      setProcessing(false);
+    }
+  };
+
+  if (processing) return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="relative w-20 h-20 mb-6">
+        <div className="absolute inset-0 rounded-full border-4 border-primary-100" />
+        <div className="absolute inset-0 rounded-full border-4 border-t-primary-600 animate-spin" />
+        <span className="absolute inset-0 flex items-center justify-center text-2xl">💳</span>
+      </div>
+      <p className="text-lg font-bold text-gray-800 mb-1">Processing Payment…</p>
+      <p className="text-sm text-gray-400">Please wait, do not close this page</p>
+    </div>
+  );
+
+  return (
+    <div className="max-w-md mx-auto">
+      <button onClick={onBack} className="flex items-center gap-2 text-gray-500 hover:text-primary-600 text-sm font-medium mb-5 transition-colors">
+        <FiArrowLeft /> Back to cart
+      </button>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-br from-primary-700 to-primary-600 px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-primary-200 text-xs font-medium mb-0.5">Complete your booking</p>
+              <p className="text-white font-bold text-base leading-tight truncate">{labName}</p>
+              <p className="text-primary-300 text-xs mt-1">
+                {itemCount} test{itemCount !== 1 ? 's' : ''}{slotLabel ? ` · ${slotLabel}` : ''}{form.slotTime ? ` · ${form.slotTime}` : ''}
+              </p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-primary-300 text-xs">Total</p>
+              <p className="text-white font-extrabold text-2xl">₹{total.toLocaleString('en-IN')}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Demo notice */}
+        <div className="bg-amber-50 border-b border-amber-100 px-5 py-2 flex items-center gap-2">
+          <span className="text-xs font-bold text-amber-700">⚡ DEMO MODE</span>
+          <span className="text-xs text-amber-600">— No real payment will be charged</span>
+        </div>
+
+        {/* Payment method tabs */}
+        <div className="flex border-b border-gray-100">
+          {[
+            { id: 'upi',        label: 'UPI',         emoji: '📱' },
+            { id: 'card',       label: 'Card',        emoji: '💳' },
+            { id: 'netbanking', label: 'Net Banking',  emoji: '🏦' },
+          ].map(({ id, label, emoji }) => (
+            <button key={id} onClick={() => setPayTab(id)}
+              className={`flex-1 py-3 text-xs font-semibold transition-colors flex flex-col items-center gap-0.5 ${
+                payTab === id
+                  ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/30'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}>
+              <span className="text-base">{emoji}</span>{label}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* UPI Tab */}
+          {payTab === 'upi' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Enter UPI ID</label>
+              <input type="text" value={upiId} onChange={(e) => setUpiId(e.target.value)}
+                placeholder="yourname@paytm / @gpay / @upi"
+                className="input text-sm w-full" />
+              <p className="text-xs text-gray-400 mt-1.5">e.g. 9876543210@paytm · name@okaxis · user@gpay</p>
+              <div className="flex gap-2 mt-3 flex-wrap">
+                {['PhonePe','GPay','Paytm','BHIM'].map((app) => (
+                  <button key={app} type="button" onClick={() => setUpiId(`demo@${app.toLowerCase()}`)}
+                    className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-primary-50 hover:border-primary-300 font-medium text-gray-600 transition-colors">
+                    {app}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Card Tab */}
+          {payTab === 'card' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Card Number</label>
+                <input type="text" inputMode="numeric" value={cardNo}
+                  onChange={(e) => setCardNo(fmtCard(e.target.value))}
+                  placeholder="1234 5678 9012 3456"
+                  className="input text-sm font-mono tracking-widest" maxLength={19} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Name on Card</label>
+                <input type="text" value={cardName}
+                  onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                  placeholder="YOUR NAME"
+                  className="input text-sm tracking-wide uppercase" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">Expiry</label>
+                  <input type="text" inputMode="numeric" value={cardExpiry}
+                    onChange={(e) => setCardExpiry(fmtExpiry(e.target.value))}
+                    placeholder="MM / YY" className="input text-sm" maxLength={5} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">CVV</label>
+                  <input type="password" inputMode="numeric" value={cardCvv}
+                    onChange={(e) => setCardCvv(e.target.value.replace(/\D/g,'').slice(0,3))}
+                    placeholder="•••" className="input text-sm" maxLength={3} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Net Banking Tab */}
+          {payTab === 'netbanking' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Select your bank</label>
+              <select value={bank} onChange={(e) => setBank(e.target.value)} className="input text-sm">
+                <option value="">— Choose your bank —</option>
+                {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Pay button */}
+          <button onClick={handlePay} disabled={!canPay}
+            className={`w-full py-3.5 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 shadow-sm ${
+              canPay
+                ? 'bg-green-500 hover:bg-green-600 text-white shadow-green-200 active:scale-[0.98]'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}>
+            🔒 Pay ₹{total.toLocaleString('en-IN')}
+          </button>
+
+          <p className="text-center text-[11px] text-gray-400">
+            256-bit SSL encrypted &nbsp;·&nbsp; Demo mode — no real payment
+          </p>
+        </div>
+      </div>
+
+      {/* Accepted methods */}
+      <div className="flex justify-center gap-1.5 mt-4 flex-wrap">
+        {['Visa','Mastercard','RuPay','UPI','Net Banking'].map((m) => (
+          <span key={m} className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-400 rounded font-medium">{m}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Success Screen ────────────────────────────────────────────────────────────
+function SuccessScreen({ bookings }) {
+  const router = useRouter();
+  const first = bookings[0] || {};
+  const slotDate = first.slotDate
+    ? new Date(first.slotDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : '';
+
+  return (
+    <div className="text-center py-10 max-w-lg mx-auto">
+      {/* Animated check */}
+      <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5"
+        style={{ animation: 'bounceIn 0.5s ease' }}>
+        <FiCheckCircle className="text-green-500" size={48} />
+      </div>
+      <style>{`@keyframes bounceIn{0%{transform:scale(0.5);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}`}</style>
+
+      <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Booking Confirmed! 🎉</h1>
+      <p className="text-gray-500 text-sm mb-8 max-w-xs mx-auto">
+        Your lab test is booked and confirmed. We&apos;ll send you a reminder before your appointment.
+      </p>
+
+      {/* Booking cards */}
+      <div className="space-y-4 mb-8 text-left">
+        {bookings.map((booking, i) => (
+          <div key={booking._id || i} className="bg-white border border-green-100 rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-green-500 px-5 py-3 flex items-center justify-between">
+              <span className="text-white font-bold text-sm tracking-wide">{booking.bookingNo}</span>
+              <span className="text-[11px] bg-white/25 text-white px-2.5 py-0.5 rounded-full font-semibold">
+                ✓ Confirmed
+              </span>
+            </div>
+            <div className="px-5 py-4 space-y-2.5">
+              {[
+                { label: 'Lab',     value: booking.lab?.name || 'Lab' },
+                { label: 'Date',    value: slotDate },
+                { label: 'Time',    value: booking.slotTime || '—' },
+                { label: 'Visit',   value: booking.visitType === 'home' ? 'Home Collection' : 'Visit Lab' },
+                { label: 'Paid',    value: `₹${(booking.total || 0).toLocaleString('en-IN')}`, green: true },
+              ].map(({ label, value, green }) => (
+                <div key={label} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400 text-xs uppercase tracking-wide font-medium">{label}</span>
+                  <span className={`font-semibold ${green ? 'text-green-600' : 'text-gray-800'}`}>{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <button onClick={() => router.push('/dashboard/bookings')}
+          className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-xl transition-colors shadow-sm">
+          View My Bookings
+        </button>
+        <button onClick={() => router.push('/')}
+          className="px-8 py-3 text-sm font-semibold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+          Back to Home
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CartPage() {
   const { items, removeItem, clearCart } = useCart();
   const { user } = useAuth();
-  const [submitting, setSubmitting] = useState(false);
+
+  const [step, setStep] = useState('cart'); // 'cart' | 'payment' | 'success'
+  const [paymentMeta, setPaymentMeta] = useState(null); // { form, activeUser }
+  const [confirmedBookings, setConfirmedBookings] = useState([]);
+
+  const handleReadyForPayment = (form, activeUser) => {
+    setPaymentMeta({ form, activeUser });
+    setStep('payment');
+  };
+
+  const handlePaymentSuccess = (bookings) => {
+    clearCart();
+    setConfirmedBookings(bookings);
+    setStep('success');
+  };
 
   const isRestricted = user && (user.role === 'superadmin' || user.role === 'subadmin' || user.role === 'lab');
 
@@ -732,6 +982,42 @@ export default function CartPage() {
     if (cartCity) params.set('city', cartCity);
     return `/search?${params.toString()}`;
   }, [items, cartCity]);
+
+  // ── Success screen ──
+  if (step === 'success') {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen bg-gray-50">
+          <div className="max-w-2xl mx-auto px-4 py-12">
+            <SuccessScreen bookings={confirmedBookings} />
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  // ── Payment screen ──
+  if (step === 'payment' && paymentMeta) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen bg-gray-50">
+          <div className="max-w-2xl mx-auto px-4 py-8">
+            <PaymentScreen
+              form={paymentMeta.form}
+              groups={groups}
+              total={total}
+              onSuccess={handlePaymentSuccess}
+              onBack={() => setStep('cart')}
+            />
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -872,9 +1158,7 @@ export default function CartPage() {
                 <>
                   <BookingForm
                     groups={groups}
-                    onSuccess={clearCart}
-                    submitting={submitting}
-                    setSubmitting={setSubmitting}
+                    onReadyForPayment={handleReadyForPayment}
                   />
                   <p className="text-xs text-center text-gray-400">
                     By confirming, you agree to our terms &amp; conditions

@@ -36,7 +36,7 @@ const bookingSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'assigned', 'collected', 'processing', 'completed', 'cancelled', 'refunded'],
-    default: 'pending'
+    default: 'confirmed'
   },
   paymentMethod: { type: String, enum: ['online', 'cash', 'guest'], default: 'online' },
   paymentStatus: { type: String, enum: ['unpaid', 'paid', 'failed', 'refunded'], default: 'unpaid' },

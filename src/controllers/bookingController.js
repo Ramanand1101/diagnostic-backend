@@ -71,6 +71,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
     slotTime: payload.slotTime,
     visitType: payload.visitType || 'lab',
     address: payload.address,
+    status: payload.status || 'confirmed',
     paymentMethod: payload.paymentMethod || 'online',
     paymentStatus: payload.paymentStatus || 'unpaid',
     subtotal,
