@@ -4,6 +4,11 @@ const path = require('path');
 const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../'),
   eslint: { ignoreDuringBuilds: true },
+  async redirects() {
+    return [
+      { source: '/index.html', destination: '/', permanent: true },
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.amazonaws.com' },
