@@ -6,6 +6,7 @@ import {
   FiFileText, FiPercent, FiStar, FiBook, FiFile, FiMail,
   FiSettings, FiHelpCircle, FiImage, FiUploadCloud, FiLayers,
   FiBriefcase, FiUserCheck, FiPhoneCall, FiActivity, FiList, FiLayout, FiFilePlus,
+  FiDollarSign,
 } from 'react-icons/fi';
 import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -43,8 +44,9 @@ const navSections = [
   {
     label: 'Operations',
     items: [
-      { href: '/admin/bookings',    label: 'Bookings',             icon: FiCalendar, permission: 'bookings' },
-      { href: '/admin/reports',     label: 'Reports',              icon: FiFileText, permission: 'reports' },
+      { href: '/admin/bookings',    label: 'Bookings',             icon: FiCalendar,    permission: 'bookings' },
+      { href: '/admin/billing',     label: 'Billing',              icon: FiDollarSign,  permission: 'bookings' },
+      { href: '/admin/reports',     label: 'Reports',              icon: FiFileText,    permission: 'reports' },
       { href: '/admin/lab-changes', label: 'Lab Profile Changes',  icon: FiFilePlus, permission: 'lab-changes' },
       { href: '/admin/users',       label: 'Users',                icon: FiUsers,    permission: 'users' },
       { href: '/admin/reviews',     label: 'Reviews',              icon: FiStar,     permission: 'reviews' },

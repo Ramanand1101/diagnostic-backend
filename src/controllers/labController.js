@@ -169,7 +169,9 @@ exports.bulkUploadLabsCsv = asyncHandler(async (req, res) => {
   for (const [i, row] of rows.entries()) {
     if (!row.name) { errors.push({ row: i + 2, error: 'name is required' }); continue; }
     if (!row.phone) { errors.push({ row: i + 2, error: 'phone is required' }); continue; }
+    if (!/^[+\d][\d\s\-().]{6,19}$/.test(row.phone.trim())) { errors.push({ row: i + 2, error: 'phone format is invalid' }); continue; }
     if (!row.email) { errors.push({ row: i + 2, error: 'email is required' }); continue; }
+    if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(row.email.trim())) { errors.push({ row: i + 2, error: 'email format is invalid' }); continue; }
     try {
       // Resolve brand by name
       let brandId = null;

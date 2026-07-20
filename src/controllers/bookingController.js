@@ -137,6 +137,34 @@ exports.createBooking = asyncHandler(async (req, res) => {
   res.status(201).json(booking);
 });
 
+// GET /api/v1/bookings/stats — superadmin/subadmin only
+exports.getStats = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [allAgg, paidAgg, unpaidAgg, monthAgg, payMethodAgg, statusAgg] = await Promise.all([
+    Booking.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { isDeleted: false, paymentStatus: 'paid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { isDeleted: false, paymentStatus: 'unpaid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { isDeleted: false, createdAt: { $gte: monthStart } } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$total' } } }]),
+    Booking.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+  ]);
+
+  res.json({
+    totalRevenue:   allAgg[0]?.total   || 0,
+    totalCount:     allAgg[0]?.count   || 0,
+    paidRevenue:    paidAgg[0]?.total  || 0,
+    paidCount:      paidAgg[0]?.count  || 0,
+    unpaidRevenue:  unpaidAgg[0]?.total|| 0,
+    unpaidCount:    unpaidAgg[0]?.count|| 0,
+    thisMonthRevenue: monthAgg[0]?.total|| 0,
+    thisMonthCount:   monthAgg[0]?.count|| 0,
+    byPaymentMethod: payMethodAgg,
+    byStatus: statusAgg,
+  });
+});
+
 exports.listBookings = asyncHandler(async (req, res) => {
   const { status, lab, q, deleted, page = 1, limit = 20 } = req.query;
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);

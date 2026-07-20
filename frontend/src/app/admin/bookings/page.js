@@ -1,34 +1,48 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { bookingApi, labApi } from '@/lib/api';
+import { bookingApi } from '@/lib/api';
 import { formatDate, formatCurrency, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
-import { FiEye, FiSearch, FiEdit, FiTrash2, FiRotateCcw } from 'react-icons/fi';
+import { FiEye, FiSearch, FiEdit, FiTrash2, FiRotateCcw, FiMapPin, FiCalendar, FiClock } from 'react-icons/fi';
+
+// Standard slot groups (same as cart page)
+const SLOT_GROUPS = [
+  { label: 'Morning Slots (AM)',   emoji: '☀️',  color: 'text-amber-600',  slots: ['06:00 AM – 07:00 AM','07:00 AM – 08:00 AM','08:00 AM – 09:00 AM','09:00 AM – 10:00 AM','10:00 AM – 11:00 AM','11:00 AM – 12:00 PM'] },
+  { label: 'Afternoon Slots (PM)', emoji: '🌤️', color: 'text-blue-600',   slots: ['12:00 PM – 01:00 PM','01:00 PM – 02:00 PM','02:00 PM – 03:00 PM','03:00 PM – 04:00 PM'] },
+  { label: 'Evening Slots',        emoji: '🌙',  color: 'text-indigo-600', slots: ['04:00 PM – 05:00 PM','05:00 PM – 06:00 PM','06:00 PM – 07:00 PM','07:00 PM – 08:00 PM','08:00 PM – 09:00 PM'] },
+];
 
 function EditBookingModal({ booking, onSave, onClose }) {
-  const [labs, setLabs] = useState([]);
+  const _td = new Date();
+  const today = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
+
   const [form, setForm] = useState({
     slotDate: booking.slotDate ? booking.slotDate.slice(0, 10) : '',
     slotTime: booking.slotTime || '',
-    lab: booking.lab?._id || booking.lab || '',
     notes: booking.notes || '',
   });
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    labApi.getAll({ limit: 200 }).then((r) => setLabs(r.data.items || r.data.labs || []));
-  }, []);
+  const labName = booking.lab?.name || 'Unknown Lab';
+  const labCity = booking.lab?.city ? ` — ${booking.lab.city}` : '';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.slotDate) { toast.error('Please select a new date'); return; }
+    if (!form.slotTime) { toast.error('Please select a time slot'); return; }
     setLoading(true);
     try {
-      await bookingApi.editBooking(booking._id, form);
-      toast.success('Booking updated!');
+      // Only send date, time and notes — lab stays the same
+      await bookingApi.editBooking(booking._id, {
+        slotDate: form.slotDate,
+        slotTime: form.slotTime,
+        notes: form.notes,
+      });
+      toast.success('Booking rescheduled successfully!');
       onSave();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -38,31 +52,104 @@ function EditBookingModal({ booking, onSave, onClose }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Lab — locked, read-only */}
+      <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+        <FiMapPin className="text-blue-500 flex-shrink-0" size={16} />
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-          <input type="date" value={form.slotDate} onChange={(e) => setForm({ ...form, slotDate: e.target.value })} className="input" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Time Slot</label>
-          <input value={form.slotTime} onChange={(e) => setForm({ ...form, slotTime: e.target.value })} className="input" placeholder="e.g. 09:00 AM" />
-        </div>
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Lab</label>
-          <select value={form.lab} onChange={(e) => setForm({ ...form, lab: e.target.value })} className="input">
-            <option value="">No change</option>
-            {labs.map((l) => <option key={l._id} value={l._id}>{l.name}</option>)}
-          </select>
-        </div>
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-          <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input" rows={2} />
+          <p className="text-[11px] text-blue-400 font-medium uppercase tracking-wide">Center (cannot be changed)</p>
+          <p className="text-sm font-semibold text-blue-800">{labName}{labCity}</p>
         </div>
       </div>
-      <div className="flex gap-3 justify-end">
+
+      {/* Current slot info */}
+      <div className="flex gap-3">
+        <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+          <p className="text-[11px] text-gray-400 font-medium">Current Date</p>
+          <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+            <FiCalendar size={12} className="text-gray-400" />
+            {booking.slotDate ? formatDate(booking.slotDate) : '—'}
+          </p>
+        </div>
+        <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+          <p className="text-[11px] text-gray-400 font-medium">Current Slot</p>
+          <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+            <FiClock size={12} className="text-gray-400" />
+            {booking.slotTime || '—'}
+          </p>
+        </div>
+      </div>
+
+      {/* New Date */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          New Date <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="date"
+          min={today}
+          value={form.slotDate}
+          onChange={(e) => setForm((f) => ({ ...f, slotDate: e.target.value, slotTime: '' }))}
+          className="input"
+          required
+        />
+        <p className="text-[11px] text-gray-400 mt-1">Changing the date resets the time slot selection.</p>
+      </div>
+
+      {/* New Time Slot — grid picker */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          New Time Slot <span className="text-red-500">*</span>
+        </label>
+        <div className="border border-gray-200 rounded-xl p-3 space-y-3 bg-gray-50/50">
+          {SLOT_GROUPS.map(({ label, emoji, color, slots }) => (
+            <div key={label}>
+              <p className={`flex items-center gap-1.5 text-xs font-semibold ${color} mb-1.5`}>
+                <span>{emoji}</span> {label}
+              </p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {slots.map((slot) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, slotTime: slot }))}
+                    className={`text-[11px] py-1.5 px-1 rounded-lg border text-center transition-all font-medium ${
+                      form.slotTime === slot
+                        ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                        : 'border-gray-200 text-gray-600 hover:border-primary-300 hover:bg-primary-50 bg-white'
+                    }`}
+                  >
+                    {slot}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {form.slotTime && (
+          <p className="mt-2 text-xs text-primary-600 font-semibold flex items-center gap-1">
+            ✓ Selected: {form.slotTime}
+          </p>
+        )}
+      </div>
+
+      {/* Notes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+        <textarea
+          value={form.notes}
+          onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+          className="input resize-none"
+          rows={2}
+          placeholder="Any special instructions or reason for rescheduling…"
+        />
+      </div>
+
+      <div className="flex gap-3 justify-end pt-1">
         <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-        <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Saving…' : 'Save Changes'}</button>
+        <button type="submit" disabled={loading} className="btn-primary">
+          {loading ? 'Saving…' : 'Reschedule Booking'}
+        </button>
       </div>
     </form>
   );
@@ -209,7 +296,7 @@ export default function AdminBookingsPage() {
                         {!showDeleted && (
                           <>
                             <button onClick={() => { setViewBooking(b); setNewStatus(b.status); }} title="View" className="text-gray-400 hover:text-primary-600"><FiEye /></button>
-                            <button onClick={() => setEditBooking(b)} title="Edit" className="text-gray-400 hover:text-primary-600"><FiEdit /></button>
+                            <button onClick={() => setEditBooking(b)} title="Reschedule" className="text-gray-400 hover:text-primary-600"><FiEdit /></button>
                             <button onClick={() => handleDelete(b._id)} title="Delete" className="text-gray-400 hover:text-red-600"><FiTrash2 /></button>
                             {b.paymentStatus === 'unpaid' && (
                               <button onClick={() => handleMarkPaid(b._id)} className="text-xs text-green-600 hover:underline">Mark Paid</button>
@@ -259,8 +346,8 @@ export default function AdminBookingsPage() {
         )}
       </Modal>
 
-      {/* Edit Booking Modal */}
-      <Modal open={!!editBooking} onClose={() => setEditBooking(null)} title={`Edit Booking #${editBooking?.bookingNo}`} size="md">
+      {/* Reschedule Modal */}
+      <Modal open={!!editBooking} onClose={() => setEditBooking(null)} title={`Reschedule Booking #${editBooking?.bookingNo}`} size="md">
         {editBooking && (
           <EditBookingModal
             booking={editBooking}

@@ -13,7 +13,16 @@ import CityPickerModal from '@/components/layout/CityPickerModal';
 
 const TYPEWRITER = ['CBC Test', 'Thyroid Panel', 'Vitamin D', 'HbA1c', 'Full Body Checkup', 'Lipid Profile'];
 
-export default function HeroSlider() {
+const HERO_DEFAULTS = {
+  title: 'Book Lab Tests from Trusted NABL Certified Labs',
+  subtitle: 'Compare prices from trusted diagnostic laboratories, book online in minutes, and receive secure digital reports.',
+  tagline: 'NABL Certified Labs | Fast & Accurate Reports | Home Sample Collection',
+  promoText: 'Get <strong>10% OFF*</strong> on orders above ₹500 | Use: <strong>WELCOME10</strong>',
+  promoVisible: true,
+};
+
+export default function HeroSlider({ heroContent }) {
+  const hc = { ...HERO_DEFAULTS, ...heroContent };
   const { city: contextCity } = useCity();
   const city = contextCity || '';
 
@@ -189,14 +198,16 @@ export default function HeroSlider() {
 
         {/* Overlay — pointer-events-none except form */}
         <div className="absolute inset-0 flex flex-col items-center justify-center z-20 px-4 sm:px-12 lg:px-24 pointer-events-none">
-          <h1 className="text-white font-bold text-xl sm:text-2xl md:text-4xl text-center drop-shadow-lg mb-1 sm:mb-2">
-            Book Lab Tests from Trusted NABL Certified Labs
-          </h1>
-          <p className="text-slate-200 text-[11px] sm:text-sm md:text-base text-center mb-1 sm:mb-2 drop-shadow max-w-2xl">
-            Compare prices from trusted diagnostic laboratories, book online in minutes, and receive secure digital reports.
-          </p>
+          <h1
+            className="text-white font-bold text-xl sm:text-2xl md:text-4xl text-center drop-shadow-lg mb-1 sm:mb-2 rich-html"
+            dangerouslySetInnerHTML={{ __html: hc.title }}
+          />
+          <div
+            className="text-slate-200 text-[11px] sm:text-sm md:text-base text-center mb-1 sm:mb-2 drop-shadow max-w-2xl rich-html"
+            dangerouslySetInnerHTML={{ __html: hc.subtitle }}
+          />
           <p className="text-slate-300 text-[10px] sm:text-xs text-center mb-3 sm:mb-5 drop-shadow">
-            NABL Certified Labs &nbsp;|&nbsp; Fast &amp; Accurate Reports &nbsp;|&nbsp; Home Sample Collection
+            {hc.tagline}
           </p>
 
           {/* Form + live dropdown wrapper */}
@@ -482,14 +493,14 @@ export default function HeroSlider() {
       </div>{/* end padded wrapper */}
 
       {/* Promo bar */}
-      <div className="bg-white border-y border-gray-100 py-2">
-        <p className="text-center text-[11px] sm:text-sm text-gray-600 leading-relaxed px-4">
-          Get <span className="text-secondary-600 font-bold">10% OFF*</span>
-          {' '}on orders above ₹500
-          <span className="mx-1.5 text-gray-300">|</span>
-          Use: <span className="font-bold text-gray-900 tracking-wide">WELCOME10</span>
-        </p>
-      </div>
+      {hc.promoVisible !== false && (
+        <div className="bg-white border-y border-gray-100 py-2">
+          <div
+            className="text-center text-[11px] sm:text-sm text-gray-600 leading-relaxed px-4 rich-html"
+            dangerouslySetInnerHTML={{ __html: hc.promoText }}
+          />
+        </div>
+      )}
 
       <CityPickerModal open={cityModalOpen} onClose={() => setCityModalOpen(false)} />
     </div>

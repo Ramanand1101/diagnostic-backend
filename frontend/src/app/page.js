@@ -29,6 +29,13 @@ const TEST_ICON_MAP = {
 };
 
 const DEFAULT_CONTENT = {
+  hero: {
+    title: 'Book Lab Tests from Trusted NABL Certified Labs',
+    subtitle: 'Compare prices from trusted diagnostic laboratories, book online in minutes, and receive secure digital reports.',
+    tagline: 'NABL Certified Labs | Fast & Accurate Reports | Home Sample Collection',
+    promoText: 'Get <strong>10% OFF*</strong> on orders above ₹500 | Use: <strong>WELCOME10</strong>',
+    promoVisible: true,
+  },
   stats: [
     { value: '2000+', label: 'Tests & Packages' },
     { value: '1000+', label: 'Partner Labs' },
@@ -118,6 +125,7 @@ export default async function HomePage() {
     getCategories(),
   ]);
 
+  const hero = content.hero || DEFAULT_CONTENT.hero;
   const stats = content.stats || DEFAULT_CONTENT.stats;
   const features = content.features || DEFAULT_CONTENT.features;
   const steps = content.steps || DEFAULT_CONTENT.steps;
@@ -130,7 +138,7 @@ export default async function HomePage() {
     <>
       <Navbar />
       <main>
-        <Hero />
+        <Hero heroContent={hero} />
 
         {/* Stats cards */}
         <section className="py-12 bg-gray-50">

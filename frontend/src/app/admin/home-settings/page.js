@@ -5,11 +5,18 @@ import { getErrorMessage } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 import {
   FiSave, FiEye, FiPlus, FiTrash2, FiBarChart2,
-  FiAward, FiList, FiZap, FiFlag,
+  FiAward, FiList, FiZap, FiFlag, FiHome,
   FiBold, FiItalic, FiUnderline, FiAlignLeft, FiAlignCenter, FiAlignRight,
 } from 'react-icons/fi';
 
 const DEFAULT_CONTENT = {
+  hero: {
+    title: 'Book Lab Tests from Trusted NABL Certified Labs',
+    subtitle: 'Compare prices from trusted diagnostic laboratories, book online in minutes, and receive secure digital reports.',
+    tagline: 'NABL Certified Labs | Fast & Accurate Reports | Home Sample Collection',
+    promoText: 'Get <strong>10% OFF*</strong> on orders above ₹500 | Use: <strong>WELCOME10</strong>',
+    promoVisible: true,
+  },
   stats: [
     { value: '2000+', label: 'Tests & Packages' },
     { value: '1000+', label: 'Partner Labs' },
@@ -64,11 +71,12 @@ const COLOR_OPTIONS = [
 ];
 
 const TABS = [
-  { id: 'stats', label: 'Stats', icon: FiBarChart2 },
-  { id: 'whyus', label: 'Why Us', icon: FiAward },
+  { id: 'hero',       label: 'Hero',         icon: FiHome },
+  { id: 'stats',      label: 'Stats',        icon: FiBarChart2 },
+  { id: 'whyus',      label: 'Why Us',       icon: FiAward },
   { id: 'howitworks', label: 'How It Works', icon: FiList },
-  { id: 'tests', label: 'Popular Tests', icon: FiZap },
-  { id: 'trust', label: 'Trust Banner', icon: FiFlag },
+  { id: 'tests',      label: 'Popular Tests',icon: FiZap },
+  { id: 'trust',      label: 'Trust Banner', icon: FiFlag },
 ];
 
 function InputField({ label, value, onChange, placeholder, type = 'text' }) {
@@ -206,6 +214,93 @@ function RichTextEditor({ label, value, onChange, placeholder = 'Type here…', 
         .rich-editor-content p  { margin: 2px 0; }
         .rich-editor-content a  { color: #2563eb; text-decoration: underline; }
       `}</style>
+    </div>
+  );
+}
+
+// ── Hero Tab ─────────────────────────────────────────────────────────────────
+
+function HeroTab({ hero, onChange }) {
+  const update = (field, val) => onChange({ ...hero, [field]: val });
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-gray-500">Edit the hero banner — title, subtitle, tagline, and promo strip.</p>
+
+      <div className="space-y-4">
+        <RichTextEditor
+          label="Hero Title"
+          value={hero.title}
+          onChange={(v) => update('title', v)}
+          placeholder="Book Lab Tests from Trusted NABL Certified Labs"
+          rows={2}
+        />
+        <RichTextEditor
+          label="Subtitle"
+          value={hero.subtitle}
+          onChange={(v) => update('subtitle', v)}
+          placeholder="Compare prices from trusted diagnostic laboratories…"
+          rows={2}
+        />
+        <InputField
+          label="Tagline (pipe-separated badges below subtitle)"
+          value={hero.tagline}
+          onChange={(v) => update('tagline', v)}
+          placeholder="NABL Certified Labs | Fast & Accurate Reports | Home Sample Collection"
+        />
+      </div>
+
+      {/* Promo bar */}
+      <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Promo Strip</p>
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hero.promoVisible !== false}
+              onChange={(e) => update('promoVisible', e.target.checked)}
+              className="w-4 h-4 rounded accent-primary-600"
+            />
+            Visible
+          </label>
+        </div>
+        <RichTextEditor
+          label="Promo Text (HTML — use Bold for highlighted words)"
+          value={hero.promoText}
+          onChange={(v) => update('promoText', v)}
+          placeholder="Get <strong>10% OFF*</strong> on orders above ₹500 | Use: <strong>WELCOME10</strong>"
+          rows={1}
+        />
+      </div>
+
+      {/* Preview */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Preview</p>
+        <div className="rounded-2xl bg-gradient-to-br from-sky-900 to-blue-800 p-8 text-center">
+          <div
+            className="text-white font-bold text-lg sm:text-xl mb-2 rich-html"
+            dangerouslySetInnerHTML={{ __html: hero.title || 'Hero Title' }}
+          />
+          <div
+            className="text-slate-300 text-sm mb-1 rich-html"
+            dangerouslySetInnerHTML={{ __html: hero.subtitle || 'Subtitle text' }}
+          />
+          <p className="text-slate-400 text-xs mb-5">{hero.tagline}</p>
+          <div className="flex items-center justify-center gap-2 max-w-xl mx-auto">
+            <div className="bg-white/20 text-white text-xs px-4 py-2 rounded-full whitespace-nowrap">📍 Delhi</div>
+            <div className="bg-white text-gray-400 text-xs px-4 py-2 rounded-full flex-1 text-left">Search for Full Body…</div>
+            <div className="bg-sky-500 text-white text-xs px-4 py-2 rounded-full font-bold whitespace-nowrap">Search</div>
+          </div>
+        </div>
+        {hero.promoVisible !== false && (
+          <div className="bg-white border border-gray-200 rounded-xl mt-2 py-2 text-center">
+            <div
+              className="text-sm text-gray-600 rich-html"
+              dangerouslySetInnerHTML={{ __html: hero.promoText || '' }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -514,7 +609,7 @@ export default function HomeSettingsPage() {
   const [content, setContent] = useState(DEFAULT_CONTENT);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('stats');
+  const [activeTab, setActiveTab] = useState('hero');
 
   useEffect(() => {
     homeContentApi.get()
@@ -596,6 +691,12 @@ export default function HomeSettingsPage() {
 
       {/* Tab panels */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        {activeTab === 'hero' && (
+          <HeroTab
+            hero={content.hero || DEFAULT_CONTENT.hero}
+            onChange={(hero) => setContent((c) => ({ ...c, hero }))}
+          />
+        )}
         {activeTab === 'stats' && (
           <StatsTab
             stats={content.stats}

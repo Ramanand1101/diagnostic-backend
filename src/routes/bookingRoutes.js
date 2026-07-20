@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { protect, allowRoles } = require('../middleware/authMiddleware');
 const controller = require('../controllers/bookingController');
 
+router.get('/stats', protect, allowRoles('superadmin', 'subadmin'), controller.getStats);
 router.post('/', protect, controller.createBooking);
 router.get('/', protect, controller.listBookings);
 router.get('/:id', protect, controller.getBooking);

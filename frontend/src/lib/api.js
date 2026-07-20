@@ -125,6 +125,7 @@ export const productApi = {
 // Bookings
 export const bookingApi = {
   create: (data) => api.post('/bookings', data),
+  getStats: () => api.get('/bookings/stats'),
   getAll: (params) => api.get('/bookings', { params }),
   getById: (id) => api.get(`/bookings/${id}`),
   updateStatus: (id, data) => api.patch(`/bookings/${id}/status`, data),
