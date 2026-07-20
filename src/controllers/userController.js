@@ -85,6 +85,24 @@ exports.updateRole = asyncHandler(async (req, res) => {
   res.json({ message: `Role updated to ${role}`, user: { _id: user._id, name: user.name, role: user.role } });
 });
 
+const VALID_PERMISSIONS = [
+  'labs','brands','products','categories','test-master','bulk-upload',
+  'crm','bookings','reports','lab-changes','users','reviews','tickets',
+  'hero-slides','home-settings','coupons','blogs','newsletter','pages','settings',
+];
+
+exports.updatePermissions = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  if (user.role !== 'subadmin') return res.status(400).json({ message: 'Permissions can only be set for subadmins' });
+  const { permissions } = req.body;
+  if (!Array.isArray(permissions)) return res.status(400).json({ message: 'permissions must be an array' });
+  const filtered = permissions.filter((p) => VALID_PERMISSIONS.includes(p));
+  user.permissions = filtered;
+  await user.save();
+  res.json({ message: 'Permissions updated', permissions: user.permissions });
+});
+
 exports.deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ message: 'User not found' });

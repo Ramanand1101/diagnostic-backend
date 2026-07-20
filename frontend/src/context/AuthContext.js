@@ -39,11 +39,19 @@ export function AuthProvider({ children }) {
   };
 
   const isAdmin = user?.role === 'superadmin' || user?.role === 'subadmin';
+  const isSuperAdmin = user?.role === 'superadmin';
   const isLab = user?.role === 'lab';
   const isCustomer = user?.role === 'customer';
 
+  const hasPermission = (key) => {
+    if (!user) return false;
+    if (user.role === 'superadmin') return true;
+    if (user.role === 'subadmin') return Array.isArray(user.permissions) && user.permissions.includes(key);
+    return false;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, isAdmin, isLab, isCustomer }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, isAdmin, isSuperAdmin, isLab, isCustomer, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

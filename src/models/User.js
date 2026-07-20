@@ -34,7 +34,8 @@ const userSchema = new mongoose.Schema({
     lng: Number,
     address: String,
   },
-  lastLoginAt: Date
+  lastLoginAt: Date,
+  permissions: [{ type: String }],  // subadmin module access keys
 }, { timestamps: true });
 
 userSchema.pre('save', async function(next) {

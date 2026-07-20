@@ -4,7 +4,7 @@ import { userApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
-import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiUser, FiTool, FiDownload } from 'react-icons/fi';
+import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX, FiCheck } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 
@@ -17,6 +17,186 @@ const ROLE_META = {
   customer:   { label: 'Customer',    color: 'bg-gray-100 text-gray-600 border-gray-200',    icon: '👤' },
 };
 
+// All assignable permission keys, grouped by section
+const PERMISSION_SECTIONS = [
+  {
+    label: 'Lab Management',
+    items: [
+      { key: 'labs',         label: 'Labs' },
+      { key: 'brands',       label: 'Brands / Chains' },
+      { key: 'products',     label: 'Products' },
+      { key: 'categories',   label: 'Categories' },
+      { key: 'test-master',  label: 'Test Master List' },
+      { key: 'bulk-upload',  label: 'Bulk Upload' },
+    ],
+  },
+  {
+    label: 'CRM',
+    items: [
+      { key: 'crm', label: 'CRM (Dashboard, Patients, Leads, Follow-ups, Doctors)' },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { key: 'bookings',    label: 'Bookings' },
+      { key: 'reports',     label: 'Reports' },
+      { key: 'lab-changes', label: 'Lab Profile Changes' },
+      { key: 'users',       label: 'Users' },
+      { key: 'reviews',     label: 'Reviews' },
+      { key: 'tickets',     label: 'Tickets' },
+    ],
+  },
+  {
+    label: 'Marketing',
+    items: [
+      { key: 'hero-slides',   label: 'Hero Slides' },
+      { key: 'home-settings', label: 'Home Page CMS' },
+      { key: 'coupons',       label: 'Coupons' },
+      { key: 'blogs',         label: 'Blogs' },
+      { key: 'newsletter',    label: 'Newsletter' },
+    ],
+  },
+  {
+    label: 'Content & Config',
+    items: [
+      { key: 'pages',    label: 'Pages' },
+      { key: 'settings', label: 'Settings' },
+    ],
+  },
+];
+
+const ALL_KEYS = PERMISSION_SECTIONS.flatMap((s) => s.items.map((i) => i.key));
+
+// ── Permissions modal ─────────────────────────────────────────────────────────
+function PermissionsModal({ user, onClose, onSaved }) {
+  const [selected, setSelected] = useState(new Set(user.permissions || []));
+  const [saving, setSaving] = useState(false);
+
+  const toggle = (key) => setSelected((prev) => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
+  });
+
+  const toggleSection = (keys) => {
+    const allOn = keys.every((k) => selected.has(k));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      keys.forEach((k) => allOn ? next.delete(k) : next.add(k));
+      return next;
+    });
+  };
+
+  const selectAll   = () => setSelected(new Set(ALL_KEYS));
+  const deselectAll = () => setSelected(new Set());
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await userApi.updatePermissions(user._id, [...selected]);
+      toast.success(`Permissions updated for ${user.name}`);
+      onSaved(user._id, [...selected]);
+      onClose();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Module Permissions</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {user.name} &mdash; <span className="text-blue-600 font-medium">Sub Admin</span>
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100">
+            <FiX size={18} />
+          </button>
+        </div>
+
+        {/* Quick actions */}
+        <div className="flex items-center gap-2 px-6 py-3 bg-gray-50 border-b border-gray-100">
+          <span className="text-xs text-gray-500 font-medium">{selected.size} of {ALL_KEYS.length} selected</span>
+          <div className="ml-auto flex gap-2">
+            <button onClick={selectAll} className="text-xs px-3 py-1 border border-gray-200 rounded-lg hover:bg-white transition-colors text-gray-600">
+              Select All
+            </button>
+            <button onClick={deselectAll} className="text-xs px-3 py-1 border border-gray-200 rounded-lg hover:bg-white transition-colors text-gray-600">
+              Deselect All
+            </button>
+          </div>
+        </div>
+
+        {/* Permission list */}
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+          {PERMISSION_SECTIONS.map((section) => {
+            const sectionKeys = section.items.map((i) => i.key);
+            const allOn = sectionKeys.every((k) => selected.has(k));
+            const someOn = sectionKeys.some((k) => selected.has(k));
+            return (
+              <div key={section.label}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{section.label}</p>
+                  <button
+                    onClick={() => toggleSection(sectionKeys)}
+                    className={`text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors ${
+                      allOn
+                        ? 'bg-primary-100 text-primary-700 border-primary-200'
+                        : someOn
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-gray-50 text-gray-500 border-gray-200'
+                    }`}
+                  >
+                    {allOn ? 'All On' : someOn ? 'Partial' : 'All Off'} — toggle
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  {section.items.map(({ key, label }) => {
+                    const on = selected.has(key);
+                    return (
+                      <label key={key} className={`flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer border transition-all ${
+                        on ? 'bg-primary-50 border-primary-200' : 'bg-white border-gray-100 hover:border-gray-200'
+                      }`}>
+                        <span className={`w-4 h-4 rounded flex items-center justify-center border transition-colors flex-shrink-0 ${
+                          on ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
+                        }`}>
+                          {on && <FiCheck size={10} className="text-white" strokeWidth={3} />}
+                        </span>
+                        <input type="checkbox" checked={on} onChange={() => toggle(key)} className="sr-only" />
+                        <span className="text-sm text-gray-700">{label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-white transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-5 py-2 text-sm font-semibold bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-60">
+            {saving ? 'Saving…' : 'Save Permissions'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Role badge + dropdown ─────────────────────────────────────────────────────
 function RoleBadge({ role }) {
   const meta = ROLE_META[role] || ROLE_META.customer;
   return (
@@ -31,7 +211,6 @@ function RoleDropdown({ user, currentUserRole, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -42,7 +221,6 @@ function RoleDropdown({ user, currentUserRole, onChange }) {
   const canEdit = currentUserRole === 'superadmin' ||
     (currentUserRole === 'subadmin' && user.role !== 'superadmin');
 
-  // subadmin cannot assign superadmin role
   const allowedRoles = currentUserRole === 'superadmin'
     ? ROLES
     : ROLES.filter((r) => r !== 'superadmin');
@@ -96,6 +274,7 @@ function RoleDropdown({ user, currentUserRole, onChange }) {
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
@@ -107,6 +286,7 @@ export default function AdminUsersPage() {
   const [limit, setLimit] = useState(20);
   const [selected, setSelected] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [permTarget, setPermTarget] = useState(null); // user object whose permissions we're editing
   const searchTimer = useRef(null);
 
   const fetchUsers = useCallback(() => {
@@ -134,13 +314,14 @@ export default function AdminUsersPage() {
     setUsers((prev) => prev.map((u) => u._id === userId ? { ...u, role: newRole } : u));
   };
 
-  // Selectable users = non-superadmin only
+  const handlePermissionsSaved = (userId, permissions) => {
+    setUsers((prev) => prev.map((u) => u._id === userId ? { ...u, permissions } : u));
+  };
+
   const selectableUsers = users.filter((u) => u.role !== 'superadmin');
   const toggleSelect = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll = () => setSelected(
-    selected.size === selectableUsers.length
-      ? new Set()
-      : new Set(selectableUsers.map((u) => u._id))
+    selected.size === selectableUsers.length ? new Set() : new Set(selectableUsers.map((u) => u._id))
   );
   const allSelected = selectableUsers.length > 0 && selected.size === selectableUsers.length;
   const someSelected = selected.size > 0 && !allSelected;
@@ -168,14 +349,24 @@ export default function AdminUsersPage() {
     }
   };
 
+  const isSuperAdmin = currentUser?.role === 'superadmin';
   const FILTER_ROLES = ['', ...ROLES];
 
   return (
     <div className="space-y-5">
+      {/* Permissions modal */}
+      {permTarget && (
+        <PermissionsModal
+          user={permTarget}
+          onClose={() => setPermTarget(null)}
+          onSaved={handlePermissionsSaved}
+        />
+      )}
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage user accounts and assign roles.</p>
+          <p className="text-sm text-gray-500 mt-0.5">Manage user accounts, roles, and subadmin permissions.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -249,10 +440,10 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Role change hint */}
+      {/* Hint */}
       <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
         <FiShield size={13} className="shrink-0" />
-        <span>Click any role badge to change a user's role. Superadmin rows cannot be selected for bulk delete.</span>
+        <span>Click a role badge to change roles. For Sub Admins, use the <strong>Permissions</strong> button to control which modules they can access.</span>
       </div>
 
       {loading ? <PageLoader /> : (
@@ -282,12 +473,13 @@ export default function AdminUsersPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {users.map((u) => {
-                  const isSuperadmin = u.role === 'superadmin';
+                  const isSuper = u.role === 'superadmin';
+                  const isSubadmin = u.role === 'subadmin';
                   const isSelected = selected.has(u._id);
                   return (
                     <tr key={u._id} className={`transition-colors ${isSelected ? 'bg-red-50' : 'hover:bg-gray-50'}`}>
                       <td className="table-cell">
-                        {!isSuperadmin ? (
+                        {!isSuper ? (
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(u._id)}
                             className="w-4 h-4 rounded text-primary-600 cursor-pointer" />
                         ) : (
@@ -299,7 +491,16 @@ export default function AdminUsersPage() {
                           <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center text-xs font-bold text-primary-700 shrink-0">
                             {u.name?.[0]?.toUpperCase() || '?'}
                           </div>
-                          <span className="font-medium text-gray-900">{u.name}</span>
+                          <div>
+                            <span className="font-medium text-gray-900">{u.name}</span>
+                            {isSubadmin && (
+                              <p className="text-[10px] text-gray-400 mt-0.5">
+                                {u.permissions?.length
+                                  ? `${u.permissions.length} module${u.permissions.length !== 1 ? 's' : ''}`
+                                  : 'No modules assigned'}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="table-cell text-sm text-gray-600">{u.email || '-'}</td>
@@ -314,12 +515,24 @@ export default function AdminUsersPage() {
                       </td>
                       <td className="table-cell text-sm text-gray-500">{formatDate(u.createdAt)}</td>
                       <td className="table-cell">
-                        {!isSuperadmin && (
-                          <button onClick={() => handleDelete(u)} title="Delete user"
-                            className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50">
-                            <FiTrash2 size={14} />
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {/* Permissions button — only for subadmins, only visible to superadmin */}
+                          {isSubadmin && isSuperAdmin && (
+                            <button
+                              onClick={() => setPermTarget(u)}
+                              title="Manage module permissions"
+                              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+                            >
+                              <FiSliders size={12} /> Permissions
+                            </button>
+                          )}
+                          {!isSuper && (
+                            <button onClick={() => handleDelete(u)} title="Delete user"
+                              className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50">
+                              <FiTrash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

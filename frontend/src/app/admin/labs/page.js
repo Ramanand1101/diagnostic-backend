@@ -542,7 +542,7 @@ export default function AdminLabsPage() {
       {/* CSV Upload */}
       <CsvUploadSection
         title="Bulk Upload Labs via CSV"
-        description="Upload multiple labs at once. Include brand name column to auto-assign brand."
+        description="Required columns: name, phone, email. Optional: address, area, city, state, pincode, homeCollection, featured, description, brand. Download the Demo CSV for the correct format."
         onDemoDownload={labApi.demoCsv}
         onUpload={labApi.bulkCsv}
         demoFileName="labs-template.csv"

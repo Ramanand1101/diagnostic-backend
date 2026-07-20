@@ -8,67 +8,80 @@ import {
   FiBriefcase, FiUserCheck, FiPhoneCall, FiActivity, FiList, FiLayout, FiFilePlus,
 } from 'react-icons/fi';
 import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
+import { useAuth } from '@/context/AuthContext';
 
+// permission: null  → always visible to all admins (dashboard)
+// permission: 'key' → visible only if superadmin OR subadmin with that key
 const navSections = [
   {
     label: null,
     items: [
-      { href: '/admin', label: 'Dashboard', icon: FiGrid },
+      { href: '/admin', label: 'Dashboard', icon: FiGrid, permission: null },
     ],
   },
   {
     label: 'Lab Management',
     items: [
-      { href: '/admin/labs', label: 'Labs', icon: FiMapPin },
-      { href: '/admin/brands', label: 'Brands / Chains', icon: FiLayers },
-      { href: '/admin/products', label: 'Products', icon: FiPackage },
-      { href: '/admin/categories', label: 'Categories', icon: FiTag },
-      { href: '/admin/test-master', label: 'Test Master List', icon: FiList },
-      { href: '/admin/bulk-upload', label: 'Bulk Upload', icon: FiUploadCloud },
+      { href: '/admin/labs',        label: 'Labs',            icon: FiMapPin,      permission: 'labs' },
+      { href: '/admin/brands',      label: 'Brands / Chains', icon: FiLayers,      permission: 'brands' },
+      { href: '/admin/products',    label: 'Products',        icon: FiPackage,     permission: 'products' },
+      { href: '/admin/categories',  label: 'Categories',      icon: FiTag,         permission: 'categories' },
+      { href: '/admin/test-master', label: 'Test Master List',icon: FiList,        permission: 'test-master' },
+      { href: '/admin/bulk-upload', label: 'Bulk Upload',     icon: FiUploadCloud, permission: 'bulk-upload' },
     ],
   },
   {
     label: 'CRM',
     items: [
-      { href: '/admin/crm', label: 'CRM Dashboard', icon: FiActivity },
-      { href: '/admin/crm/patients', label: 'Patients', icon: FiUsers },
-      { href: '/admin/crm/leads', label: 'Leads', icon: FiBriefcase },
-      { href: '/admin/crm/followups', label: 'Follow-ups', icon: FiPhoneCall },
-      { href: '/admin/crm/doctors', label: 'Referral Doctors', icon: FiUserCheck },
+      { href: '/admin/crm',              label: 'CRM Dashboard',    icon: FiActivity,  permission: 'crm' },
+      { href: '/admin/crm/patients',     label: 'Patients',         icon: FiUsers,     permission: 'crm' },
+      { href: '/admin/crm/leads',        label: 'Leads',            icon: FiBriefcase, permission: 'crm' },
+      { href: '/admin/crm/followups',    label: 'Follow-ups',       icon: FiPhoneCall, permission: 'crm' },
+      { href: '/admin/crm/doctors',      label: 'Referral Doctors', icon: FiUserCheck, permission: 'crm' },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { href: '/admin/bookings', label: 'Bookings', icon: FiCalendar },
-      { href: '/admin/reports', label: 'Reports', icon: FiFileText },
-      { href: '/admin/lab-changes', label: 'Lab Profile Changes', icon: FiFilePlus },
-      { href: '/admin/users', label: 'Users', icon: FiUsers },
-      { href: '/admin/reviews', label: 'Reviews', icon: FiStar },
-      { href: '/admin/tickets', label: 'Tickets', icon: FiHelpCircle },
+      { href: '/admin/bookings',    label: 'Bookings',             icon: FiCalendar, permission: 'bookings' },
+      { href: '/admin/reports',     label: 'Reports',              icon: FiFileText, permission: 'reports' },
+      { href: '/admin/lab-changes', label: 'Lab Profile Changes',  icon: FiFilePlus, permission: 'lab-changes' },
+      { href: '/admin/users',       label: 'Users',                icon: FiUsers,    permission: 'users' },
+      { href: '/admin/reviews',     label: 'Reviews',              icon: FiStar,     permission: 'reviews' },
+      { href: '/admin/tickets',     label: 'Tickets',              icon: FiHelpCircle, permission: 'tickets' },
     ],
   },
   {
     label: 'Marketing',
     items: [
-      { href: '/admin/hero-slides', label: 'Hero Slides', icon: FiImage },
-      { href: '/admin/home-settings', label: 'Home Page CMS', icon: FiLayout },
-      { href: '/admin/coupons', label: 'Coupons', icon: FiPercent },
-      { href: '/admin/blogs', label: 'Blogs', icon: FiBook },
-      { href: '/admin/newsletter', label: 'Newsletter', icon: FiMail },
+      { href: '/admin/hero-slides',   label: 'Hero Slides',    icon: FiImage,   permission: 'hero-slides' },
+      { href: '/admin/home-settings', label: 'Home Page CMS',  icon: FiLayout,  permission: 'home-settings' },
+      { href: '/admin/coupons',       label: 'Coupons',        icon: FiPercent, permission: 'coupons' },
+      { href: '/admin/blogs',         label: 'Blogs',          icon: FiBook,    permission: 'blogs' },
+      { href: '/admin/newsletter',    label: 'Newsletter',     icon: FiMail,    permission: 'newsletter' },
     ],
   },
   {
     label: 'Content & Config',
     items: [
-      { href: '/admin/pages', label: 'Pages', icon: FiFile },
-      { href: '/admin/settings', label: 'Settings', icon: FiSettings },
+      { href: '/admin/pages',    label: 'Pages',    icon: FiFile,     permission: 'pages' },
+      { href: '/admin/settings', label: 'Settings', icon: FiSettings, permission: 'settings' },
     ],
   },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const { isSuperAdmin, hasPermission } = useAuth();
+
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) =>
+        item.permission === null ? true : hasPermission(item.permission)
+      ),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <aside className="w-64 bg-gray-900 min-h-screen flex flex-col">
@@ -77,9 +90,14 @@ export default function AdminSidebar() {
           <HealthOnTimeLogo dark size="text-lg" />
         </Link>
         <p className="text-xs text-gray-500 mt-1">Admin Panel</p>
+        {!isSuperAdmin && (
+          <span className="mt-1.5 inline-block text-[10px] font-medium bg-blue-900 text-blue-300 px-2 py-0.5 rounded-full">
+            Sub Admin
+          </span>
+        )}
       </div>
       <nav className="flex-1 py-4 overflow-y-auto">
-        {navSections.map((section, si) => (
+        {visibleSections.map((section, si) => (
           <div key={si}>
             {section.label && (
               <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider px-6 pt-4 pb-1">

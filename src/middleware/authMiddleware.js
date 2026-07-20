@@ -27,4 +27,14 @@ function allowRoles(...roles) {
   };
 }
 
-module.exports = { protect, allowRoles };
+// Superadmin always passes. Subadmin passes only if they have the specific permission key.
+function allowPermission(permission) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(403).json({ message: 'Forbidden' });
+    if (req.user.role === 'superadmin') return next();
+    if (req.user.role === 'subadmin' && req.user.permissions?.includes(permission)) return next();
+    return res.status(403).json({ message: 'Insufficient permissions' });
+  };
+}
+
+module.exports = { protect, allowRoles, allowPermission };
