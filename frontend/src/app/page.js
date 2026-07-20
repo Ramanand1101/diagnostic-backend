@@ -157,7 +157,7 @@ export default async function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-10">
               <h2 className="text-2xl font-bold text-gray-900">{whyUs.title}</h2>
-              <p className="text-sm text-gray-500 mt-2">{whyUs.subtitle}</p>
+              <div className="text-sm text-gray-500 mt-2 rich-html" dangerouslySetInnerHTML={{ __html: whyUs.subtitle }} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {features.map(({ icon, title, desc, color, bg }) => {
@@ -168,7 +168,7 @@ export default async function HomePage() {
                       <Icon className={`text-xl ${color}`} />
                     </div>
                     <h3 className="font-semibold text-gray-900 mb-2">{title}</h3>
-                    <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
+                    <div className="text-sm text-gray-500 leading-relaxed rich-html" dangerouslySetInnerHTML={{ __html: desc }} />
                   </div>
                 );
               })}
@@ -181,7 +181,7 @@ export default async function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
               <h2 className="text-2xl font-bold text-gray-900">{howItWorks.title}</h2>
-              <p className="text-sm text-gray-500 mt-2">{howItWorks.subtitle}</p>
+              <div className="text-sm text-gray-500 mt-2 rich-html" dangerouslySetInnerHTML={{ __html: howItWorks.subtitle }} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
               <div className="hidden md:block absolute top-8 left-1/3 right-1/3 h-0.5 bg-primary-100 z-0" />
@@ -197,7 +197,7 @@ export default async function HomePage() {
                       </span>
                     </div>
                     <h3 className="font-semibold text-gray-900 text-lg mb-2">{title}</h3>
-                    <p className="text-sm text-gray-500 leading-relaxed max-w-xs">{desc}</p>
+                    <div className="text-sm text-gray-500 leading-relaxed max-w-xs rich-html" dangerouslySetInnerHTML={{ __html: desc }} />
                   </div>
                 );
               })}
@@ -266,7 +266,7 @@ export default async function HomePage() {
         <section className="bg-gradient-to-br from-primary-700 to-primary-900 py-14">
           <div className="max-w-4xl mx-auto px-4 text-center text-white">
             <h2 className="text-2xl md:text-3xl font-bold mb-3">{trustBanner.title}</h2>
-            <p className="text-primary-200 mb-8 text-base">{trustBanner.subtitle}</p>
+            <div className="text-primary-200 mb-8 text-base rich-html" dangerouslySetInnerHTML={{ __html: trustBanner.subtitle }} />
             <div className="flex flex-wrap justify-center gap-4">
               <Link href={trustBanner.btn1Href || '/products?type=test'} className="bg-white text-primary-700 font-semibold px-7 py-3 rounded-xl hover:bg-primary-50 transition-colors shadow-lg">
                 {trustBanner.btn1Text}

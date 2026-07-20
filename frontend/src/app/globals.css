@@ -44,4 +44,14 @@
   .table-header {
     @apply px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
   }
+  /* Rich-text HTML output rendered on public pages */
+  .rich-html b, .rich-html strong { font-weight: 700; }
+  .rich-html i, .rich-html em     { font-style: italic; }
+  .rich-html u                    { text-decoration: underline; }
+  .rich-html h2                   { font-size: 1.125rem; font-weight: 700; margin: 4px 0; }
+  .rich-html h3                   { font-size: 1rem; font-weight: 600; margin: 3px 0; }
+  .rich-html ul  { list-style: disc; padding-left: 1.25rem; margin: 4px 0; }
+  .rich-html ol  { list-style: decimal; padding-left: 1.25rem; margin: 4px 0; }
+  .rich-html p   { margin: 2px 0; }
+  .rich-html a   { color: #2563eb; text-decoration: underline; }
 }

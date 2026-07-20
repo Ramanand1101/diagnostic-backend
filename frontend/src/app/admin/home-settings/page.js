@@ -1,11 +1,12 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { homeContentApi } from '@/lib/api';
 import { getErrorMessage } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 import {
   FiSave, FiEye, FiPlus, FiTrash2, FiBarChart2,
   FiAward, FiList, FiZap, FiFlag,
+  FiBold, FiItalic, FiUnderline, FiAlignLeft, FiAlignCenter, FiAlignRight,
 } from 'react-icons/fi';
 
 const DEFAULT_CONTENT = {
@@ -100,6 +101,115 @@ function TextareaField({ label, value, onChange, placeholder, rows = 2 }) {
   );
 }
 
+// ── Rich Text Editor ─────────────────────────────────────────────────────────
+const TOOLBAR = [
+  { icon: FiBold,        title: 'Bold',            cmd: 'bold' },
+  { icon: FiItalic,      title: 'Italic',          cmd: 'italic' },
+  { icon: FiUnderline,   title: 'Underline',       cmd: 'underline' },
+  null, // divider
+  { text: 'H2',          title: 'Heading 2',       cmd: 'formatBlock', val: 'H2' },
+  { text: 'H3',          title: 'Heading 3',       cmd: 'formatBlock', val: 'H3' },
+  { text: 'P',           title: 'Paragraph',       cmd: 'formatBlock', val: 'P' },
+  null,
+  { text: '•',           title: 'Bullet List',     cmd: 'insertUnorderedList' },
+  { text: '1.',          title: 'Ordered List',    cmd: 'insertOrderedList' },
+  null,
+  { icon: FiAlignLeft,   title: 'Align Left',      cmd: 'justifyLeft' },
+  { icon: FiAlignCenter, title: 'Align Center',    cmd: 'justifyCenter' },
+  { icon: FiAlignRight,  title: 'Align Right',     cmd: 'justifyRight' },
+  null,
+  { text: 'Tx',          title: 'Clear Formatting',cmd: 'removeFormat' },
+];
+
+function RichTextEditor({ label, value, onChange, placeholder = 'Type here…', rows = 3 }) {
+  const editorRef = useRef(null);
+  const skipSync = useRef(false);
+
+  // Sync external value → DOM only when it differs (avoids cursor reset while typing)
+  useEffect(() => {
+    if (!editorRef.current || skipSync.current) return;
+    if (editorRef.current.innerHTML !== (value || '')) {
+      editorRef.current.innerHTML = value || '';
+    }
+  }, [value]);
+
+  const exec = (cmd, val) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, val ?? null);
+    skipSync.current = true;
+    onChange(editorRef.current?.innerHTML ?? '');
+    requestAnimationFrame(() => { skipSync.current = false; });
+  };
+
+  const handleInput = () => {
+    skipSync.current = true;
+    onChange(editorRef.current?.innerHTML ?? '');
+    requestAnimationFrame(() => { skipSync.current = false; });
+  };
+
+  const minH = { 1: 48, 2: 64, 3: 96, 4: 128, 5: 160 }[rows] || 96;
+
+  return (
+    <div>
+      {label && <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>}
+      <div className="border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-primary-300 focus-within:border-primary-300">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 bg-gray-50 border-b border-gray-200">
+          {TOOLBAR.map((btn, i) =>
+            btn === null ? (
+              <span key={i} className="w-px h-4 bg-gray-300 mx-1 inline-block" />
+            ) : btn.icon ? (
+              <button
+                key={i}
+                type="button"
+                title={btn.title}
+                onMouseDown={(e) => { e.preventDefault(); exec(btn.cmd, btn.val); }}
+                className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-200 transition-colors text-gray-600"
+              >
+                <btn.icon size={13} />
+              </button>
+            ) : (
+              <button
+                key={i}
+                type="button"
+                title={btn.title}
+                onMouseDown={(e) => { e.preventDefault(); exec(btn.cmd, btn.val); }}
+                className="px-1.5 h-7 text-xs font-medium rounded hover:bg-gray-200 transition-colors text-gray-600 min-w-[26px]"
+              >
+                {btn.text}
+              </button>
+            )
+          )}
+        </div>
+        {/* Editable area */}
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={handleInput}
+          data-placeholder={placeholder}
+          className="px-3 py-2 text-sm text-gray-800 focus:outline-none rich-editor-content"
+          style={{ minHeight: minH }}
+        />
+      </div>
+      <style>{`
+        .rich-editor-content:empty:before {
+          content: attr(data-placeholder);
+          color: #9ca3af;
+          pointer-events: none;
+          display: block;
+        }
+        .rich-editor-content h2 { font-size: 1.125rem; font-weight: 700; margin: 4px 0; }
+        .rich-editor-content h3 { font-size: 1rem; font-weight: 600; margin: 3px 0; }
+        .rich-editor-content ul { list-style: disc; padding-left: 1.25rem; margin: 4px 0; }
+        .rich-editor-content ol { list-style: decimal; padding-left: 1.25rem; margin: 4px 0; }
+        .rich-editor-content p  { margin: 2px 0; }
+        .rich-editor-content a  { color: #2563eb; text-decoration: underline; }
+      `}</style>
+    </div>
+  );
+}
+
 // ── Stats Tab ────────────────────────────────────────────────────────────────
 
 function StatsTab({ stats, onChange }) {
@@ -168,7 +278,7 @@ function WhyUsTab({ whyUs, features, onWhyUsChange, onFeaturesChange }) {
       <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 space-y-3">
         <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Section Heading</p>
         <InputField label="Title" value={whyUs.title} onChange={(v) => updateHeading('title', v)} placeholder="Why HealthOnTime?" />
-        <InputField label="Subtitle" value={whyUs.subtitle} onChange={(v) => updateHeading('subtitle', v)} placeholder="Everything you need..." />
+        <RichTextEditor label="Subtitle" value={whyUs.subtitle} onChange={(v) => updateHeading('subtitle', v)} placeholder="Everything you need for hassle-free lab testing…" rows={2} />
       </div>
 
       {/* Feature cards */}
@@ -208,7 +318,7 @@ function WhyUsTab({ whyUs, features, onWhyUsChange, onFeaturesChange }) {
               </div>
             </div>
             <InputField label="Title" value={f.title} onChange={(v) => updateFeature(idx, 'title', v)} placeholder="Card title" />
-            <TextareaField label="Description" value={f.desc} onChange={(v) => updateFeature(idx, 'desc', v)} placeholder="Card description" />
+            <RichTextEditor label="Description" value={f.desc} onChange={(v) => updateFeature(idx, 'desc', v)} placeholder="Card description…" rows={2} />
           </div>
         ))}
       </div>
@@ -252,7 +362,7 @@ function HowItWorksTab({ howItWorks, steps, onHowItWorksChange, onStepsChange })
       <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 space-y-3">
         <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Section Heading</p>
         <InputField label="Title" value={howItWorks.title} onChange={(v) => updateHeading('title', v)} placeholder="How It Works" />
-        <InputField label="Subtitle" value={howItWorks.subtitle} onChange={(v) => updateHeading('subtitle', v)} placeholder="Book your lab test in 3 simple steps" />
+        <RichTextEditor label="Subtitle" value={howItWorks.subtitle} onChange={(v) => updateHeading('subtitle', v)} placeholder="Book your lab test in 3 simple steps…" rows={2} />
       </div>
 
       <div className="flex items-center justify-between">
@@ -273,7 +383,7 @@ function HowItWorksTab({ howItWorks, steps, onHowItWorksChange, onStepsChange })
               </button>
             </div>
             <InputField label="Step Title" value={step.title} onChange={(v) => updateStep(idx, 'title', v)} placeholder="Search & Compare" />
-            <TextareaField label="Description" value={step.desc} onChange={(v) => updateStep(idx, 'desc', v)} placeholder="Step description..." />
+            <RichTextEditor label="Description" value={step.desc} onChange={(v) => updateStep(idx, 'desc', v)} placeholder="Step description…" rows={2} />
           </div>
         ))}
       </div>
@@ -363,7 +473,7 @@ function TrustBannerTab({ banner, onChange }) {
       <p className="text-sm text-gray-500">Edit the full-width CTA banner at the bottom of the home page.</p>
       <div className="space-y-4">
         <InputField label="Heading" value={banner.title} onChange={(v) => update('title', v)} placeholder="India's Most Trusted Lab Booking Platform" />
-        <TextareaField label="Subtitle" value={banner.subtitle} onChange={(v) => update('subtitle', v)} placeholder="Supporting text..." rows={2} />
+        <RichTextEditor label="Subtitle" value={banner.subtitle} onChange={(v) => update('subtitle', v)} placeholder="Supporting text…" rows={2} />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
