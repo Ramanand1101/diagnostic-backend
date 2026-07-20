@@ -1,11 +1,14 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { bookingApi, reportApi } from '@/lib/api';
-import { formatDate, formatCurrency, statusColor, getErrorMessage } from '@/utils/helpers';
+import { formatDate, formatCurrency, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Spinner from '@/components/ui/Spinner';
 import toast from 'react-hot-toast';
-import { FiCalendar, FiMapPin, FiHome, FiUser, FiClock, FiCheckCircle, FiUpload, FiFileText } from 'react-icons/fi';
+import {
+  FiCalendar, FiMapPin, FiHome, FiUser, FiClock,
+  FiUpload, FiFileText, FiUserCheck, FiPackage, FiCpu, FiCheckCircle,
+} from 'react-icons/fi';
 
 const STATUS_TABS = [
   { key: '', label: 'All' },
@@ -18,15 +21,70 @@ const STATUS_TABS = [
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
-const NEXT_ACTIONS = {
-  pending:    [{ label: 'Confirm',          status: 'confirmed',  style: 'primary' }],
-  confirmed:  [{ label: 'Mark Assigned',    status: 'assigned',   style: 'secondary' }],
-  assigned:   [{ label: 'Mark Collected',   status: 'collected',  style: 'secondary' }],
-  collected:  [{ label: 'Mark Processing',  status: 'processing', style: 'secondary' }],
-  processing: [{ label: 'Mark Completed',   status: 'completed',  style: 'success' }],
-};
+// Journey stages shown in the stepper (confirmed is always first, it's the starting state)
+const JOURNEY = [
+  { key: 'confirmed',  label: 'Confirmed',  shortLabel: 'Confirmed' },
+  { key: 'assigned',   label: 'Assigned',   shortLabel: 'Assign'    },
+  { key: 'collected',  label: 'Collected',  shortLabel: 'Collect'   },
+  { key: 'processing', label: 'Processing', shortLabel: 'Process'   },
+  { key: 'completed',  label: 'Completed',  shortLabel: 'Complete'  },
+];
+
+// Each action button config: what status it transitions TO, from which status
+const JOURNEY_ACTIONS = [
+  { label: 'Mark Assigned',    icon: FiUserCheck,    nextStatus: 'assigned',   fromStatus: 'confirmed',  color: 'blue'   },
+  { label: 'Mark Collected',   icon: FiPackage,      nextStatus: 'collected',  fromStatus: 'assigned',   color: 'purple' },
+  { label: 'Mark Processing',  icon: FiCpu,          nextStatus: 'processing', fromStatus: 'collected',  color: 'orange' },
+  { label: 'Mark Completed',   icon: FiCheckCircle,  nextStatus: 'completed',  fromStatus: 'processing', color: 'teal'   },
+];
+
+const JOURNEY_IDX = Object.fromEntries(JOURNEY.map((s, i) => [s.key, i]));
 
 const CANCEL_ALLOWED = ['pending', 'confirmed', 'assigned'];
+
+const actionColorClass = {
+  blue:   'bg-blue-600 text-white hover:bg-blue-700',
+  purple: 'bg-purple-600 text-white hover:bg-purple-700',
+  orange: 'bg-orange-500 text-white hover:bg-orange-600',
+  teal:   'bg-teal-600 text-white hover:bg-teal-700',
+};
+
+function JourneyStepper({ status }) {
+  const currentIdx = JOURNEY_IDX[status] ?? -1;
+  const isCancelled = status === 'cancelled';
+
+  if (isCancelled) {
+    return (
+      <div className="px-3 py-1.5 bg-red-50 text-red-600 text-xs font-medium rounded-lg border border-red-100 inline-flex">
+        Booking Cancelled
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-0 overflow-x-auto">
+      {JOURNEY.map((stage, i) => {
+        const isDone    = i <= currentIdx;
+        const isCurrent = i === currentIdx;
+        return (
+          <div key={stage.key} className="flex items-center">
+            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all ${
+              isDone && isCurrent ? 'bg-primary-100 text-primary-700 ring-1 ring-primary-300' :
+              isDone              ? 'bg-green-100 text-green-700' :
+                                    'bg-gray-100 text-gray-400'
+            }`}>
+              <span className="font-bold">{isDone && !isCurrent ? '✓' : i + 1}</span>
+              <span>{stage.shortLabel}</span>
+            </div>
+            {i < JOURNEY.length - 1 && (
+              <div className={`w-4 h-0.5 flex-shrink-0 ${i < currentIdx ? 'bg-green-300' : 'bg-gray-200'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function LabBookingsPage() {
   const [bookings, setBookings] = useState([]);
@@ -61,7 +119,7 @@ export default function LabBookingsPage() {
       setBookings((prev) =>
         prev.map((b) => b._id === bookingId ? { ...b, status: res.data.status } : b)
       );
-      toast.success(`Booking ${status}!`);
+      toast.success(`Status updated to ${status}`);
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -81,10 +139,7 @@ export default function LabBookingsPage() {
     if (!files.length || !bookingId) return;
 
     const invalid = files.find((f) => f.type !== 'application/pdf');
-    if (invalid) {
-      toast.error(`"${invalid.name}" is not a PDF`);
-      return;
-    }
+    if (invalid) { toast.error(`"${invalid.name}" is not a PDF`); return; }
 
     setUploadingFor(bookingId);
     try {
@@ -92,11 +147,8 @@ export default function LabBookingsPage() {
       files.forEach((f) => formData.append('files', f));
       formData.append('booking', bookingId);
       await reportApi.upload(formData);
-      setUploadedBookings((prev) => ({
-        ...prev,
-        [bookingId]: (prev[bookingId] || 0) + files.length,
-      }));
-      toast.success(`${files.length} report${files.length > 1 ? 's' : ''} uploaded! Superadmin notified.`);
+      setUploadedBookings((prev) => ({ ...prev, [bookingId]: (prev[bookingId] || 0) + files.length }));
+      toast.success(`${files.length} report${files.length > 1 ? 's' : ''} uploaded!`);
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -108,23 +160,14 @@ export default function LabBookingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="application/pdf"
-        multiple
-        className="hidden"
-        onChange={handleFileSelected}
-      />
+      <input ref={fileInputRef} type="file" accept="application/pdf" multiple className="hidden" onChange={handleFileSelected} />
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
           {pendingCount > 0 && (
             <p className="text-sm text-accent-600 font-medium mt-0.5">
-              {pendingCount} booking{pendingCount > 1 ? 's' : ''} waiting for confirmation
+              {pendingCount} booking{pendingCount > 1 ? 's' : ''} awaiting action
             </p>
           )}
         </div>
@@ -147,7 +190,6 @@ export default function LabBookingsPage() {
         ))}
       </div>
 
-      {/* Booking list */}
       {loading ? (
         <PageLoader />
       ) : bookings.length === 0 ? (
@@ -161,32 +203,33 @@ export default function LabBookingsPage() {
       ) : (
         <div className="space-y-4">
           {bookings.map((b) => {
-            const actions = NEXT_ACTIONS[b.status] || [];
-            const canCancel = CANCEL_ALLOWED.includes(b.status);
-            const isUpdating = (s) => updating === b._id + s;
-            const isCompleted = b.status === 'completed';
-            const reportUploaded = uploadedBookings[b._id];
+            const currentIdx      = JOURNEY_IDX[b.status] ?? -1;
+            const isCancelled     = b.status === 'cancelled';
+            const isPending       = b.status === 'pending';
+            const canCancel       = CANCEL_ALLOWED.includes(b.status);
+            const reportUploaded  = uploadedBookings[b._id];
             const isUploadingThis = uploadingFor === b._id;
 
             return (
-              <div key={b._id} className={`card space-y-4 ${b.status === 'pending' ? 'border-l-4 border-l-yellow-400' : ''}`}>
-                {/* Top row */}
+              <div
+                key={b._id}
+                className={`card space-y-4 ${
+                  isPending     ? 'border-l-4 border-l-yellow-400' :
+                  isCancelled   ? 'opacity-75' : ''
+                }`}
+              >
+                {/* Header row */}
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-gray-900 text-sm">#{b.bookingNo}</span>
-                      <span className={`badge text-xs capitalize ${statusColor(b.status)}`}>
-                        {b.status}
-                      </span>
                       {b.visitType === 'home' && (
                         <span className="badge bg-secondary-50 text-secondary-700 text-xs flex items-center gap-1">
                           <FiHome className="text-xs" /> Home Visit
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Booked on {formatDate(b.createdAt)}
-                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">Booked on {formatDate(b.createdAt)}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-primary-600 text-lg">{formatCurrency(b.total)}</p>
@@ -195,6 +238,9 @@ export default function LabBookingsPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Journey stepper */}
+                <JourneyStepper status={b.status} />
 
                 {/* Tests */}
                 <div className="bg-gray-50 rounded-lg p-3 space-y-1">
@@ -206,7 +252,7 @@ export default function LabBookingsPage() {
                   ))}
                 </div>
 
-                {/* Details row */}
+                {/* Details */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                   {b.patients?.length > 0 && (
                     <div className="flex items-start gap-2">
@@ -221,7 +267,6 @@ export default function LabBookingsPage() {
                       </div>
                     </div>
                   )}
-
                   {b.slotDate && (
                     <div className="flex items-start gap-2">
                       <FiClock className="text-primary-400 mt-0.5 flex-shrink-0" />
@@ -233,7 +278,6 @@ export default function LabBookingsPage() {
                       </div>
                     </div>
                   )}
-
                   {b.visitType === 'home' && b.address && (
                     <div className="flex items-start gap-2">
                       <FiMapPin className="text-primary-400 mt-0.5 flex-shrink-0" />
@@ -254,53 +298,95 @@ export default function LabBookingsPage() {
                   </div>
                 )}
 
-                {/* Action buttons */}
-                {(actions.length > 0 || canCancel || isCompleted) && (
-                  <div className="flex gap-2 flex-wrap pt-1 border-t border-gray-100">
-                    {actions.map(({ label, status, style }) => (
-                      <button
-                        key={status}
-                        onClick={() => updateStatus(b._id, status)}
-                        disabled={!!updating}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-60 ${
-                          style === 'primary'   ? 'bg-primary-600 text-white hover:bg-primary-700' :
-                          style === 'success'   ? 'bg-green-600 text-white hover:bg-green-700' :
-                                                  'bg-secondary-500 text-white hover:bg-secondary-600'
-                        }`}
-                      >
-                        {isUpdating(status) ? <Spinner size="sm" /> : <FiCheckCircle className="text-sm" />}
-                        {label}
-                      </button>
-                    ))}
-
-                    {canCancel && (
-                      <button
-                        onClick={() => updateStatus(b._id, 'cancelled')}
-                        disabled={!!updating}
-                        className="px-4 py-2 rounded-lg text-sm font-medium border border-accent-200 text-accent-600 hover:bg-accent-50 transition-colors disabled:opacity-60"
-                      >
-                        {isUpdating('cancelled') ? <Spinner size="sm" /> : 'Cancel Booking'}
-                      </button>
+                {/* ── Journey Action Buttons ── */}
+                {!isCancelled && (
+                  <div className="border-t border-gray-100 pt-3 space-y-2">
+                    {/* Confirm if pending */}
+                    {isPending && (
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => updateStatus(b._id, 'confirmed')}
+                          disabled={!!updating}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60 transition-colors"
+                        >
+                          {updating === b._id + 'confirmed' ? <Spinner size="sm" /> : <FiCheckCircle />}
+                          Confirm Booking
+                        </button>
+                        <button
+                          onClick={() => updateStatus(b._id, 'cancelled')}
+                          disabled={!!updating}
+                          className="px-4 py-2 rounded-lg text-sm font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-60"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     )}
 
-                    {/* Upload Report — available for completed bookings */}
-                    {isCompleted && (
-                      <>
-                        {reportUploaded > 0 && (
-                          <span className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-green-50 text-green-700 border border-green-200">
-                            <FiFileText className="text-sm" />
-                            {reportUploaded} Report{reportUploaded > 1 ? 's' : ''} Uploaded
-                          </span>
-                        )}
+                    {/* Journey step buttons (shown for non-pending, non-cancelled) */}
+                    {!isPending && (
+                      <div className="flex flex-wrap gap-2">
+                        {JOURNEY_ACTIONS.map(({ label, icon: Icon, nextStatus, fromStatus, color }) => {
+                          const nextIdx  = JOURNEY_IDX[nextStatus] ?? 99;
+                          const isDone   = nextIdx <= currentIdx;
+                          const isNext   = b.status === fromStatus;
+                          const isFuture = nextIdx > currentIdx + 1;
+
+                          return (
+                            <button
+                              key={nextStatus}
+                              disabled={!isNext || !!updating}
+                              onClick={() => isNext && updateStatus(b._id, nextStatus)}
+                              title={isFuture ? 'Complete previous steps first' : undefined}
+                              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                isDone
+                                  ? 'bg-green-50 text-green-700 border border-green-200 cursor-default'
+                                  : isNext
+                                    ? `${actionColorClass[color]} shadow-sm`
+                                    : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'
+                              }`}
+                            >
+                              {isDone ? (
+                                <><FiCheckCircle className="text-green-600" />{label.replace('Mark ', '')} ✓</>
+                              ) : updating === b._id + nextStatus ? (
+                                <><Spinner size="sm" />{label}</>
+                              ) : (
+                                <><Icon />{label}</>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Upload Report — always a separate distinct button */}
+                    {!isPending && (
+                      <div className="flex items-center gap-2 flex-wrap pt-1">
                         <button
                           onClick={() => triggerUpload(b._id)}
                           disabled={!!uploadingFor}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-colors disabled:opacity-60"
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-60 transition-colors"
                         >
                           {isUploadingThis ? <Spinner size="sm" /> : <FiUpload className="text-sm" />}
-                          {isUploadingThis ? 'Uploading...' : reportUploaded ? 'Upload More PDFs' : 'Upload Report (PDF)'}
+                          {isUploadingThis ? 'Uploading…' : reportUploaded ? `Upload More PDFs` : 'Upload Report PDF'}
                         </button>
-                      </>
+
+                        {reportUploaded > 0 && (
+                          <span className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                            <FiFileText />
+                            {reportUploaded} Report{reportUploaded > 1 ? 's' : ''} Uploaded
+                          </span>
+                        )}
+
+                        {canCancel && (
+                          <button
+                            onClick={() => updateStatus(b._id, 'cancelled')}
+                            disabled={!!updating}
+                            className="ml-auto text-xs text-red-400 hover:text-red-600 font-medium transition-colors disabled:opacity-60"
+                          >
+                            {updating === b._id + 'cancelled' ? 'Cancelling…' : 'Cancel Booking'}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

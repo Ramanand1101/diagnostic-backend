@@ -218,6 +218,7 @@ export const testMasterApi = {
 // Lab CRM (for lab role — filtered to own lab)
 export const labCrmApi = {
   stats: () => api.get('/lab-crm/stats'),
+  billing: (params) => api.get('/lab-crm/billing', { params }),
   patientList: (params) => api.get('/lab-crm/patients', { params }),
   patientDetail: (id) => api.get(`/lab-crm/patients/${id}`),
 };

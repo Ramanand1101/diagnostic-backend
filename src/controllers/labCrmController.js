@@ -116,6 +116,62 @@ exports.patientList = async (req, res) => {
   }
 };
 
+// GET /api/v1/lab-crm/billing
+exports.billing = async (req, res) => {
+  try {
+    const lab = await getLabByOwner(req.user._id);
+    if (!lab) return res.status(404).json({ message: 'Lab not found' });
+
+    const { from, to, page = 1, limit = 20, paymentStatus } = req.query;
+    const safeLimit = Math.min(Number(limit) || 20, 200);
+    const skip = (Number(page) - 1) * safeLimit;
+
+    const baseFilter = { lab: lab._id, isDeleted: false };
+    if (from || to) {
+      baseFilter.createdAt = {};
+      if (from) baseFilter.createdAt.$gte = new Date(from + 'T00:00:00.000Z');
+      if (to)   baseFilter.createdAt.$lte = new Date(to   + 'T23:59:59.999Z');
+    }
+
+    const listFilter = { ...baseFilter };
+    if (paymentStatus) listFilter.paymentStatus = paymentStatus;
+
+    const [totalAgg, paidAgg, bookings, count] = await Promise.all([
+      Booking.aggregate([
+        { $match: baseFilter },
+        { $group: { _id: null, revenue: { $sum: '$total' }, count: { $sum: 1 } } },
+      ]),
+      Booking.aggregate([
+        { $match: { ...baseFilter, paymentStatus: 'paid' } },
+        { $group: { _id: null, revenue: { $sum: '$total' }, count: { $sum: 1 } } },
+      ]),
+      Booking.find(listFilter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(safeLimit)
+        .populate('user', 'name mobile email')
+        .lean(),
+      Booking.countDocuments(listFilter),
+    ]);
+
+    const totalRevenue = totalAgg[0]?.revenue || 0;
+    const bookingCount = totalAgg[0]?.count  || 0;
+    const paidRevenue  = paidAgg[0]?.revenue || 0;
+    const paidCount    = paidAgg[0]?.count   || 0;
+
+    res.json({
+      totalRevenue, bookingCount,
+      paidRevenue,  paidCount,
+      unpaidRevenue: totalRevenue - paidRevenue,
+      unpaidCount:   bookingCount - paidCount,
+      bookings, total: count,
+      page: Number(page), limit: safeLimit,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // GET /api/v1/lab-crm/patients/:id
 exports.patientDetail = async (req, res) => {
   try {

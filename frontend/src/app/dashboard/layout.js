@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import { FiGrid, FiCalendar, FiFileText, FiUser, FiMessageSquare, FiMapPin, FiPackage, FiActivity, FiUsers, FiBriefcase, FiPhoneCall, FiUserCheck } from 'react-icons/fi';
+import { FiGrid, FiCalendar, FiFileText, FiUser, FiMessageSquare, FiMapPin, FiPackage, FiActivity, FiUsers, FiBriefcase, FiPhoneCall, FiUserCheck, FiDollarSign } from 'react-icons/fi';
 import { PageLoader } from '@/components/ui/Spinner';
 
 const customerNav = [
@@ -21,6 +21,7 @@ const labNav = [
   { href: '/dashboard/lab', label: 'My Lab', icon: FiMapPin },
   { href: '/dashboard/lab/products', label: 'Tests & Packages', icon: FiPackage },
   { href: '/dashboard/lab/bookings', label: 'Bookings', icon: FiCalendar },
+  { href: '/dashboard/lab/billing', label: 'Billing', icon: FiDollarSign },
   { label: '── CRM ──', divider: true },
   { href: '/dashboard/lab/crm', label: 'CRM Dashboard', icon: FiActivity },
   { href: '/dashboard/lab/crm/patients', label: 'Patients', icon: FiUsers },
