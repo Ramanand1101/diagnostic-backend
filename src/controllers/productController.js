@@ -72,7 +72,7 @@ exports.updateProduct = asyncHandler(async (req, res) => {
   // Lab role: only update products that belong to their lab
   if (req.user.role === 'lab') {
     const Lab = require('../models/Lab');
-    const myLab = await Lab.findOne({ owner: req.user._id });
+    const myLab = await Lab.findOne({ owners: req.user._id });
     if (!myLab) return res.status(403).json({ message: 'No lab found for this user' });
     const existing = await Product.findOne({ _id: req.params.id, lab: myLab._id });
     if (!existing) return res.status(403).json({ message: 'Not your product' });

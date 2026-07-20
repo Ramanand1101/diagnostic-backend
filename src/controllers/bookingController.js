@@ -177,7 +177,7 @@ exports.listBookings = asyncHandler(async (req, res) => {
     filter.user = req.user._id;
   } else if (req.user.role === 'lab') {
     const Lab = require('../models/Lab');
-    const myLab = await Lab.findOne({ owner: req.user._id });
+    const myLab = await Lab.findOne({ owners: req.user._id });
     filter.lab = myLab?._id || null;
   } else {
     if (lab) filter.lab = lab;

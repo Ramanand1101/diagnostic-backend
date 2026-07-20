@@ -6,7 +6,7 @@ const Lead = require('../models/Lead');
 const FollowUp = require('../models/FollowUp');
 
 // Helper: get lab by owner
-const getLabByOwner = async (userId) => Lab.findOne({ owner: userId });
+const getLabByOwner = async (userId) => Lab.findOne({ owners: userId });
 
 // GET /api/v1/lab-crm/stats
 exports.stats = async (req, res) => {

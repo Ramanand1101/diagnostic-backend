@@ -133,7 +133,7 @@ exports.listReports = asyncHandler(async (req, res) => {
     const myBookings = await Booking.find({ user: req.user._id }).select('_id');
     filter.booking = { $in: myBookings.map((b) => b._id) };
   } else if (req.user.role === 'lab') {
-    const myLab = await Lab.findOne({ owner: req.user._id });
+    const myLab = await Lab.findOne({ owners: req.user._id });
     filter.lab = myLab?._id || null;
   } else if (req.query.lab) {
     filter.lab = req.query.lab;
@@ -156,7 +156,7 @@ exports.getDownloadUrl = asyncHandler(async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
   } else if (req.user.role === 'lab') {
-    const myLab = await Lab.findOne({ owner: req.user._id });
+    const myLab = await Lab.findOne({ owners: req.user._id });
     if (!myLab || !report.lab || report.lab.toString() !== myLab._id.toString()) {
       return res.status(403).json({ message: 'Access denied' });
     }
