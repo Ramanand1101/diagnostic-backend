@@ -28,6 +28,8 @@ export default function ContactPage() {
       toast.error('Please login to submit a support ticket');
       return;
     }
+    if (!form.subject.trim()) return toast.error('Subject is required');
+    if (!form.message.trim()) return toast.error('Message is required');
     setLoading(true);
     try {
       await ticketApi.create(form);

@@ -84,7 +84,11 @@ function BrandForm({ initial, onSave, onClose }) {
     e.preventDefault();
     if (!form.name.trim()) return toast.error('Brand name is required');
     if (!form.phone.trim()) return toast.error('Primary phone is required');
+    if (!/^[+\d][\d\s\-().]{6,19}$/.test(form.phone.trim()))
+      return toast.error('Enter a valid phone number (e.g. 9876543210 or 1800-xxx-xxxx)');
     if (!form.email.trim()) return toast.error('Primary email is required');
+    if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.email.trim()))
+      return toast.error('Enter a valid email address');
     setLoading(true);
     try {
       if (initial?._id) await brandApi.update(initial._id, form);

@@ -101,6 +101,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.name.trim()) return toast.error('Full name is required');
     if (!EMAIL_RE.test(form.email)) {
       toast.error('Please enter a valid email address.'); return;
     }

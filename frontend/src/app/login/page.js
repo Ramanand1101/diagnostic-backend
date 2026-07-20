@@ -127,6 +127,8 @@ function LoginContent() {
   // ── Password login ──────────────────────────────────────────────────────────
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
+    if (!form.emailOrMobile.trim()) return toast.error('Please enter your email or mobile number');
+    if (!form.password.trim()) return toast.error('Please enter your password');
     setLoading(true);
     try {
       const res = await authApi.login({ emailOrMobile: form.emailOrMobile, password: form.password });

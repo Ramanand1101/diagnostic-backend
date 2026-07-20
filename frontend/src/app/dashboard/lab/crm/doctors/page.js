@@ -20,6 +20,8 @@ function DoctorForm({ initial, labId, onSave, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return toast.error('Name is required');
+    if (form.phone && !/^[+\d][\d\s\-().]{6,19}$/.test(form.phone.trim())) return toast.error('Enter a valid phone number');
+    if (form.email && !/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.email.trim())) return toast.error('Enter a valid email address');
     setLoading(true);
     try {
       const payload = { ...form, lab: labId };

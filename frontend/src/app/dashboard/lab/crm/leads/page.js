@@ -28,7 +28,10 @@ function LeadForm({ initial, labId, doctors, onSave, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.mobile.trim()) return toast.error('Name and mobile are required');
+    if (!form.name.trim()) return toast.error('Name is required');
+    if (!form.mobile.trim()) return toast.error('Mobile number is required');
+    if (!/^[6-9]\d{9}$/.test(form.mobile.trim())) return toast.error('Enter a valid 10-digit mobile number starting with 6–9');
+    if (form.email && !/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.email.trim())) return toast.error('Enter a valid email address');
     setLoading(true);
     try {
       const payload = { ...form, lab: labId, referredBy: form.referredBy || null, followUpDate: form.followUpDate || null };

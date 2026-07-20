@@ -191,8 +191,11 @@ function LabForm({ initial, onSave, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.name.trim()) return toast.error('Lab name is required');
     if (!form.phone.trim()) return toast.error('Phone number is required');
+    if (!/^[+\d][\d\s\-().]{6,19}$/.test(form.phone.trim())) return toast.error('Enter a valid phone number');
     if (!form.email.trim()) return toast.error('Email address is required');
+    if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.email.trim())) return toast.error('Enter a valid email address');
     if (form.pincode && !/^\d{6}$/.test(form.pincode)) return toast.error('Pincode must be exactly 6 digits');
     setLoading(true);
     try {

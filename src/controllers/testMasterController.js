@@ -75,7 +75,19 @@ exports.remove = async (req, res) => {
   try {
     const test = await TestMaster.findByIdAndDelete(req.params.id);
     if (!test) return res.status(404).json({ message: 'Test not found' });
-    res.json({ message: 'Deleted' });
+
+    // Cascade: delete all products with the same name
+    const Product = require('../models/Product');
+    const { deleteObjects } = require('../services/algoliaSync');
+
+    const products = await Product.find({ name: new RegExp(`^${test.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }).select('_id').lean();
+    if (products.length) {
+      const ids = products.map((p) => String(p._id));
+      await Product.deleteMany({ _id: { $in: ids } });
+      try { await deleteObjects('products', ids); } catch { /* algolia optional */ }
+    }
+
+    res.json({ message: 'Deleted', productsRemoved: products.length });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

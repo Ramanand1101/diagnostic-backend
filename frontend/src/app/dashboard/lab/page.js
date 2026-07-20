@@ -146,6 +146,9 @@ export default function MyLabPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (schedule.days.length === 0) { toast.error('Select at least one working day'); return; }
+    if (!form.name?.trim()) return toast.error('Lab name is required');
+    if (form.phone && !/^[+\d][\d\s\-().]{6,19}$/.test(form.phone.trim())) return toast.error('Enter a valid phone number');
+    if (form.email && !/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.email.trim())) return toast.error('Enter a valid email address');
     setSaving(true);
     try {
       const openingHours = `${schedule.days.join(', ')}: ${fmtTime(schedule.openFrom)} – ${fmtTime(schedule.openTo)}`;

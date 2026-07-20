@@ -107,6 +107,8 @@ function ProductForm({ initial, labs, onSave, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.name.trim()) return toast.error('Test name is required');
+    if (!form.lab) return toast.error('Please select a lab');
     setLoading(true);
     try {
       const payload = {

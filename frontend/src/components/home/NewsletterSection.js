@@ -11,6 +11,8 @@ export default function NewsletterSection() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!email.trim()) return toast.error('Email is required');
+    if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email.trim())) return toast.error('Enter a valid email address');
     setLoading(true);
     try {
       await newsletterApi.subscribe({ email });
