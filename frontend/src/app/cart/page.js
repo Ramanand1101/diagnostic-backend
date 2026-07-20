@@ -95,6 +95,108 @@ function TimeSlotPicker({ value, onChange, slotDate }) {
   );
 }
 
+// ── DD / MM / YYYY date picker ────────────────────────────────────────────────
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function DateSelectPicker({ value, onChange, minDate }) {
+  const [dd, setDd] = useState('');
+  const [mm, setMm] = useState('');
+  const [yyyy, setYyyy] = useState('');
+
+  // Sync inbound value (YYYY-MM-DD) → selects
+  useEffect(() => {
+    if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [y, m, d] = value.split('-');
+      setYyyy(y); setMm(m); setDd(d);
+    } else {
+      setYyyy(''); setMm(''); setDd('');
+    }
+  }, [value]);
+
+  const emit = (newYyyy, newMm, newDd) => {
+    if (newYyyy && newMm && newDd) {
+      onChange(`${newYyyy}-${newMm}-${newDd}`);
+    } else {
+      onChange('');
+    }
+  };
+
+  const min = minDate || '';
+  const [minY, minM, minD] = min ? min.split('-').map(Number) : [0, 0, 0];
+
+  // Year options: today's year to +2
+  const nowYear = new Date().getFullYear();
+  const yearOpts = [nowYear, nowYear + 1, nowYear + 2];
+
+  // Month options: filter past months if year == minYear
+  const monthOpts = Array.from({ length: 12 }, (_, i) => i + 1).filter((m) => {
+    if (Number(yyyy) === minY) return m >= minM;
+    return true;
+  });
+
+  // Day options: filter by month length and past days if same month/year
+  const daysInMonth = yyyy && mm ? new Date(Number(yyyy), Number(mm), 0).getDate() : 31;
+  const dayOpts = Array.from({ length: daysInMonth }, (_, i) => i + 1).filter((d) => {
+    if (Number(yyyy) === minY && Number(mm) === minM) return d >= minD;
+    return true;
+  });
+
+  const handleYear = (v) => {
+    setYyyy(v);
+    // Reset month/day if they'd be invalid
+    let newMm = mm, newDd = dd;
+    if (Number(v) === minY && Number(mm) < minM) { newMm = ''; newDd = ''; setMm(''); setDd(''); }
+    if (Number(v) === minY && Number(mm) === minM && Number(dd) < minD) { newDd = ''; setDd(''); }
+    emit(v, newMm, newDd);
+  };
+  const handleMonth = (v) => {
+    setMm(v);
+    let newDd = dd;
+    const days = v && yyyy ? new Date(Number(yyyy), Number(v), 0).getDate() : 31;
+    if (Number(dd) > days) { newDd = ''; setDd(''); }
+    if (Number(yyyy) === minY && Number(v) === minM && Number(dd) < minD) { newDd = ''; setDd(''); }
+    emit(yyyy, v, newDd);
+  };
+  const handleDay = (v) => { setDd(v); emit(yyyy, mm, v); };
+
+  const sel = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 appearance-none cursor-pointer';
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {/* Day */}
+      <div className="relative">
+        <select value={dd} onChange={(e) => handleDay(e.target.value)} className={sel}>
+          <option value="">DD</option>
+          {dayOpts.map((d) => (
+            <option key={d} value={String(d).padStart(2, '0')}>{String(d).padStart(2, '0')}</option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+      </div>
+      {/* Month */}
+      <div className="relative">
+        <select value={mm} onChange={(e) => handleMonth(e.target.value)} className={sel}>
+          <option value="">MM</option>
+          {monthOpts.map((m) => (
+            <option key={m} value={String(m).padStart(2, '0')}>{MONTHS[m - 1]}</option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+      </div>
+      {/* Year */}
+      <div className="relative">
+        <select value={yyyy} onChange={(e) => handleYear(e.target.value)} className={sel}>
+          <option value="">YYYY</option>
+          {yearOpts.map((y) => (
+            <option key={y} value={String(y)}>{y}</option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+      </div>
+    </div>
+  );
+}
+
 const TYPE_COLOR = {
   test:     'bg-blue-50 text-blue-700 border-blue-100',
   package:  'bg-purple-50 text-purple-700 border-purple-100',
@@ -482,7 +584,11 @@ function BookingForm({ groups, onSuccess, submitting, setSubmitting }) {
         )}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Preferred Date <span className="text-red-500">*</span></label>
-          <input required type="date" min={today} value={form.slotDate} onChange={F('slotDate')} className="input text-sm" />
+          <DateSelectPicker
+            value={form.slotDate}
+            onChange={(v) => setForm((f) => ({ ...f, slotDate: v }))}
+            minDate={today}
+          />
         </div>
       </div>
 
