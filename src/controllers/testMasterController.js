@@ -139,6 +139,43 @@ exports.remove = async (req, res) => {
   }
 };
 
+// DELETE /api/v1/test-master/bulk  — delete multiple tests by IDs
+exports.bulkDelete = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0)
+      return res.status(400).json({ message: 'ids array is required' });
+
+    const Product = require('../models/Product');
+    const { deleteObjects } = require('../services/algoliaSync');
+
+    const deletedTests = await TestMaster.find({ _id: { $in: ids } }).select('name').lean();
+    await TestMaster.deleteMany({ _id: { $in: ids } });
+
+    // Cascade: remove products matching deleted test names
+    let totalProductsRemoved = 0;
+    const allProductIds = [];
+    for (const t of deletedTests) {
+      const products = await Product.find({
+        name: new RegExp(`^${t.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+      }).select('_id').lean();
+      if (products.length) {
+        const pIds = products.map((p) => String(p._id));
+        await Product.deleteMany({ _id: { $in: pIds } });
+        allProductIds.push(...pIds);
+        totalProductsRemoved += pIds.length;
+      }
+    }
+    if (allProductIds.length) {
+      try { await deleteObjects('products', allProductIds); } catch { /* algolia optional */ }
+    }
+
+    res.json({ deleted: deletedTests.length, productsRemoved: totalProductsRemoved });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // GET /api/v1/test-master/demo-csv
 exports.demoCsv = (req, res) => {
   const csv = [

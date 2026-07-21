@@ -5,7 +5,6 @@ import { formatCurrency, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
-import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
 import { FiPlus, FiEdit, FiTrash2, FiSearch, FiDollarSign, FiDownload } from 'react-icons/fi';
 
@@ -318,7 +317,10 @@ export default function AdminProductsPage() {
   const [selected, setSelected] = useState(new Set());
   const [limit, setLimit] = useState(20);
   const [downloading, setDownloading] = useState(false);
+  const [demoLabEmail, setDemoLabEmail] = useState('');
+  const [csvUploading, setCsvUploading] = useState(false);
   const searchTimer = useRef(null);
+  const csvFileRef = useRef(null);
 
   const fetchProducts = useCallback(() => {
     setLoading(true);
@@ -449,14 +451,87 @@ export default function AdminProductsPage() {
         )}
       </div>
 
-      <CsvUploadSection
-        title="Bulk Upload Products via CSV"
-        description="Upload tests/packages for labs or brands. Download the demo CSV to see the required format."
-        onDemoDownload={productApi.demoCsv}
-        onUpload={productApi.bulkCsv}
-        demoFileName="products-template.csv"
-        onSuccess={fetchProducts}
-      />
+      {/* Bulk Upload — with lab selector for demo CSV */}
+      <div className="border border-dashed border-gray-200 rounded-xl p-5 bg-gray-50/50 space-y-3">
+        <div>
+          <p className="text-sm font-semibold text-gray-800">Bulk Upload Products via CSV</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Upload tests/packages for labs or brands. Select a lab below, then download the demo CSV — it will be pre-filled with your Test Master List and the selected lab&apos;s email.
+          </p>
+        </div>
+
+        {/* Lab selector */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Select Lab for CSV:</label>
+          <select
+            value={demoLabEmail}
+            onChange={(e) => setDemoLabEmail(e.target.value)}
+            className="input text-xs py-1.5 flex-1 min-w-[200px] max-w-sm"
+          >
+            <option value="">— No lab (fill manually) —</option>
+            {labs.map((lab) => (
+              <option key={lab._id} value={lab.email || ''}>
+                {lab.name}{lab.city ? ` — ${lab.city}` : ''}{lab.email ? ` (${lab.email})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={async () => {
+              try {
+                const params = {};
+                if (demoLabEmail) params.labEmail = demoLabEmail;
+                const res = await productApi.demoCsv(params);
+                const url = URL.createObjectURL(new Blob([res.data]));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'products-template.csv';
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch {
+                toast.error('Failed to download template');
+              }
+            }}
+            className="flex items-center gap-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors font-medium"
+          >
+            <FiDownload size={12} />
+            {demoLabEmail ? 'Demo CSV (lab pre-filled)' : 'Demo CSV'}
+          </button>
+          <input
+            ref={csvFileRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file) return;
+              setCsvUploading(true);
+              try {
+                const res = await productApi.bulkCsv(file);
+                const d = res.data;
+                toast.success(`Done! ${d.created || 0} created, ${d.updated || 0} updated`);
+                if (d.errors?.length) toast.error(`${d.errors.length} row error(s) — check console`);
+                fetchProducts();
+              } catch (err) {
+                toast.error(getErrorMessage(err));
+              } finally {
+                setCsvUploading(false);
+              }
+            }}
+          />
+          <button
+            onClick={() => csvFileRef.current?.click()}
+            disabled={csvUploading}
+            className="flex items-center gap-1.5 text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium disabled:opacity-60"
+          >
+            <FiDownload size={12} className="rotate-180" />
+            {csvUploading ? 'Uploading…' : 'Upload CSV'}
+          </button>
+        </div>
+      </div>
 
       {/* Type filter tabs */}
       <div className="flex flex-wrap gap-2 items-center">

@@ -244,22 +244,48 @@ exports.adminListProducts = asyncHandler(async (req, res) => {
   res.json({ items, page: Number(page), limit: safeLimit, total });
 });
 
-// GET /api/v1/products/demo-csv — public template download
-exports.productDemoCsv = (req, res) => {
-  const rows = [
-    'name,price,salePrice,reportTime,sampleType,homeCollection,fastingRequired,description,category,labEmail,brand',
-    '--- OPTION 1: Upload for a single lab (use labEmail column) ---,,,,,,,,,,',
-    'CBC Complete Blood Count,299,199,24 hours,Blood,true,true,Measures blood components,Pathology,apollo-lucknow@apollo.com,',
-    '--- OPTION 2: Upload for ALL branches of a chain (use brand column) ---,,,,,,,,,,',
-    'CBC Complete Blood Count,299,199,24 hours,Blood,true,true,Measures blood components,Pathology,,Apollo Diagnostics',
-    'Lipid Profile,599,399,24 hours,Blood,true,true,Cholesterol analysis,Pathology,,Apollo Diagnostics',
-    'Full Body Checkup,1999,1499,48 hours,Blood,true,true,Comprehensive health package,Packages,,Apollo Diagnostics',
-    'Chest X-Ray,500,350,Same day,N/A,false,false,Digital chest radiograph,Radiology,,Apollo Diagnostics',
-  ].join('\n');
+// GET /api/v1/products/demo-csv — generates template from TestMaster data
+exports.productDemoCsv = asyncHandler(async (req, res) => {
+  const TestMaster = require('../models/TestMaster');
+  const { labEmail = '', brand = '' } = req.query;
+
+  const tests = await TestMaster.find({})
+    .populate('category', 'name')
+    .sort('name')
+    .limit(200)
+    .lean();
+
+  const esc = (v) => `"${String(v || '').replace(/"/g, '""')}"`;
+
+  const header = 'name,price,salePrice,reportTime,sampleType,homeCollection,fastingRequired,description,category,labEmail,brand';
+
+  const dataRows = tests.length > 0
+    ? tests.map((t) => [
+        esc(t.name),
+        '0',
+        '0',
+        esc(t.reportTime || ''),
+        esc(t.sampleType || ''),
+        t.homeCollection ? 'true' : 'false',
+        t.fastingRequired ? 'true' : 'false',
+        esc(t.description || ''),
+        esc(t.category?.name || ''),
+        esc(labEmail),
+        esc(brand),
+      ].join(','))
+    : [
+        `"CBC Complete Blood Count",299,199,"24 hours","Blood",false,true,"Measures blood components","Pathology",${esc(labEmail)},${esc(brand)}`,
+        `"Lipid Profile",599,399,"Same day","Blood",false,true,"Cholesterol panel","Pathology",${esc(labEmail)},${esc(brand)}`,
+        `"Full Body Checkup",1999,1499,"48 hours","Blood",false,true,"Comprehensive health check","Packages",${esc(labEmail)},${esc(brand)}`,
+        `"Thyroid Profile (T3 T4 TSH)",800,599,"24 hours","Blood",false,false,"Thyroid hormone levels","Pathology",${esc(labEmail)},${esc(brand)}`,
+        `"HbA1c (Glycated Haemoglobin)",700,549,"Same day","Blood",false,false,"3-month blood sugar average","Diabetes",${esc(labEmail)},${esc(brand)}`,
+      ];
+
+  const csv = [header, ...dataRows].join('\n');
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="products-template.csv"');
-  res.send(rows);
-};
+  res.send(csv);
+});
 
 // POST /api/v1/products/bulk-csv — admin only
 // CSV columns: name, price, salePrice, reportTime, sampleType, homeCollection,

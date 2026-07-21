@@ -7,7 +7,7 @@ import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiList, FiDownload } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiList, FiDownload, FiCheckSquare } from 'react-icons/fi';
 
 const REPORT_PRESETS = ['Same day', '4 hours', '8 hours', '12 hours', '24 hours', '48 hours', '2-3 days'];
 const SAMPLE_PRESETS = ['Blood', 'Urine', 'Stool', 'Saliva', 'Swab', 'Multiple'];
@@ -177,6 +177,7 @@ export default function TestMasterPage() {
   const [q, setQ] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [modal, setModal] = useState(null);
+  const [selected, setSelected] = useState(new Set());
   const searchTimer = useRef(null);
 
   const fetchTests = useCallback(() => {
@@ -186,13 +187,27 @@ export default function TestMasterPage() {
       .finally(() => setLoading(false));
   }, [page, limit, q, catFilter]);
 
-  useEffect(() => { fetchTests(); }, [fetchTests]);
+  useEffect(() => { fetchTests(); setSelected(new Set()); }, [fetchTests]);
   useEffect(() => { categoryApi.getTopLevel().then((r) => setCategories(r.data.items || [])); }, []);
+
+  const toggleSelect = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAll = () => setSelected(selected.size === tests.length ? new Set() : new Set(tests.map((t) => t._id)));
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this test from master list?')) return;
     try { await testMasterApi.delete(id); toast.success('Deleted'); fetchTests(); }
     catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selected.size) return;
+    if (!confirm(`Delete ${selected.size} test(s)? This will also remove matching products. Cannot be undone.`)) return;
+    try {
+      const res = await testMasterApi.bulkDelete([...selected]);
+      toast.success(`${res.data.deleted} test(s) deleted${res.data.productsRemoved ? `, ${res.data.productsRemoved} products removed` : ''}`);
+      setSelected(new Set());
+      fetchTests();
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   return (
@@ -234,7 +249,7 @@ export default function TestMasterPage() {
         onSuccess={fetchTests}
       />
 
-      {/* Filters */}
+      {/* Filters + bulk action bar */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
@@ -248,6 +263,14 @@ export default function TestMasterPage() {
           <option value="">All Categories</option>
           {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
         </select>
+        {selected.size > 0 && (
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors"
+          >
+            <FiTrash2 size={13} /> Delete Selected ({selected.size})
+          </button>
+        )}
         <span className="text-xs text-gray-400 ml-auto">{total} tests</span>
       </div>
 
@@ -257,6 +280,14 @@ export default function TestMasterPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  <th className="table-header w-8">
+                    <input
+                      type="checkbox"
+                      className="rounded text-primary-600"
+                      checked={tests.length > 0 && selected.size === tests.length}
+                      onChange={toggleAll}
+                    />
+                  </th>
                   <th className="table-header">Test Name</th>
                   <th className="table-header">Category</th>
                   <th className="table-header">Sample</th>
@@ -268,7 +299,10 @@ export default function TestMasterPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {tests.map((t) => (
-                  <tr key={t._id} className="hover:bg-gray-50">
+                  <tr key={t._id} className={`hover:bg-gray-50 ${selected.has(t._id) ? 'bg-blue-50' : ''}`}>
+                    <td className="table-cell">
+                      <input type="checkbox" className="rounded text-primary-600" checked={selected.has(t._id)} onChange={() => toggleSelect(t._id)} />
+                    </td>
                     <td className="table-cell font-medium text-gray-900">{t.name}</td>
                     <td className="table-cell">
                       <p className="text-sm text-gray-700">{t.category?.name || '—'}</p>
@@ -297,7 +331,7 @@ export default function TestMasterPage() {
                 ))}
                 {tests.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="table-cell text-center py-16">
+                    <td colSpan={8} className="table-cell text-center py-16">
                       <FiList className="mx-auto text-4xl text-gray-300 mb-3" />
                       <p className="text-gray-500">No tests in master list yet</p>
                       <p className="text-xs text-gray-400 mt-1">Add tests here or bulk upload via CSV</p>

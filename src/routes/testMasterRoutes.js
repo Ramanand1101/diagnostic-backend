@@ -13,6 +13,7 @@ router.get('/search', c.search);                          // public — used in 
 router.get('/', ...admin, c.list);
 router.post('/bulk-csv', ...admin, csvUpload.single('file'), c.bulkCsv);
 router.post('/', ...admin, c.create);
+router.delete('/bulk', ...admin, c.bulkDelete);
 router.put('/:id', ...admin, c.update);
 router.delete('/:id', ...admin, c.remove);
 
