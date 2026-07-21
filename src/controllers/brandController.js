@@ -86,12 +86,12 @@ exports.uploadLogo = asyncHandler(async (req, res) => {
 // GET /brands/demo-csv
 exports.demoCsv = (req, res) => {
   const rows = [
-    'name,website,description,isActive',
-    'Apollo Diagnostics,https://www.apollodiagnostics.in,Leading diagnostic chain across India,true',
-    'Dr Lal PathLabs,https://www.lalpathlabs.com,Trusted pathology services since 1949,true',
-    'SRL Diagnostics,https://www.srlworld.com,NABL accredited diagnostic network,true',
-    'Thyrocare,https://www.thyrocare.com,Affordable preventive healthcare diagnostics,true',
-    'Metropolis Healthcare,https://www.metropolisindia.com,Premium diagnostic services,true',
+    'name,website,phone,email,description,isActive',
+    'Apollo Diagnostics,https://www.apollodiagnostics.in,04069467075,customer.care@apollodiagnostics.in,Leading diagnostic chain across India,true',
+    'Dr Lal PathLabs,https://www.lalpathlabs.com,01244177000,customercare@lalpathlabs.com,Trusted pathology services since 1949,true',
+    'SRL Diagnostics,https://www.srlworld.com,18002027777,support@srlworld.com,NABL accredited diagnostic network,true',
+    'Thyrocare,https://www.thyrocare.com,09999999999,info@thyrocare.com,Affordable preventive healthcare diagnostics,true',
+    'Metropolis Healthcare,https://www.metropolisindia.com,09999000000,customercare@metropolisindia.com,Premium diagnostic services,true',
   ].join('\n');
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="brands-template.csv"');
@@ -99,7 +99,7 @@ exports.demoCsv = (req, res) => {
 };
 
 // POST /brands/bulk-csv
-// Columns: name, website, description, isActive
+// Columns: name, website, phone, email, description, isActive
 exports.bulkCsv = asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'CSV file required' });
 
@@ -117,9 +117,11 @@ exports.bulkCsv = asyncHandler(async (req, res) => {
       const payload = {
         name,
         slug: makeSlug(name),
-        website: row.website || '',
-        description: row.description || '',
-        isActive: row.isactive !== 'false',
+        website: (row.website || '').trim(),
+        phone: (row.phone || '').trim(),
+        email: (row.email || '').trim(),
+        description: (row.description || '').trim(),
+        isActive: (row.isactive || row.isActive || 'true').toString().toLowerCase() !== 'false',
       };
 
       const existing = await Brand.findOne({ name: new RegExp(`^${name}$`, 'i') });
