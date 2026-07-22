@@ -319,6 +319,7 @@ export default function AdminProductsPage() {
   const [downloading, setDownloading] = useState(false);
   const [selectedLabEmails, setSelectedLabEmails] = useState(new Set());
   const [labDropdownOpen, setLabDropdownOpen] = useState(false);
+  const [labSearch, setLabSearch] = useState('');
   const [csvUploading, setCsvUploading] = useState(false);
   const searchTimer = useRef(null);
   const csvFileRef = useRef(null);
@@ -327,7 +328,7 @@ export default function AdminProductsPage() {
   // Close lab dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
-      if (labDropdownRef.current && !labDropdownRef.current.contains(e.target)) setLabDropdownOpen(false);
+      if (labDropdownRef.current && !labDropdownRef.current.contains(e.target)) { setLabDropdownOpen(false); setLabSearch(''); }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -507,7 +508,19 @@ export default function AdminProductsPage() {
 
             {labDropdownOpen && (
               <div className="absolute z-50 mt-1 w-full max-w-sm bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden">
-                <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-100 bg-gray-50">
+                {/* Search */}
+                <div className="px-3 py-2 border-b border-gray-100">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={labSearch}
+                    onChange={(e) => setLabSearch(e.target.value)}
+                    placeholder="Search labs…"
+                    className="w-full text-sm border border-gray-200 rounded-md px-2.5 py-1.5 outline-none focus:border-primary-400"
+                  />
+                </div>
+                {/* Select all / Clear */}
+                <div className="flex items-center gap-3 px-3 py-1.5 border-b border-gray-100 bg-gray-50">
                   <button type="button"
                     onClick={() => setSelectedLabEmails(new Set(labs.map((l) => l.email).filter(Boolean)))}
                     className="text-xs text-primary-600 font-medium hover:underline">
@@ -519,24 +532,31 @@ export default function AdminProductsPage() {
                     className="text-xs text-gray-500 hover:underline">
                     Clear
                   </button>
-                  <span className="ml-auto text-xs text-gray-400">{labs.length} labs</span>
+                  <span className="ml-auto text-xs text-gray-400">
+                    {labs.filter(l => l.name.toLowerCase().includes(labSearch.toLowerCase())).length} result{labs.filter(l => l.name.toLowerCase().includes(labSearch.toLowerCase())).length !== 1 ? 's' : ''}
+                  </span>
                 </div>
+                {/* List */}
                 <div className="max-h-52 overflow-y-auto">
-                  {labs.map((lab) => (
-                    <label key={lab._id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-primary-50 cursor-pointer transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={selectedLabEmails.has(lab.email || '')}
-                        onChange={() => toggleLabEmail(lab.email || '')}
-                        className="rounded accent-primary-600"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{lab.name}</p>
-                        {lab.city && <p className="text-xs text-gray-400">{lab.city}</p>}
-                      </div>
-                    </label>
-                  ))}
-                  {labs.length === 0 && <p className="text-sm text-gray-400 px-3 py-4 text-center">No labs found</p>}
+                  {labs
+                    .filter((l) => l.name.toLowerCase().includes(labSearch.toLowerCase()) || (l.city || '').toLowerCase().includes(labSearch.toLowerCase()))
+                    .map((lab) => (
+                      <label key={lab._id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-primary-50 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={selectedLabEmails.has(lab.email || '')}
+                          onChange={() => toggleLabEmail(lab.email || '')}
+                          className="rounded accent-primary-600"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{lab.name}</p>
+                          {lab.city && <p className="text-xs text-gray-400">{lab.city}</p>}
+                        </div>
+                      </label>
+                    ))}
+                  {labs.filter(l => l.name.toLowerCase().includes(labSearch.toLowerCase())).length === 0 && (
+                    <p className="text-sm text-gray-400 px-3 py-4 text-center">No labs match &quot;{labSearch}&quot;</p>
+                  )}
                 </div>
               </div>
             )}
