@@ -266,34 +266,10 @@ exports.productDemoCsv = asyncHandler(async (req, res) => {
   const headers = ['name', 'price', 'salePrice', 'reportTime', 'sampleType', 'homeCollection', 'fastingRequired', 'description', 'category', 'labEmail', 'brand'];
   const numCols = headers.length;
 
-  // Build worksheet manually so we can set cell styles at creation time
-  const ws = {};
-
-  // Helper: cell type from JS value
-  const cellType = (v) => {
-    if (typeof v === 'boolean') return 'b';
-    if (typeof v === 'number') return 'n';
-    return 's';
-  };
-
-  // Styles: locked header, locked name cell, unlocked editable cell
-  const sHeader   = { font: { bold: true }, protection: { locked: true } };
-  const sLocked   = { protection: { locked: true } };
-  const sEditable = { protection: { locked: false } };
-
-  let rowIdx = 0;
-
-  // Header row
-  for (let c = 0; c < numCols; c++) {
-    const addr = XLSX.utils.encode_cell({ r: rowIdx, c });
-    ws[addr] = { v: headers[c], t: 's', s: sHeader };
-  }
-  rowIdx++;
-
-  // Data rows — one block per selected lab
+  const aoa = [headers];
   for (const labEmail of emailList) {
     for (const t of source) {
-      const rowValues = [
+      aoa.push([
         t.name,
         0, 0,
         t.reportTime || '',
@@ -304,45 +280,20 @@ exports.productDemoCsv = asyncHandler(async (req, res) => {
         t.category?.name || '',
         labEmail,
         brand,
-      ];
-      for (let c = 0; c < numCols; c++) {
-        const addr = XLSX.utils.encode_cell({ r: rowIdx, c });
-        const v = rowValues[c];
-        // Column A (name) = locked; all others = editable
-        const s = c === 0 ? sLocked : sEditable;
-        ws[addr] = { v, t: cellType(v), s };
-      }
-      rowIdx++;
+      ]);
     }
   }
 
-  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rowIdx - 1, c: numCols - 1 } });
-
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [
     { wch: 42 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 },
     { wch: 16 }, { wch: 16 }, { wch: 40 }, { wch: 16 }, { wch: 32 }, { wch: 20 },
   ];
-
-  // Freeze header row
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-
-  // Sheet protection — only locked cells (col A + header) will be non-editable
-  ws['!protect'] = {
-    sheet: true,
-    selectLockedCells: true,
-    selectUnlockedCells: true,
-    formatCells: false,
-    formatColumns: false,
-    formatRows: false,
-    insertRows: false,
-    deleteRows: false,
-    sort: true,
-    autoFilter: true,
-  };
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'products');
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', cellStyles: true });
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="products-template.xlsx"');
