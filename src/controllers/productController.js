@@ -244,85 +244,101 @@ exports.adminListProducts = asyncHandler(async (req, res) => {
   res.json({ items, page: Number(page), limit: safeLimit, total });
 });
 
-// GET /api/v1/products/demo-csv — generates XLSX template from TestMaster (name column locked)
+// GET /api/v1/products/demo-csv — generates XLSX template from TestMaster (only name column locked)
 exports.productDemoCsv = asyncHandler(async (req, res) => {
   const XLSX = require('xlsx');
   const TestMaster = require('../models/TestMaster');
   const { labEmails = '', brand = '' } = req.query;
 
-  // Support multiple labs: comma-separated email list
   const emailList = labEmails ? labEmails.split(',').map((e) => e.trim()).filter(Boolean) : [''];
 
   const tests = await TestMaster.find({}).populate('category', 'name').sort('name').limit(200).lean();
 
   const FALLBACK = [
-    ['CBC Complete Blood Count', 299, 199, '24 hours', 'Blood', false, true, 'Measures blood components', 'Pathology'],
-    ['Lipid Profile', 599, 399, 'Same day', 'Blood', false, true, 'Cholesterol analysis', 'Pathology'],
-    ['Full Body Checkup', 1999, 1499, '48 hours', 'Blood', false, true, 'Comprehensive health check', 'Packages'],
-    ['Thyroid Profile (T3 T4 TSH)', 800, 599, '24 hours', 'Blood', false, false, 'Thyroid hormone levels', 'Pathology'],
-    ['HbA1c (Glycated Haemoglobin)', 700, 549, 'Same day', 'Blood', false, false, '3-month blood sugar average', 'Diabetes'],
+    { name: 'CBC Complete Blood Count', reportTime: '24 hours', sampleType: 'Blood', homeCollection: false, fastingRequired: true, description: 'Measures blood components', category: { name: 'Pathology' } },
+    { name: 'Lipid Profile', reportTime: 'Same day', sampleType: 'Blood', homeCollection: false, fastingRequired: true, description: 'Cholesterol analysis', category: { name: 'Pathology' } },
+    { name: 'Full Body Checkup', reportTime: '48 hours', sampleType: 'Blood', homeCollection: false, fastingRequired: true, description: 'Comprehensive health check', category: { name: 'Packages' } },
+    { name: 'Thyroid Profile (T3 T4 TSH)', reportTime: '24 hours', sampleType: 'Blood', homeCollection: false, fastingRequired: false, description: 'Thyroid hormone levels', category: { name: 'Pathology' } },
+    { name: 'HbA1c (Glycated Haemoglobin)', reportTime: 'Same day', sampleType: 'Blood', homeCollection: false, fastingRequired: false, description: '3-month blood sugar average', category: { name: 'Diabetes' } },
   ];
+  const source = tests.length > 0 ? tests : FALLBACK;
 
   const headers = ['name', 'price', 'salePrice', 'reportTime', 'sampleType', 'homeCollection', 'fastingRequired', 'description', 'category', 'labEmail', 'brand'];
-  const aoa = [headers];
+  const numCols = headers.length;
 
+  // Build worksheet manually so we can set cell styles at creation time
+  const ws = {};
+
+  // Helper: cell type from JS value
+  const cellType = (v) => {
+    if (typeof v === 'boolean') return 'b';
+    if (typeof v === 'number') return 'n';
+    return 's';
+  };
+
+  // Styles: locked header, locked name cell, unlocked editable cell
+  const sHeader   = { font: { bold: true }, protection: { locked: true } };
+  const sLocked   = { protection: { locked: true } };
+  const sEditable = { protection: { locked: false } };
+
+  let rowIdx = 0;
+
+  // Header row
+  for (let c = 0; c < numCols; c++) {
+    const addr = XLSX.utils.encode_cell({ r: rowIdx, c });
+    ws[addr] = { v: headers[c], t: 's', s: sHeader };
+  }
+  rowIdx++;
+
+  // Data rows — one block per selected lab
   for (const labEmail of emailList) {
-    const source = tests.length > 0 ? tests : FALLBACK.map((f) => ({
-      name: f[0], price: f[1], salePrice: f[2], reportTime: f[3],
-      sampleType: f[4], homeCollection: f[5], fastingRequired: f[6],
-      description: f[7], category: { name: f[8] },
-    }));
-
     for (const t of source) {
-      aoa.push([
+      const rowValues = [
         t.name,
         0, 0,
         t.reportTime || '',
         t.sampleType || '',
-        t.homeCollection ? true : false,
-        t.fastingRequired ? true : false,
+        !!t.homeCollection,
+        !!t.fastingRequired,
         t.description || '',
         t.category?.name || '',
         labEmail,
         brand,
-      ]);
+      ];
+      for (let c = 0; c < numCols; c++) {
+        const addr = XLSX.utils.encode_cell({ r: rowIdx, c });
+        const v = rowValues[c];
+        // Column A (name) = locked; all others = editable
+        const s = c === 0 ? sLocked : sEditable;
+        ws[addr] = { v, t: cellType(v), s };
+      }
+      rowIdx++;
     }
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rowIdx - 1, c: numCols - 1 } });
 
-  // Column widths
   ws['!cols'] = [
     { wch: 42 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 },
     { wch: 16 }, { wch: 16 }, { wch: 40 }, { wch: 16 }, { wch: 32 }, { wch: 20 },
   ];
 
-  // Freeze first row (header)
+  // Freeze header row
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
 
-  // Protect sheet — name column (col A) stays locked, all other data cells unlocked
+  // Sheet protection — only locked cells (col A + header) will be non-editable
   ws['!protect'] = {
-    sheet: true, selectLockedCells: true, selectUnlockedCells: true,
-    formatCells: true, formatColumns: true, formatRows: true,
-    sort: true, autoFilter: true,
+    sheet: true,
+    selectLockedCells: true,
+    selectUnlockedCells: true,
+    formatCells: false,
+    formatColumns: false,
+    formatRows: false,
+    insertRows: false,
+    deleteRows: false,
+    sort: true,
+    autoFilter: true,
   };
-
-  // Mark every data cell in cols B–K (index 1–10) as unlocked
-  const rangeStr = ws['!ref'] || 'A1';
-  const range = XLSX.utils.decode_range(rangeStr);
-  for (let r = 1; r <= range.e.r; r++) {       // skip header row 0
-    for (let c = 1; c <= range.e.c; c++) {     // skip col A (name)
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (!ws[addr]) ws[addr] = { v: '' };
-      ws[addr].s = { ...(ws[addr].s || {}), protection: { locked: false } };
-    }
-  }
-  // Header row cells — all locked (no editing headers)
-  for (let c = 0; c <= range.e.c; c++) {
-    const addr = XLSX.utils.encode_cell({ r: 0, c });
-    if (!ws[addr]) ws[addr] = { v: headers[c] };
-    ws[addr].s = { ...(ws[addr].s || {}), protection: { locked: true }, font: { bold: true } };
-  }
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'products');
