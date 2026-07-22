@@ -6,7 +6,8 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { bookingApi, userApi, authApi } from '@/lib/api';
+import { bookingApi, userApi, authApi, settingApi } from '@/lib/api';
+import BookingAnimation from '@/components/booking/BookingAnimation';
 import { getErrorMessage } from '@/utils/helpers';
 import {
   FiTrash2, FiShoppingCart, FiMapPin, FiArrowLeft,
@@ -945,10 +946,36 @@ export default function CartPage() {
   const [step, setStep] = useState('cart'); // 'cart' | 'payment' | 'success'
   const [paymentMeta, setPaymentMeta] = useState(null); // { form, activeUser }
   const [confirmedBookings, setConfirmedBookings] = useState([]);
+  const [animConfig, setAnimConfig] = useState(null);   // null = not loaded
+  const [showAnim, setShowAnim] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState(null);
+
+  // Load animation config once on mount
+  useEffect(() => {
+    settingApi.getPublic('booking_animation')
+      .then((res) => setAnimConfig(res.data.value || { enabled: false }))
+      .catch(() => setAnimConfig({ enabled: false }));
+  }, []);
 
   const handleReadyForPayment = (form, activeUser) => {
-    setPaymentMeta({ form, activeUser });
-    setStep('payment');
+    if (animConfig?.enabled) {
+      // Save the payload and show animation first
+      setPendingPayment({ form, activeUser });
+      setShowAnim(true);
+    } else {
+      setPaymentMeta({ form, activeUser });
+      setStep('payment');
+    }
+  };
+
+  // Called when animation finishes
+  const handleAnimDone = () => {
+    setShowAnim(false);
+    if (pendingPayment) {
+      setPaymentMeta(pendingPayment);
+      setPendingPayment(null);
+      setStep('payment');
+    }
   };
 
   const handlePaymentSuccess = (bookings) => {
@@ -1038,6 +1065,7 @@ export default function CartPage() {
 
   return (
     <>
+      {showAnim && <BookingAnimation config={animConfig} onDone={handleAnimDone} />}
       <Navbar />
       <main className="min-h-screen bg-gray-50">
         <div className="max-w-5xl mx-auto px-4 py-8">

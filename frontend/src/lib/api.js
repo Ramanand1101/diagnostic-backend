@@ -199,8 +199,15 @@ export const ticketApi = {
 // Settings
 export const settingApi = {
   getAll: () => api.get('/settings'),
+  getPublic: (key) => api.get(`/settings/public/${key}`),
   create: (data) => api.post('/settings', data),
   update: (id, data) => api.put(`/settings/${id}`, data),
+  upsert: async (key, value) => {
+    const list = await api.get('/settings');
+    const existing = (list.data.items || list.data).find((s) => s.key === key);
+    if (existing) return api.put(`/settings/${existing._id}`, { key, value });
+    return api.post('/settings', { key, value });
+  },
 };
 
 // Test Master

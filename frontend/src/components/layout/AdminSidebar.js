@@ -68,6 +68,7 @@ const navSections = [
     items: [
       { href: '/admin/pages',    label: 'Pages',    icon: FiFile,     permission: 'pages' },
       { href: '/admin/settings', label: 'Settings', icon: FiSettings, permission: 'settings' },
+      { href: '/admin/settings/animation', label: 'Booking Animation', icon: FiActivity, permission: 'settings' },
     ],
   },
 ];
