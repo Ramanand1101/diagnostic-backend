@@ -113,7 +113,7 @@ export const productApi = {
   bulkUploadTests: (data) => api.post('/products/bulk-tests', data),
   demoCsv: (params) => api.get('/products/demo-csv', { params, responseType: 'blob' }),
   demoCsvUrl: () => `${BASE_URL}/products/demo-csv`,
-  bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/products/bulk-csv', fd); },
+  bulkCsv: (file, params) => { const fd = new FormData(); fd.append('file', file); return api.post('/products/bulk-csv', fd, { params }); },
   bulkDelete: (ids) => api.delete('/products/bulk-delete', { data: { ids } }),
   bulkPrice: (ids, salePrice, discountPercent) => api.patch('/products/bulk-price', { ids, salePrice, discountPercent }),
   setPrice: (id, data) => api.patch(`/products/${id}/set-price`, data),

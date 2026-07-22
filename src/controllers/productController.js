@@ -337,6 +337,19 @@ exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
   let created = 0;
   const errors = [];
 
+  // UI-selected labs override — resolve once before the loop
+  const overrideLabEmails = (req.query.labEmails || '').split(',').map((e) => e.trim()).filter(Boolean);
+  let overrideLabs = [];
+  if (overrideLabEmails.length > 0) {
+    overrideLabs = (
+      await Promise.all(
+        overrideLabEmails.map((email) =>
+          Lab.findOne({ email: new RegExp(`^${email}$`, 'i') }).select('_id name').lean()
+        )
+      )
+    ).filter(Boolean);
+  }
+
   for (const [i, row] of rows.entries()) {
     if (!row.name) { errors.push({ row: i + 2, error: 'name is required' }); continue; }
     if (!row.price) { errors.push({ row: i + 2, error: 'price is required' }); continue; }
@@ -360,13 +373,16 @@ exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
       }
 
       // Resolve target labs
+      // Priority: 1. UI-selected labEmails param  2. brand column  3. labEmail column
       const Brand = require('../models/Brand');
       const brandKey = (row.brand || '').trim();
       const emailKey = (row.labemail || row.lab_email || '').trim();
 
       let targetLabs = [];
-      if (brandKey) {
-        // Find Brand document by name, then all labs with that brand ObjectId
+      if (overrideLabEmails.length > 0) {
+        // Labs selected from UI — use those directly, ignore CSV lab columns
+        targetLabs = overrideLabs;
+      } else if (brandKey) {
         const brandDoc = await Brand.findOne({ name: new RegExp(`^${brandKey}$`, 'i') });
         if (!brandDoc) {
           errors.push({ row: i + 2, error: `Brand "${brandKey}" not found. Create it in Admin → Brands first.` });

@@ -319,19 +319,31 @@ export default function AdminProductsPage() {
   const [downloading, setDownloading] = useState(false);
   const [demoLabEmails, setDemoLabEmails] = useState(new Set());
   const [labDropdownOpen, setLabDropdownOpen] = useState(false);
+  const [uploadLabEmails, setUploadLabEmails] = useState(new Set());
+  const [uploadDropdownOpen, setUploadDropdownOpen] = useState(false);
   const [csvUploading, setCsvUploading] = useState(false);
   const searchTimer = useRef(null);
   const csvFileRef = useRef(null);
   const labDropdownRef = useRef(null);
+  const uploadDropdownRef = useRef(null);
 
-  // Close lab multi-select dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
-    const handler = (e) => { if (labDropdownRef.current && !labDropdownRef.current.contains(e.target)) setLabDropdownOpen(false); };
+    const handler = (e) => {
+      if (labDropdownRef.current && !labDropdownRef.current.contains(e.target)) setLabDropdownOpen(false);
+      if (uploadDropdownRef.current && !uploadDropdownRef.current.contains(e.target)) setUploadDropdownOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   const toggleLabEmail = (email) => setDemoLabEmails((prev) => {
+    const next = new Set(prev);
+    next.has(email) ? next.delete(email) : next.add(email);
+    return next;
+  });
+
+  const toggleUploadLabEmail = (email) => setUploadLabEmails((prev) => {
     const next = new Set(prev);
     next.has(email) ? next.delete(email) : next.add(email);
     return next;
@@ -553,7 +565,8 @@ export default function AdminProductsPage() {
               if (!file) return;
               setCsvUploading(true);
               try {
-                const res = await productApi.bulkCsv(file);
+                const params = uploadLabEmails.size > 0 ? { labEmails: [...uploadLabEmails].join(',') } : {};
+                const res = await productApi.bulkCsv(file, params);
                 const d = res.data;
                 if (d.created || d.updated) toast.success(`Done! ${d.created || 0} created, ${d.updated || 0} updated`);
                 if (d.errors?.length) {
@@ -568,13 +581,57 @@ export default function AdminProductsPage() {
               }
             }}
           />
+
+          {/* Upload labs selector */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500 whitespace-nowrap">Upload to labs:</span>
+            <div className="relative" ref={uploadDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setUploadDropdownOpen((o) => !o)}
+                className="input text-xs py-1 min-w-[180px] max-w-xs text-left flex items-center justify-between gap-2"
+              >
+                <span className="truncate text-gray-600">
+                  {uploadLabEmails.size === 0 ? 'From CSV / all' : `${uploadLabEmails.size} lab${uploadLabEmails.size > 1 ? 's' : ''} selected`}
+                </span>
+                <span className="text-gray-400 text-[10px]">▼</span>
+              </button>
+              {uploadDropdownOpen && (
+                <div className="absolute z-50 mt-1 w-72 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                  <div className="p-1.5 border-b border-gray-100 flex gap-2">
+                    <button type="button" onClick={() => setUploadLabEmails(new Set(labs.map((l) => l.email).filter(Boolean)))}
+                      className="text-[11px] text-primary-600 hover:underline">All</button>
+                    <button type="button" onClick={() => setUploadLabEmails(new Set())}
+                      className="text-[11px] text-gray-500 hover:underline">Clear (use CSV)</button>
+                  </div>
+                  {labs.map((lab) => (
+                    <label key={lab._id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={uploadLabEmails.has(lab.email || '')}
+                        onChange={() => toggleUploadLabEmail(lab.email || '')}
+                        className="rounded"
+                      />
+                      <span className="text-xs text-gray-700">
+                        {lab.name}{lab.city ? ` — ${lab.city}` : ''}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {uploadLabEmails.size > 0 && (
+              <button type="button" onClick={() => setUploadLabEmails(new Set())} className="text-[11px] text-gray-400 hover:text-red-500">✕</button>
+            )}
+          </div>
+
           <button
             onClick={() => csvFileRef.current?.click()}
             disabled={csvUploading}
             className="flex items-center gap-1.5 text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium disabled:opacity-60"
           >
             <FiDownload size={12} className="rotate-180" />
-            {csvUploading ? 'Uploading…' : 'Upload CSV/XLSX'}
+            {csvUploading ? 'Uploading…' : `Upload CSV/XLSX${uploadLabEmails.size > 0 ? ` → ${uploadLabEmails.size} lab${uploadLabEmails.size > 1 ? 's' : ''}` : ''}`}
           </button>
         </div>
       </div>
