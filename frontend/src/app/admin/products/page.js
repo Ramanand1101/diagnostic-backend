@@ -317,33 +317,23 @@ export default function AdminProductsPage() {
   const [selected, setSelected] = useState(new Set());
   const [limit, setLimit] = useState(20);
   const [downloading, setDownloading] = useState(false);
-  const [demoLabEmails, setDemoLabEmails] = useState(new Set());
+  const [selectedLabEmails, setSelectedLabEmails] = useState(new Set());
   const [labDropdownOpen, setLabDropdownOpen] = useState(false);
-  const [uploadLabEmails, setUploadLabEmails] = useState(new Set());
-  const [uploadDropdownOpen, setUploadDropdownOpen] = useState(false);
   const [csvUploading, setCsvUploading] = useState(false);
   const searchTimer = useRef(null);
   const csvFileRef = useRef(null);
   const labDropdownRef = useRef(null);
-  const uploadDropdownRef = useRef(null);
 
-  // Close dropdowns on outside click
+  // Close lab dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
       if (labDropdownRef.current && !labDropdownRef.current.contains(e.target)) setLabDropdownOpen(false);
-      if (uploadDropdownRef.current && !uploadDropdownRef.current.contains(e.target)) setUploadDropdownOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const toggleLabEmail = (email) => setDemoLabEmails((prev) => {
-    const next = new Set(prev);
-    next.has(email) ? next.delete(email) : next.add(email);
-    return next;
-  });
-
-  const toggleUploadLabEmail = (email) => setUploadLabEmails((prev) => {
+  const toggleLabEmail = (email) => setSelectedLabEmails((prev) => {
     const next = new Set(prev);
     next.has(email) ? next.delete(email) : next.add(email);
     return next;
@@ -478,82 +468,100 @@ export default function AdminProductsPage() {
         )}
       </div>
 
-      {/* Bulk Upload — with lab selector for demo CSV */}
-      <div className="border border-dashed border-gray-200 rounded-xl p-5 bg-gray-50/50 space-y-3">
+      {/* Bulk Upload */}
+      <div className="border border-dashed border-gray-200 rounded-xl p-5 bg-gray-50/50 space-y-4">
         <div>
-          <p className="text-sm font-semibold text-gray-800">Bulk Upload Products via CSV</p>
+          <p className="text-sm font-semibold text-gray-800">Bulk Upload Products</p>
           <p className="text-xs text-gray-500 mt-0.5">
-            Upload tests/packages for labs or brands. Select a lab below, then download the demo CSV — it will be pre-filled with your Test Master List and the selected lab&apos;s email.
+            Select labs → download the pre-filled template → fill in prices → upload.
           </p>
         </div>
 
-        {/* Multi-lab selector */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Select Labs for CSV:</label>
+        {/* Single lab selector — shared for both download & upload */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-gray-700">
+            Select Labs <span className="text-red-500">*</span>
+            {selectedLabEmails.size > 0 && (
+              <span className="ml-2 text-primary-600 font-semibold">{selectedLabEmails.size} selected</span>
+            )}
+          </label>
           <div className="relative" ref={labDropdownRef}>
             <button
               type="button"
               onClick={() => setLabDropdownOpen((o) => !o)}
-              className="input text-xs py-1.5 min-w-[220px] max-w-sm text-left flex items-center justify-between gap-2"
+              className={`w-full max-w-sm input text-sm py-2 text-left flex items-center justify-between gap-2 ${
+                selectedLabEmails.size === 0 ? 'text-gray-400' : 'text-gray-800'
+              }`}
             >
               <span className="truncate">
-                {demoLabEmails.size === 0 ? '— Select labs (optional) —' : `${demoLabEmails.size} lab${demoLabEmails.size > 1 ? 's' : ''} selected`}
+                {selectedLabEmails.size === 0
+                  ? 'Select labs to continue…'
+                  : [...selectedLabEmails].length === labs.length
+                    ? 'All labs selected'
+                    : [...selectedLabEmails]
+                        .map((e) => labs.find((l) => l.email === e)?.name || e)
+                        .join(', ')}
               </span>
-              <span className="text-gray-400 text-[10px]">▼</span>
+              <span className="text-gray-400 flex-shrink-0 text-[10px]">{labDropdownOpen ? '▲' : '▼'}</span>
             </button>
+
             {labDropdownOpen && (
-              <div className="absolute z-50 mt-1 w-80 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                <div className="p-1.5 border-b border-gray-100 flex gap-2">
-                  <button type="button" onClick={() => setDemoLabEmails(new Set(labs.map((l) => l.email).filter(Boolean)))}
-                    className="text-[11px] text-primary-600 hover:underline">All</button>
-                  <button type="button" onClick={() => setDemoLabEmails(new Set())}
-                    className="text-[11px] text-gray-500 hover:underline">Clear</button>
+              <div className="absolute z-50 mt-1 w-full max-w-sm bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden">
+                <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-100 bg-gray-50">
+                  <button type="button"
+                    onClick={() => setSelectedLabEmails(new Set(labs.map((l) => l.email).filter(Boolean)))}
+                    className="text-xs text-primary-600 font-medium hover:underline">
+                    Select all
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button type="button"
+                    onClick={() => setSelectedLabEmails(new Set())}
+                    className="text-xs text-gray-500 hover:underline">
+                    Clear
+                  </button>
+                  <span className="ml-auto text-xs text-gray-400">{labs.length} labs</span>
                 </div>
-                {labs.map((lab) => (
-                  <label key={lab._id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={demoLabEmails.has(lab.email || '')}
-                      onChange={() => toggleLabEmail(lab.email || '')}
-                      className="rounded"
-                    />
-                    <span className="text-xs text-gray-700">
-                      {lab.name}{lab.city ? ` — ${lab.city}` : ''}
-                      {lab.email ? <span className="text-gray-400"> ({lab.email})</span> : ''}
-                    </span>
-                  </label>
-                ))}
-                {labs.length === 0 && <p className="text-xs text-gray-400 px-3 py-2">No labs found</p>}
+                <div className="max-h-52 overflow-y-auto">
+                  {labs.map((lab) => (
+                    <label key={lab._id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-primary-50 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={selectedLabEmails.has(lab.email || '')}
+                        onChange={() => toggleLabEmail(lab.email || '')}
+                        className="rounded accent-primary-600"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{lab.name}</p>
+                        {lab.city && <p className="text-xs text-gray-400">{lab.city}</p>}
+                      </div>
+                    </label>
+                  ))}
+                  {labs.length === 0 && <p className="text-sm text-gray-400 px-3 py-4 text-center">No labs found</p>}
+                </div>
               </div>
             )}
           </div>
-          {demoLabEmails.size > 0 && (
-            <button type="button" onClick={() => setDemoLabEmails(new Set())} className="text-[11px] text-gray-400 hover:text-red-500">✕ Clear</button>
-          )}
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        {/* Action buttons */}
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={async () => {
+              if (selectedLabEmails.size === 0) { toast.error('Select at least one lab first'); return; }
               try {
-                const params = {};
-                if (demoLabEmails.size > 0) params.labEmails = [...demoLabEmails].join(',');
-                const res = await productApi.demoCsv(params);
+                const res = await productApi.demoCsv({ labEmails: [...selectedLabEmails].join(',') });
                 const url = URL.createObjectURL(new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'products-template.xlsx';
-                a.click();
+                const a = document.createElement('a'); a.href = url;
+                a.download = 'products-template.xlsx'; a.click();
                 URL.revokeObjectURL(url);
-              } catch {
-                toast.error('Failed to download template');
-              }
+              } catch { toast.error('Failed to download template'); }
             }}
-            className="flex items-center gap-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors font-medium"
+            disabled={selectedLabEmails.size === 0}
+            className="flex items-center gap-2 text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <FiDownload size={12} />
-            {demoLabEmails.size > 0 ? `Demo XLSX (${demoLabEmails.size} lab${demoLabEmails.size > 1 ? 's' : ''})` : 'Demo XLSX'}
+            <FiDownload size={14} /> Download Template
           </button>
+
           <input
             ref={csvFileRef}
             type="file"
@@ -563,14 +571,14 @@ export default function AdminProductsPage() {
               const file = e.target.files?.[0];
               e.target.value = '';
               if (!file) return;
+              if (selectedLabEmails.size === 0) { toast.error('Select at least one lab before uploading'); return; }
               setCsvUploading(true);
               try {
-                const params = uploadLabEmails.size > 0 ? { labEmails: [...uploadLabEmails].join(',') } : {};
-                const res = await productApi.bulkCsv(file, params);
+                const res = await productApi.bulkCsv(file, { labEmails: [...selectedLabEmails].join(',') });
                 const d = res.data;
                 if (d.created || d.updated) toast.success(`Done! ${d.created || 0} created, ${d.updated || 0} updated`);
                 if (d.errors?.length) {
-                  d.errors.slice(0, 5).forEach((e) => toast.error(`Row ${e.row}: ${e.error}`, { duration: 6000 }));
+                  d.errors.slice(0, 5).forEach((err) => toast.error(`Row ${err.row}: ${err.error}`, { duration: 6000 }));
                   if (d.errors.length > 5) toast.error(`…and ${d.errors.length - 5} more errors`, { duration: 6000 });
                 }
                 fetchProducts();
@@ -581,58 +589,23 @@ export default function AdminProductsPage() {
               }
             }}
           />
-
-          {/* Upload labs selector */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-gray-500 whitespace-nowrap">Upload to labs:</span>
-            <div className="relative" ref={uploadDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setUploadDropdownOpen((o) => !o)}
-                className="input text-xs py-1 min-w-[180px] max-w-xs text-left flex items-center justify-between gap-2"
-              >
-                <span className="truncate text-gray-600">
-                  {uploadLabEmails.size === 0 ? 'From CSV / all' : `${uploadLabEmails.size} lab${uploadLabEmails.size > 1 ? 's' : ''} selected`}
-                </span>
-                <span className="text-gray-400 text-[10px]">▼</span>
-              </button>
-              {uploadDropdownOpen && (
-                <div className="absolute z-50 mt-1 w-72 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                  <div className="p-1.5 border-b border-gray-100 flex gap-2">
-                    <button type="button" onClick={() => setUploadLabEmails(new Set(labs.map((l) => l.email).filter(Boolean)))}
-                      className="text-[11px] text-primary-600 hover:underline">All</button>
-                    <button type="button" onClick={() => setUploadLabEmails(new Set())}
-                      className="text-[11px] text-gray-500 hover:underline">Clear (use CSV)</button>
-                  </div>
-                  {labs.map((lab) => (
-                    <label key={lab._id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={uploadLabEmails.has(lab.email || '')}
-                        onChange={() => toggleUploadLabEmail(lab.email || '')}
-                        className="rounded"
-                      />
-                      <span className="text-xs text-gray-700">
-                        {lab.name}{lab.city ? ` — ${lab.city}` : ''}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            {uploadLabEmails.size > 0 && (
-              <button type="button" onClick={() => setUploadLabEmails(new Set())} className="text-[11px] text-gray-400 hover:text-red-500">✕</button>
-            )}
-          </div>
-
           <button
-            onClick={() => csvFileRef.current?.click()}
+            onClick={() => {
+              if (selectedLabEmails.size === 0) { toast.error('Select at least one lab before uploading'); return; }
+              csvFileRef.current?.click();
+            }}
             disabled={csvUploading}
-            className="flex items-center gap-1.5 text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium disabled:opacity-60"
+            className="flex items-center gap-2 text-sm bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors font-medium disabled:opacity-60"
           >
-            <FiDownload size={12} className="rotate-180" />
-            {csvUploading ? 'Uploading…' : `Upload CSV/XLSX${uploadLabEmails.size > 0 ? ` → ${uploadLabEmails.size} lab${uploadLabEmails.size > 1 ? 's' : ''}` : ''}`}
+            <FiDownload size={14} className="rotate-180" />
+            {csvUploading ? 'Uploading…' : 'Upload File'}
           </button>
+
+          {selectedLabEmails.size === 0 && (
+            <p className="text-xs text-amber-600 flex items-center gap-1">
+              ⚠ Select labs above to enable download &amp; upload
+            </p>
+          )}
         </div>
       </div>
 
