@@ -244,47 +244,93 @@ exports.adminListProducts = asyncHandler(async (req, res) => {
   res.json({ items, page: Number(page), limit: safeLimit, total });
 });
 
-// GET /api/v1/products/demo-csv — generates template from TestMaster data
+// GET /api/v1/products/demo-csv — generates XLSX template from TestMaster (name column locked)
 exports.productDemoCsv = asyncHandler(async (req, res) => {
+  const XLSX = require('xlsx');
   const TestMaster = require('../models/TestMaster');
-  const { labEmail = '', brand = '' } = req.query;
+  const { labEmails = '', brand = '' } = req.query;
 
-  const tests = await TestMaster.find({})
-    .populate('category', 'name')
-    .sort('name')
-    .limit(200)
-    .lean();
+  // Support multiple labs: comma-separated email list
+  const emailList = labEmails ? labEmails.split(',').map((e) => e.trim()).filter(Boolean) : [''];
 
-  const esc = (v) => `"${String(v || '').replace(/"/g, '""')}"`;
+  const tests = await TestMaster.find({}).populate('category', 'name').sort('name').limit(200).lean();
 
-  const header = 'name,price,salePrice,reportTime,sampleType,homeCollection,fastingRequired,description,category,labEmail,brand';
+  const FALLBACK = [
+    ['CBC Complete Blood Count', 299, 199, '24 hours', 'Blood', false, true, 'Measures blood components', 'Pathology'],
+    ['Lipid Profile', 599, 399, 'Same day', 'Blood', false, true, 'Cholesterol analysis', 'Pathology'],
+    ['Full Body Checkup', 1999, 1499, '48 hours', 'Blood', false, true, 'Comprehensive health check', 'Packages'],
+    ['Thyroid Profile (T3 T4 TSH)', 800, 599, '24 hours', 'Blood', false, false, 'Thyroid hormone levels', 'Pathology'],
+    ['HbA1c (Glycated Haemoglobin)', 700, 549, 'Same day', 'Blood', false, false, '3-month blood sugar average', 'Diabetes'],
+  ];
 
-  const dataRows = tests.length > 0
-    ? tests.map((t) => [
-        esc(t.name),
-        '0',
-        '0',
-        esc(t.reportTime || ''),
-        esc(t.sampleType || ''),
-        t.homeCollection ? 'true' : 'false',
-        t.fastingRequired ? 'true' : 'false',
-        esc(t.description || ''),
-        esc(t.category?.name || ''),
-        esc(labEmail),
-        esc(brand),
-      ].join(','))
-    : [
-        `"CBC Complete Blood Count",299,199,"24 hours","Blood",false,true,"Measures blood components","Pathology",${esc(labEmail)},${esc(brand)}`,
-        `"Lipid Profile",599,399,"Same day","Blood",false,true,"Cholesterol panel","Pathology",${esc(labEmail)},${esc(brand)}`,
-        `"Full Body Checkup",1999,1499,"48 hours","Blood",false,true,"Comprehensive health check","Packages",${esc(labEmail)},${esc(brand)}`,
-        `"Thyroid Profile (T3 T4 TSH)",800,599,"24 hours","Blood",false,false,"Thyroid hormone levels","Pathology",${esc(labEmail)},${esc(brand)}`,
-        `"HbA1c (Glycated Haemoglobin)",700,549,"Same day","Blood",false,false,"3-month blood sugar average","Diabetes",${esc(labEmail)},${esc(brand)}`,
-      ];
+  const headers = ['name', 'price', 'salePrice', 'reportTime', 'sampleType', 'homeCollection', 'fastingRequired', 'description', 'category', 'labEmail', 'brand'];
+  const aoa = [headers];
 
-  const csv = [header, ...dataRows].join('\n');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="products-template.csv"');
-  res.send(csv);
+  for (const labEmail of emailList) {
+    const source = tests.length > 0 ? tests : FALLBACK.map((f) => ({
+      name: f[0], price: f[1], salePrice: f[2], reportTime: f[3],
+      sampleType: f[4], homeCollection: f[5], fastingRequired: f[6],
+      description: f[7], category: { name: f[8] },
+    }));
+
+    for (const t of source) {
+      aoa.push([
+        t.name,
+        0, 0,
+        t.reportTime || '',
+        t.sampleType || '',
+        t.homeCollection ? true : false,
+        t.fastingRequired ? true : false,
+        t.description || '',
+        t.category?.name || '',
+        labEmail,
+        brand,
+      ]);
+    }
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 42 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 },
+    { wch: 16 }, { wch: 16 }, { wch: 40 }, { wch: 16 }, { wch: 32 }, { wch: 20 },
+  ];
+
+  // Freeze first row (header)
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  // Protect sheet — name column (col A) stays locked, all other data cells unlocked
+  ws['!protect'] = {
+    sheet: true, selectLockedCells: true, selectUnlockedCells: true,
+    formatCells: true, formatColumns: true, formatRows: true,
+    sort: true, autoFilter: true,
+  };
+
+  // Mark every data cell in cols B–K (index 1–10) as unlocked
+  const rangeStr = ws['!ref'] || 'A1';
+  const range = XLSX.utils.decode_range(rangeStr);
+  for (let r = 1; r <= range.e.r; r++) {       // skip header row 0
+    for (let c = 1; c <= range.e.c; c++) {     // skip col A (name)
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) ws[addr] = { v: '' };
+      ws[addr].s = { ...(ws[addr].s || {}), protection: { locked: false } };
+    }
+  }
+  // Header row cells — all locked (no editing headers)
+  for (let c = 0; c <= range.e.c; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    if (!ws[addr]) ws[addr] = { v: headers[c] };
+    ws[addr].s = { ...(ws[addr].s || {}), protection: { locked: true }, font: { bold: true } };
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'products');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', cellStyles: true });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="products-template.xlsx"');
+  res.send(buf);
 });
 
 // POST /api/v1/products/bulk-csv — admin only
@@ -296,13 +342,30 @@ exports.productDemoCsv = asyncHandler(async (req, res) => {
 //   2. labEmail      → single lab matched by email
 //   3. neither       → product created with no lab
 exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
-  if (!req.file) return res.status(400).json({ message: 'CSV file is required.' });
+  if (!req.file) return res.status(400).json({ message: 'File is required (CSV or XLSX).' });
 
-  const { rows } = parseCSV(req.file.buffer);
-  if (!rows.length) return res.status(400).json({ message: 'CSV has no data rows.' });
+  // Parse CSV or XLSX
+  let rows;
+  const isXlsx = req.file.originalname?.toLowerCase().endsWith('.xlsx') ||
+    req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (isXlsx) {
+    const XLSX = require('xlsx');
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    rows = rawRows.map((r) => {
+      const lower = {};
+      for (const [k, v] of Object.entries(r)) lower[k.toLowerCase().replace(/[\s_-]+/g, '')] = String(v ?? '').trim();
+      return lower;
+    });
+  } else {
+    ({ rows } = parseCSV(req.file.buffer));
+  }
+  if (!rows.length) return res.status(400).json({ message: 'File has no data rows.' });
 
   const Lab = require('../models/Lab');
   const Category = require('../models/Category');
+  const TestMaster = require('../models/TestMaster');
   const algoliaRows = [];
   let created = 0;
   const errors = [];
@@ -310,6 +373,14 @@ exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
   for (const [i, row] of rows.entries()) {
     if (!row.name) { errors.push({ row: i + 2, error: 'name is required' }); continue; }
     if (!row.price) { errors.push({ row: i + 2, error: 'price is required' }); continue; }
+
+    // Validate name against TestMaster list
+    const escapedRowName = row.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const masterTest = await TestMaster.findOne({ name: new RegExp(`^${escapedRowName}$`, 'i') });
+    if (!masterTest) {
+      errors.push({ row: i + 2, error: `"${row.name}" — name not found in Test Master List. Add it to Test Master first or check spelling.` });
+      continue;
+    }
 
     try {
       // Resolve category

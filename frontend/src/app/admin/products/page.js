@@ -317,10 +317,25 @@ export default function AdminProductsPage() {
   const [selected, setSelected] = useState(new Set());
   const [limit, setLimit] = useState(20);
   const [downloading, setDownloading] = useState(false);
-  const [demoLabEmail, setDemoLabEmail] = useState('');
+  const [demoLabEmails, setDemoLabEmails] = useState(new Set());
+  const [labDropdownOpen, setLabDropdownOpen] = useState(false);
   const [csvUploading, setCsvUploading] = useState(false);
   const searchTimer = useRef(null);
   const csvFileRef = useRef(null);
+  const labDropdownRef = useRef(null);
+
+  // Close lab multi-select dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => { if (labDropdownRef.current && !labDropdownRef.current.contains(e.target)) setLabDropdownOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggleLabEmail = (email) => setDemoLabEmails((prev) => {
+    const next = new Set(prev);
+    next.has(email) ? next.delete(email) : next.add(email);
+    return next;
+  });
 
   const fetchProducts = useCallback(() => {
     setLoading(true);
@@ -460,21 +475,49 @@ export default function AdminProductsPage() {
           </p>
         </div>
 
-        {/* Lab selector */}
+        {/* Multi-lab selector */}
         <div className="flex items-center gap-2 flex-wrap">
-          <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Select Lab for CSV:</label>
-          <select
-            value={demoLabEmail}
-            onChange={(e) => setDemoLabEmail(e.target.value)}
-            className="input text-xs py-1.5 flex-1 min-w-[200px] max-w-sm"
-          >
-            <option value="">— No lab (fill manually) —</option>
-            {labs.map((lab) => (
-              <option key={lab._id} value={lab.email || ''}>
-                {lab.name}{lab.city ? ` — ${lab.city}` : ''}{lab.email ? ` (${lab.email})` : ''}
-              </option>
-            ))}
-          </select>
+          <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Select Labs for CSV:</label>
+          <div className="relative" ref={labDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setLabDropdownOpen((o) => !o)}
+              className="input text-xs py-1.5 min-w-[220px] max-w-sm text-left flex items-center justify-between gap-2"
+            >
+              <span className="truncate">
+                {demoLabEmails.size === 0 ? '— Select labs (optional) —' : `${demoLabEmails.size} lab${demoLabEmails.size > 1 ? 's' : ''} selected`}
+              </span>
+              <span className="text-gray-400 text-[10px]">▼</span>
+            </button>
+            {labDropdownOpen && (
+              <div className="absolute z-50 mt-1 w-80 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                <div className="p-1.5 border-b border-gray-100 flex gap-2">
+                  <button type="button" onClick={() => setDemoLabEmails(new Set(labs.map((l) => l.email).filter(Boolean)))}
+                    className="text-[11px] text-primary-600 hover:underline">All</button>
+                  <button type="button" onClick={() => setDemoLabEmails(new Set())}
+                    className="text-[11px] text-gray-500 hover:underline">Clear</button>
+                </div>
+                {labs.map((lab) => (
+                  <label key={lab._id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={demoLabEmails.has(lab.email || '')}
+                      onChange={() => toggleLabEmail(lab.email || '')}
+                      className="rounded"
+                    />
+                    <span className="text-xs text-gray-700">
+                      {lab.name}{lab.city ? ` — ${lab.city}` : ''}
+                      {lab.email ? <span className="text-gray-400"> ({lab.email})</span> : ''}
+                    </span>
+                  </label>
+                ))}
+                {labs.length === 0 && <p className="text-xs text-gray-400 px-3 py-2">No labs found</p>}
+              </div>
+            )}
+          </div>
+          {demoLabEmails.size > 0 && (
+            <button type="button" onClick={() => setDemoLabEmails(new Set())} className="text-[11px] text-gray-400 hover:text-red-500">✕ Clear</button>
+          )}
         </div>
 
         <div className="flex gap-2 flex-wrap">
@@ -482,12 +525,12 @@ export default function AdminProductsPage() {
             onClick={async () => {
               try {
                 const params = {};
-                if (demoLabEmail) params.labEmail = demoLabEmail;
+                if (demoLabEmails.size > 0) params.labEmails = [...demoLabEmails].join(',');
                 const res = await productApi.demoCsv(params);
-                const url = URL.createObjectURL(new Blob([res.data]));
+                const url = URL.createObjectURL(new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'products-template.csv';
+                a.download = 'products-template.xlsx';
                 a.click();
                 URL.revokeObjectURL(url);
               } catch {
@@ -497,12 +540,12 @@ export default function AdminProductsPage() {
             className="flex items-center gap-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors font-medium"
           >
             <FiDownload size={12} />
-            {demoLabEmail ? 'Demo CSV (lab pre-filled)' : 'Demo CSV'}
+            {demoLabEmails.size > 0 ? `Demo XLSX (${demoLabEmails.size} lab${demoLabEmails.size > 1 ? 's' : ''})` : 'Demo XLSX'}
           </button>
           <input
             ref={csvFileRef}
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx"
             className="hidden"
             onChange={async (e) => {
               const file = e.target.files?.[0];
@@ -512,8 +555,11 @@ export default function AdminProductsPage() {
               try {
                 const res = await productApi.bulkCsv(file);
                 const d = res.data;
-                toast.success(`Done! ${d.created || 0} created, ${d.updated || 0} updated`);
-                if (d.errors?.length) toast.error(`${d.errors.length} row error(s) — check console`);
+                if (d.created || d.updated) toast.success(`Done! ${d.created || 0} created, ${d.updated || 0} updated`);
+                if (d.errors?.length) {
+                  d.errors.slice(0, 5).forEach((e) => toast.error(`Row ${e.row}: ${e.error}`, { duration: 6000 }));
+                  if (d.errors.length > 5) toast.error(`…and ${d.errors.length - 5} more errors`, { duration: 6000 });
+                }
                 fetchProducts();
               } catch (err) {
                 toast.error(getErrorMessage(err));
@@ -528,7 +574,7 @@ export default function AdminProductsPage() {
             className="flex items-center gap-1.5 text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium disabled:opacity-60"
           >
             <FiDownload size={12} className="rotate-180" />
-            {csvUploading ? 'Uploading…' : 'Upload CSV'}
+            {csvUploading ? 'Uploading…' : 'Upload CSV/XLSX'}
           </button>
         </div>
       </div>
