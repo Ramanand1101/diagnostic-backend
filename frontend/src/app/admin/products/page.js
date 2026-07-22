@@ -522,9 +522,18 @@ export default function AdminProductsPage() {
                 {/* Select all / Clear */}
                 <div className="flex items-center gap-3 px-3 py-1.5 border-b border-gray-100 bg-gray-50">
                   <button type="button"
-                    onClick={() => setSelectedLabEmails(new Set(labs.map((l) => l.email).filter(Boolean)))}
+                    onClick={() => {
+                      const filtered = labs.filter((l) =>
+                        l.name.toLowerCase().includes(labSearch.toLowerCase()) ||
+                        (l.city || '').toLowerCase().includes(labSearch.toLowerCase())
+                      );
+                      const toSelect = labSearch
+                        ? filtered.map((l) => l.email || '')
+                        : labs.map((l) => l.email || '');
+                      setSelectedLabEmails((prev) => new Set([...prev, ...toSelect]));
+                    }}
                     className="text-xs text-primary-600 font-medium hover:underline">
-                    Select all
+                    {labSearch ? 'Select filtered' : 'Select all'}
                   </button>
                   <span className="text-gray-300">|</span>
                   <button type="button"

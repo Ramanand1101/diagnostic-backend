@@ -1,10 +1,11 @@
 const router = require('express').Router();
 const { protect, allowRoles } = require('../middleware/authMiddleware');
-const { getProfile, updateProfile, listUsers, changePassword, deleteUser, updateRole, bulkDeleteUsers, exportCsv, updatePermissions } = require('../controllers/userController');
+const { getProfile, updateProfile, listUsers, changePassword, deleteUser, updateRole, bulkDeleteUsers, exportCsv, updatePermissions, createUser } = require('../controllers/userController');
 
 router.get('/me', protect, getProfile);
 router.put('/me', protect, updateProfile);
 router.put('/me/change-password', protect, changePassword);
+router.post('/', protect, allowRoles('superadmin', 'subadmin'), createUser);
 router.get('/', protect, allowRoles('superadmin', 'subadmin'), listUsers);
 router.patch('/:id/role', protect, allowRoles('superadmin', 'subadmin'), updateRole);
 router.get('/export-csv', protect, allowRoles('superadmin', 'subadmin'), exportCsv);

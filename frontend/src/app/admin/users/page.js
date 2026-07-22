@@ -4,7 +4,7 @@ import { userApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
-import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX, FiCheck } from 'react-icons/fi';
+import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX, FiCheck, FiPlus } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 
@@ -286,7 +286,10 @@ export default function AdminUsersPage() {
   const [limit, setLimit] = useState(20);
   const [selected, setSelected] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [permTarget, setPermTarget] = useState(null); // user object whose permissions we're editing
+  const [permTarget, setPermTarget] = useState(null);
+  const [addModal, setAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', email: '', mobile: '', role: 'customer' });
+  const [addSaving, setAddSaving] = useState(false);
   const searchTimer = useRef(null);
 
   const fetchUsers = useCallback(() => {
@@ -352,6 +355,25 @@ export default function AdminUsersPage() {
   const isSuperAdmin = currentUser?.role === 'superadmin';
   const FILTER_ROLES = ['', ...ROLES];
 
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    if (!addForm.name.trim() || !addForm.email.trim()) { toast.error('Name and email are required'); return; }
+    setAddSaving(true);
+    try {
+      const res = await userApi.create(addForm);
+      toast.success(`User created! Password sent to ${addForm.email}`);
+      setAddModal(false);
+      setAddForm({ name: '', email: '', mobile: '', role: 'customer' });
+      fetchUsers();
+      // Also show the temp password in case email fails
+      if (res.data.tempPassword) toast(`Temp password: ${res.data.tempPassword}`, { duration: 10000, icon: '🔑' });
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Permissions modal */}
@@ -363,12 +385,85 @@ export default function AdminUsersPage() {
         />
       )}
 
+      {/* Add User modal */}
+      {addModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900">Create New User</h2>
+              <button onClick={() => setAddModal(false)} className="text-gray-400 hover:text-gray-600"><FiX size={20} /></button>
+            </div>
+            <form onSubmit={handleAddUser} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={addForm.name}
+                  onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+                  className="input"
+                  placeholder="e.g. Rohan Sharma"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
+                <input
+                  type="email"
+                  value={addForm.email}
+                  onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
+                  className="input"
+                  placeholder="rohan@gmail.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+                <input
+                  type="tel"
+                  value={addForm.mobile}
+                  onChange={(e) => setAddForm((f) => ({ ...f, mobile: e.target.value }))}
+                  className="input"
+                  placeholder="9876543210 (optional)"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <select
+                  value={addForm.role}
+                  onChange={(e) => setAddForm((f) => ({ ...f, role: e.target.value }))}
+                  className="input"
+                >
+                  <option value="customer">Customer</option>
+                  <option value="lab">Lab</option>
+                  <option value="subadmin">Sub Admin</option>
+                  {currentUser?.role === 'superadmin' && <option value="superadmin">Super Admin</option>}
+                </select>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
+                🔑 A random password will be auto-generated and sent to the user&apos;s email. They can change it after logging in.
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setAddModal(false)} className="flex-1 btn-secondary">Cancel</button>
+                <button type="submit" disabled={addSaving} className="flex-1 btn-primary disabled:opacity-60">
+                  {addSaving ? 'Creating…' : 'Create & Send Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Users</h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage user accounts, roles, and subadmin permissions.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAddModal(true)}
+            className="flex items-center gap-2 text-sm px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-colors"
+          >
+            <FiPlus size={14} /> Add User
+          </button>
           <button
             onClick={async () => {
               try {

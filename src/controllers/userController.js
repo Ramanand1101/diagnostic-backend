@@ -1,6 +1,50 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
+const { sendMail } = require('../config/email');
+
+// POST /api/v1/users — admin creates a user and emails them a temp password
+exports.createUser = asyncHandler(async (req, res) => {
+  const { name, email, mobile, role = 'customer' } = req.body;
+  if (!name || !email) return res.status(400).json({ message: 'Name and email are required.' });
+
+  const exists = await User.findOne({ email: new RegExp(`^${email}$`, 'i') });
+  if (exists) return res.status(409).json({ message: 'A user with this email already exists.' });
+
+  // Generate a readable temp password: e.g. Diag@4832
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  const tempPassword = `Health@${rand}`;
+
+  const user = await User.create({ name, email, mobile: mobile || undefined, role, password: tempPassword, isVerified: true });
+
+  // Send welcome email with temp password
+  try {
+    await sendMail({
+      to: email,
+      subject: 'Your account has been created — HealthOnTime',
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+          <h2 style="color:#1d4ed8">Welcome to HealthOnTime, ${name}!</h2>
+          <p>An account has been created for you by the admin.</p>
+          <p><strong>Login Email:</strong> ${email}</p>
+          <p><strong>Temporary Password:</strong>
+            <span style="font-size:1.3rem;font-weight:700;letter-spacing:2px;color:#111">${tempPassword}</span>
+          </p>
+          <p style="color:#dc2626;font-size:0.9rem">⚠ Please change your password after logging in.</p>
+          <a href="${process.env.FRONTEND_URL || 'https://healthontime.in'}/login"
+            style="display:inline-block;margin-top:1rem;background:#1d4ed8;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+            Login Now →
+          </a>
+        </div>
+      `,
+    });
+  } catch (e) {
+    // Don't fail the request if email fails — just warn
+    console.error('Welcome email failed:', e.message);
+  }
+
+  res.status(201).json({ user: { _id: user._id, name: user.name, email: user.email, role: user.role }, tempPassword });
+});
 
 exports.getProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).select('-password');

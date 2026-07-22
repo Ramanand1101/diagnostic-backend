@@ -46,6 +46,7 @@ export const userApi = {
   getMe: () => api.get('/users/me'),
   updateMe: (data) => api.put('/users/me', data),
   changePassword: (data) => api.put('/users/me/change-password', data),
+  create: (data) => api.post('/users', data),
   getAll: (params) => api.get('/users', { params }),
   updateRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
   bulkDelete: (ids) => api.delete('/users/bulk-delete', { data: { ids } }),
