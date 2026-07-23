@@ -18,11 +18,11 @@ export default function AdminLayout({ children }) {
   if (!user || !isAdmin) return null;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <AdminSidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
           <div />
           <div className="flex items-center gap-4">
             <button className="text-gray-400 hover:text-gray-600 relative">

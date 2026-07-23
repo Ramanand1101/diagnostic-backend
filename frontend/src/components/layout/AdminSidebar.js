@@ -88,7 +88,7 @@ export default function AdminSidebar() {
 
   return (
     <aside
-      className="bg-gray-900 min-h-screen flex flex-col flex-shrink-0 transition-all duration-300"
+      className="bg-gray-900 h-screen sticky top-0 flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden"
       style={{ width: collapsed ? '64px' : '256px' }}
     >
       {/* Logo + collapse toggle */}
