@@ -1,0 +1,1672 @@
+{
+  "info": {
+    "name": "HealthOnTime — Full API Collection",
+    "description": "Complete Postman collection for the HealthOnTime diagnostic-lab MERN backend. Set {{base_url}} = http://localhost:5001/api/v1 and {{token}} after login.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "healthontime-full-api-v1"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:5001/api/v1", "type": "string" },
+    { "key": "token",    "value": "",  "type": "string" },
+    { "key": "lab_id",   "value": "",  "type": "string" },
+    { "key": "product_id", "value": "", "type": "string" },
+    { "key": "booking_id", "value": "", "type": "string" },
+    { "key": "user_id",  "value": "",  "type": "string" },
+    { "key": "brand_id", "value": "",  "type": "string" },
+    { "key": "category_id", "value": "", "type": "string" },
+    { "key": "coupon_id",   "value": "", "type": "string" },
+    { "key": "blog_id",     "value": "", "type": "string" },
+    { "key": "ticket_id",   "value": "", "type": "string" },
+    { "key": "lead_id",     "value": "", "type": "string" },
+    { "key": "followup_id", "value": "", "type": "string" },
+    { "key": "doctor_id",   "value": "", "type": "string" },
+    { "key": "report_id",   "value": "", "type": "string" },
+    { "key": "setting_id",  "value": "", "type": "string" },
+    { "key": "slide_id",    "value": "", "type": "string" },
+    { "key": "page_id",     "value": "", "type": "string" },
+    { "key": "testmaster_id","value": "","type": "string" },
+    { "key": "newsletter_id","value": "","type": "string" },
+    { "key": "review_id",   "value": "", "type": "string" },
+    { "key": "labchange_id","value": "", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+
+    {
+      "name": "01 · Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json.token) pm.collectionVariables.set('token', json.token);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth","register"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"testuser@example.com\",\n  \"mobile\": \"9876543210\",\n  \"password\": \"Test@1234\"\n}" }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 200) {",
+            "  var json = pm.response.json();",
+            "  if (json.token) pm.collectionVariables.set('token', json.token);",
+            "  if (json.user && json.user._id) pm.collectionVariables.set('user_id', json.user._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth","login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@healthontime.in\",\n  \"password\": \"Admin@1234\"\n}" }
+          }
+        },
+        {
+          "name": "Get Me (Authenticated)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth","me"] }
+          }
+        },
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/send-otp", "host": ["{{base_url}}"], "path": ["auth","send-otp"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"testuser@example.com\"\n}" }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/verify-otp", "host": ["{{base_url}}"], "path": ["auth","verify-otp"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"otp\": \"123456\"\n}" }
+          }
+        },
+        {
+          "name": "Auto Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/auto-register", "host": ["{{base_url}}"], "path": ["auth","auto-register"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Auto User\",\n  \"email\": \"auto@example.com\",\n  \"mobile\": \"9123456789\"\n}" }
+          }
+        },
+        {
+          "name": "Google Auth",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/google", "host": ["{{base_url}}"], "path": ["auth","google"] },
+            "body": { "mode": "raw", "raw": "{\n  \"credential\": \"<GOOGLE_ID_TOKEN>\"\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "02 · Users",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/users?page=1&limit=20&role=customer", "host": ["{{base_url}}"], "path": ["users"], "query": [
+              { "key": "page", "value": "1" },
+              { "key": "limit", "value": "20" },
+              { "key": "role", "value": "customer" },
+              { "key": "q", "value": "", "disabled": true }
+            ]}
+          }
+        },
+        {
+          "name": "Create User (Admin)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json.user && json.user._id) pm.collectionVariables.set('user_id', json.user._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/users", "host": ["{{base_url}}"], "path": ["users"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Rohan Sharma\",\n  \"email\": \"rohan@example.com\",\n  \"mobile\": \"9876543210\",\n  \"role\": \"customer\"\n}" }
+          }
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/users/me", "host": ["{{base_url}}"], "path": ["users","me"] }
+          }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/users/me", "host": ["{{base_url}}"], "path": ["users","me"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Updated Name\",\n  \"mobile\": \"9000000000\"\n}" }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/users/me/change-password", "host": ["{{base_url}}"], "path": ["users","me","change-password"] },
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"Health@4832\",\n  \"newPassword\": \"NewPass@1234\"\n}" }
+          }
+        },
+        {
+          "name": "Update User Role",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/users/{{user_id}}/role", "host": ["{{base_url}}"], "path": ["users","{{user_id}}","role"] },
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"subadmin\"\n}" }
+          }
+        },
+        {
+          "name": "Update User Permissions (Subadmin)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/users/{{user_id}}/permissions", "host": ["{{base_url}}"], "path": ["users","{{user_id}}","permissions"] },
+            "body": { "mode": "raw", "raw": "{\n  \"permissions\": [\"labs\",\"products\",\"bookings\",\"users\"]\n}" }
+          }
+        },
+        {
+          "name": "Export Users CSV",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/users/export-csv", "host": ["{{base_url}}"], "path": ["users","export-csv"] }
+          }
+        },
+        {
+          "name": "Bulk Delete Users",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/users/bulk-delete", "host": ["{{base_url}}"], "path": ["users","bulk-delete"] },
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{user_id}}\"]\n}" }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/users/{{user_id}}", "host": ["{{base_url}}"], "path": ["users","{{user_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "03 · Labs",
+      "item": [
+        {
+          "name": "List Labs",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/labs?page=1&limit=20&city=Delhi&status=approved", "host": ["{{base_url}}"], "path": ["labs"], "query": [
+              { "key": "page", "value": "1" },
+              { "key": "limit", "value": "20" },
+              { "key": "city", "value": "Delhi" },
+              { "key": "status", "value": "approved" }
+            ]}
+          }
+        },
+        {
+          "name": "Get Nearby Labs",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/labs/nearby?lat=28.6139&lng=77.2090&radius=10", "host": ["{{base_url}}"], "path": ["labs","nearby"], "query": [
+              { "key": "lat", "value": "28.6139" },
+              { "key": "lng", "value": "77.2090" },
+              { "key": "radius", "value": "10" }
+            ]}
+          }
+        },
+        {
+          "name": "Compare Labs",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/labs/compare?ids=ID1,ID2", "host": ["{{base_url}}"], "path": ["labs","compare"], "query": [
+              { "key": "ids", "value": "ID1,ID2" }
+            ]}
+          }
+        },
+        {
+          "name": "Get Cities",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/labs/cities", "host": ["{{base_url}}"], "path": ["labs","cities"] }
+          }
+        },
+        {
+          "name": "Download Lab Demo CSV",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/labs/demo-csv", "host": ["{{base_url}}"], "path": ["labs","demo-csv"] }
+          }
+        },
+        {
+          "name": "Export Labs CSV (Admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/labs/export-csv", "host": ["{{base_url}}"], "path": ["labs","export-csv"] }
+          }
+        },
+        {
+          "name": "Get Lab by Slug",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/labs/apollo-diagnostics-delhi", "host": ["{{base_url}}"], "path": ["labs","apollo-diagnostics-delhi"] }
+          }
+        },
+        {
+          "name": "Get My Lab (Lab Role)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/labs/mine", "host": ["{{base_url}}"], "path": ["labs","mine"] }
+          }
+        },
+        {
+          "name": "Create Lab",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('lab_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/labs", "host": ["{{base_url}}"], "path": ["labs"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"MedTest Diagnostics\",\n  \"email\": \"medtest@lab.com\",\n  \"phone\": \"9876500001\",\n  \"address\": \"12 Health Road, Delhi\",\n  \"city\": \"Delhi\",\n  \"state\": \"Delhi\",\n  \"pincode\": \"110001\",\n  \"location\": { \"lat\": 28.6139, \"lng\": 77.2090 },\n  \"openTime\": \"07:00\",\n  \"closeTime\": \"21:00\",\n  \"homeCollection\": true,\n  \"homeCollectionCharge\": 50\n}" }
+          }
+        },
+        {
+          "name": "Update Lab",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/labs/{{lab_id}}", "host": ["{{base_url}}"], "path": ["labs","{{lab_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"9800000001\",\n  \"homeCollectionCharge\": 75\n}" }
+          }
+        },
+        {
+          "name": "Approve Lab",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/labs/{{lab_id}}/approve", "host": ["{{base_url}}"], "path": ["labs","{{lab_id}}","approve"] }
+          }
+        },
+        {
+          "name": "Reject Lab",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/labs/{{lab_id}}/reject", "host": ["{{base_url}}"], "path": ["labs","{{lab_id}}","reject"] }
+          }
+        },
+        {
+          "name": "Bulk Upload Labs CSV",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/labs/bulk-csv", "host": ["{{base_url}}"], "path": ["labs","bulk-csv"] },
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "/path/to/labs.csv" }] }
+          }
+        },
+        {
+          "name": "Bulk Delete Labs",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/labs/bulk-delete", "host": ["{{base_url}}"], "path": ["labs","bulk-delete"] },
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{lab_id}}\"]\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "04 · Products",
+      "item": [
+        {
+          "name": "List Products (Public)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/products?page=1&limit=20&city=Delhi&category=blood-test", "host": ["{{base_url}}"], "path": ["products"], "query": [
+              { "key": "page", "value": "1" },
+              { "key": "limit", "value": "20" },
+              { "key": "city", "value": "Delhi" },
+              { "key": "category", "value": "blood-test" },
+              { "key": "lab", "value": "", "disabled": true },
+              { "key": "q", "value": "", "disabled": true }
+            ]}
+          }
+        },
+        {
+          "name": "Admin List Products",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/products/admin?page=1&limit=20", "host": ["{{base_url}}"], "path": ["products","admin"], "query": [
+              { "key": "page", "value": "1" },
+              { "key": "limit", "value": "20" }
+            ]}
+          }
+        },
+        {
+          "name": "Get Product by Slug",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/products/complete-blood-count", "host": ["{{base_url}}"], "path": ["products","complete-blood-count"] }
+          }
+        },
+        {
+          "name": "Download Product Demo XLSX",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/products/demo-csv?labEmails=medtest@lab.com", "host": ["{{base_url}}"], "path": ["products","demo-csv"], "query": [
+              { "key": "labEmails", "value": "medtest@lab.com" }
+            ]}
+          }
+        },
+        {
+          "name": "Export Products CSV (Admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/products/export-csv", "host": ["{{base_url}}"], "path": ["products","export-csv"] }
+          }
+        },
+        {
+          "name": "Lab Demo CSV (Lab Role)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/products/lab-demo-csv", "host": ["{{base_url}}"], "path": ["products","lab-demo-csv"] }
+          }
+        },
+        {
+          "name": "Create Product",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('product_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/products", "host": ["{{base_url}}"], "path": ["products"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Complete Blood Count\",\n  \"lab\": \"{{lab_id}}\",\n  \"mrp\": 500,\n  \"salePrice\": 350,\n  \"discountPercent\": 30,\n  \"turnAroundTime\": \"24 hours\",\n  \"sampleType\": \"Blood\",\n  \"preparationRequired\": \"8 hours fasting\",\n  \"reportDelivery\": \"Online\",\n  \"homeCollection\": true\n}" }
+          }
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/products/{{product_id}}", "host": ["{{base_url}}"], "path": ["products","{{product_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"salePrice\": 320,\n  \"discountPercent\": 36\n}" }
+          }
+        },
+        {
+          "name": "Set Product Price (Lab Role)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/products/{{product_id}}/set-price", "host": ["{{base_url}}"], "path": ["products","{{product_id}}","set-price"] },
+            "body": { "mode": "raw", "raw": "{\n  \"mrp\": 500,\n  \"salePrice\": 330,\n  \"discountPercent\": 34\n}" }
+          }
+        },
+        {
+          "name": "Bulk Update Price",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/products/bulk-price", "host": ["{{base_url}}"], "path": ["products","bulk-price"] },
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{product_id}}\"],\n  \"salePrice\": 299,\n  \"discountPercent\": 40\n}" }
+          }
+        },
+        {
+          "name": "Bulk Upload Products CSV/XLSX",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/products/bulk-csv?labEmails=medtest@lab.com", "host": ["{{base_url}}"], "path": ["products","bulk-csv"], "query": [
+              { "key": "labEmails", "value": "medtest@lab.com" }
+            ]},
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "/path/to/products.xlsx" }] }
+          }
+        },
+        {
+          "name": "Lab Bulk Upload CSV (Lab Role)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/products/lab-bulk-csv", "host": ["{{base_url}}"], "path": ["products","lab-bulk-csv"] },
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "/path/to/lab-products.csv" }] }
+          }
+        },
+        {
+          "name": "Bulk Upload Tests (JSON)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/products/bulk-tests", "host": ["{{base_url}}"], "path": ["products","bulk-tests"] },
+            "body": { "mode": "raw", "raw": "{\n  \"lab\": \"{{lab_id}}\",\n  \"tests\": [\n    { \"name\": \"CBC\", \"mrp\": 400, \"salePrice\": 280 },\n    { \"name\": \"Lipid Profile\", \"mrp\": 600, \"salePrice\": 420 }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "Bulk Delete Products",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/products/bulk-delete", "host": ["{{base_url}}"], "path": ["products","bulk-delete"] },
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{product_id}}\"]\n}" }
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/products/{{product_id}}", "host": ["{{base_url}}"], "path": ["products","{{product_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "05 · Brands",
+      "item": [
+        {
+          "name": "List Brands",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/brands?page=1&limit=20", "host": ["{{base_url}}"], "path": ["brands"] }
+          }
+        },
+        {
+          "name": "Get Brands by City",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/brands/by-city?city=Delhi", "host": ["{{base_url}}"], "path": ["brands","by-city"], "query": [{ "key": "city", "value": "Delhi" }] }
+          }
+        },
+        {
+          "name": "Download Brand Demo CSV",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/brands/demo-csv", "host": ["{{base_url}}"], "path": ["brands","demo-csv"] }
+          }
+        },
+        {
+          "name": "Export Brands CSV",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/brands/export-csv", "host": ["{{base_url}}"], "path": ["brands","export-csv"] }
+          }
+        },
+        {
+          "name": "Create Brand",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('brand_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/brands", "host": ["{{base_url}}"], "path": ["brands"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Apollo Diagnostics\",\n  \"slug\": \"apollo-diagnostics\",\n  \"cities\": [\"Delhi\", \"Mumbai\"],\n  \"description\": \"Leading diagnostic chain\"\n}" }
+          }
+        },
+        {
+          "name": "Update Brand",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/brands/{{brand_id}}", "host": ["{{base_url}}"], "path": ["brands","{{brand_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Trusted healthcare chain with 200+ centres\"\n}" }
+          }
+        },
+        {
+          "name": "Set Home Collection Flag",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/brands/{{brand_id}}/home-collection", "host": ["{{base_url}}"], "path": ["brands","{{brand_id}}","home-collection"] },
+            "body": { "mode": "raw", "raw": "{\n  \"homeCollection\": true\n}" }
+          }
+        },
+        {
+          "name": "Upload Brand Logo",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/brands/upload-logo", "host": ["{{base_url}}"], "path": ["brands","upload-logo"] },
+            "body": { "mode": "formdata", "formdata": [{ "key": "logo", "type": "file", "src": "/path/to/logo.png" }] }
+          }
+        },
+        {
+          "name": "Bulk Upload Brands CSV",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/brands/bulk-csv", "host": ["{{base_url}}"], "path": ["brands","bulk-csv"] },
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "/path/to/brands.csv" }] }
+          }
+        },
+        {
+          "name": "Bulk Delete Brands",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/brands/bulk-delete", "host": ["{{base_url}}"], "path": ["brands","bulk-delete"] },
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{brand_id}}\"]\n}" }
+          }
+        },
+        {
+          "name": "Delete Brand",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/brands/{{brand_id}}", "host": ["{{base_url}}"], "path": ["brands","{{brand_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "06 · Categories",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/categories?page=1&limit=50", "host": ["{{base_url}}"], "path": ["categories"] }
+          }
+        },
+        {
+          "name": "Category Tree",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/categories/tree", "host": ["{{base_url}}"], "path": ["categories","tree"] }
+          }
+        },
+        {
+          "name": "Get Category by Slug",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/categories/blood-test", "host": ["{{base_url}}"], "path": ["categories","blood-test"] }
+          }
+        },
+        {
+          "name": "Download Category Demo CSV",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/categories/demo-csv", "host": ["{{base_url}}"], "path": ["categories","demo-csv"] }
+          }
+        },
+        {
+          "name": "Create Category",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('category_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/categories", "host": ["{{base_url}}"], "path": ["categories"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Blood Test\",\n  \"slug\": \"blood-test\",\n  \"description\": \"All blood-related diagnostic tests\"\n}" }
+          }
+        },
+        {
+          "name": "Update Category",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/categories/{{category_id}}", "host": ["{{base_url}}"], "path": ["categories","{{category_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Haematology and biochemistry panels\"\n}" }
+          }
+        },
+        {
+          "name": "Bulk Upload Categories CSV",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/categories/bulk-csv", "host": ["{{base_url}}"], "path": ["categories","bulk-csv"] },
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "/path/to/categories.csv" }] }
+          }
+        },
+        {
+          "name": "Delete Category",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/categories/{{category_id}}", "host": ["{{base_url}}"], "path": ["categories","{{category_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "07 · Test Master",
+      "item": [
+        {
+          "name": "List Test Master",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/test-master?page=1&limit=20", "host": ["{{base_url}}"], "path": ["test-master"] }
+          }
+        },
+        {
+          "name": "Search Tests (Public Autocomplete)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/test-master/search?q=blood", "host": ["{{base_url}}"], "path": ["test-master","search"], "query": [{ "key": "q", "value": "blood" }] }
+          }
+        },
+        {
+          "name": "Download Test Master Demo CSV",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/test-master/demo-csv", "host": ["{{base_url}}"], "path": ["test-master","demo-csv"] }
+          }
+        },
+        {
+          "name": "Export Test Master CSV",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/test-master/export-csv", "host": ["{{base_url}}"], "path": ["test-master","export-csv"] }
+          }
+        },
+        {
+          "name": "Create Test Master Entry",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('testmaster_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/test-master", "host": ["{{base_url}}"], "path": ["test-master"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Complete Blood Count\",\n  \"aliases\": [\"CBC\", \"Haemogram\"],\n  \"category\": \"{{category_id}}\",\n  \"sampleType\": \"Blood\",\n  \"preparationRequired\": \"No fasting required\",\n  \"turnAroundTime\": \"24 hours\"\n}" }
+          }
+        },
+        {
+          "name": "Update Test Master Entry",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/test-master/{{testmaster_id}}", "host": ["{{base_url}}"], "path": ["test-master","{{testmaster_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"turnAroundTime\": \"12 hours\"\n}" }
+          }
+        },
+        {
+          "name": "Bulk Upload Test Master CSV",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/test-master/bulk-csv", "host": ["{{base_url}}"], "path": ["test-master","bulk-csv"] },
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "/path/to/tests.csv" }] }
+          }
+        },
+        {
+          "name": "Bulk Delete Test Master",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/test-master/bulk", "host": ["{{base_url}}"], "path": ["test-master","bulk"] },
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{testmaster_id}}\"]\n}" }
+          }
+        },
+        {
+          "name": "Delete Test Master Entry",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/test-master/{{testmaster_id}}", "host": ["{{base_url}}"], "path": ["test-master","{{testmaster_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "08 · Bookings",
+      "item": [
+        {
+          "name": "Get Booking Stats (Admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/bookings/stats", "host": ["{{base_url}}"], "path": ["bookings","stats"] }
+          }
+        },
+        {
+          "name": "Create Booking",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('booking_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/bookings", "host": ["{{base_url}}"], "path": ["bookings"] },
+            "body": { "mode": "raw", "raw": "{\n  \"lab\": \"{{lab_id}}\",\n  \"products\": [\"{{product_id}}\"],\n  \"bookingDate\": \"2026-08-10\",\n  \"timeSlot\": \"09:00 AM\",\n  \"patientName\": \"Rahul Sharma\",\n  \"patientAge\": 34,\n  \"patientGender\": \"male\",\n  \"patientMobile\": \"9876543210\",\n  \"address\": \"12 Park Street, Delhi\",\n  \"homeCollection\": true,\n  \"totalAmount\": 350,\n  \"paymentMethod\": \"online\"\n}" }
+          }
+        },
+        {
+          "name": "List Bookings",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/bookings?page=1&limit=20&status=pending", "host": ["{{base_url}}"], "path": ["bookings"], "query": [
+              { "key": "page", "value": "1" },
+              { "key": "limit", "value": "20" },
+              { "key": "status", "value": "pending" },
+              { "key": "lab", "value": "", "disabled": true },
+              { "key": "from", "value": "", "disabled": true },
+              { "key": "to", "value": "", "disabled": true }
+            ]}
+          }
+        },
+        {
+          "name": "Get Booking by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/bookings/{{booking_id}}", "host": ["{{base_url}}"], "path": ["bookings","{{booking_id}}"] }
+          }
+        },
+        {
+          "name": "Update Booking Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/bookings/{{booking_id}}/status", "host": ["{{base_url}}"], "path": ["bookings","{{booking_id}}","status"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"confirmed\"\n}" }
+          }
+        },
+        {
+          "name": "Mark Booking as Paid",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/bookings/{{booking_id}}/paid", "host": ["{{base_url}}"], "path": ["bookings","{{booking_id}}","paid"] }
+          }
+        },
+        {
+          "name": "Edit Booking (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/bookings/{{booking_id}}/edit", "host": ["{{base_url}}"], "path": ["bookings","{{booking_id}}","edit"] },
+            "body": { "mode": "raw", "raw": "{\n  \"bookingDate\": \"2026-08-12\",\n  \"timeSlot\": \"10:00 AM\",\n  \"totalAmount\": 399\n}" }
+          }
+        },
+        {
+          "name": "Restore Booking",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/bookings/{{booking_id}}/restore", "host": ["{{base_url}}"], "path": ["bookings","{{booking_id}}","restore"] }
+          }
+        },
+        {
+          "name": "Delete Booking",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/bookings/{{booking_id}}", "host": ["{{base_url}}"], "path": ["bookings","{{booking_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "09 · Reports",
+      "item": [
+        {
+          "name": "List Reports",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/reports?page=1&limit=20", "host": ["{{base_url}}"], "path": ["reports"] }
+          }
+        },
+        {
+          "name": "Upload Report",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('report_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/reports", "host": ["{{base_url}}"], "path": ["reports"] },
+            "body": { "mode": "formdata", "formdata": [
+              { "key": "files", "type": "file", "src": "/path/to/report.pdf" },
+              { "key": "booking", "value": "{{booking_id}}", "type": "text" },
+              { "key": "patientName", "value": "Rahul Sharma", "type": "text" }
+            ]}
+          }
+        },
+        {
+          "name": "Get Shared Report (Public Token)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/reports/share/SHARE_TOKEN_HERE", "host": ["{{base_url}}"], "path": ["reports","share","SHARE_TOKEN_HERE"] }
+          }
+        },
+        {
+          "name": "Get Report Download URL",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/reports/{{report_id}}/download", "host": ["{{base_url}}"], "path": ["reports","{{report_id}}","download"] }
+          }
+        },
+        {
+          "name": "Replace Report File",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{base_url}}/reports/{{report_id}}/replace", "host": ["{{base_url}}"], "path": ["reports","{{report_id}}","replace"] },
+            "body": { "mode": "formdata", "formdata": [{ "key": "files", "type": "file", "src": "/path/to/new-report.pdf" }] }
+          }
+        },
+        {
+          "name": "Delete Report",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/reports/{{report_id}}", "host": ["{{base_url}}"], "path": ["reports","{{report_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "10 · Coupons",
+      "item": [
+        {
+          "name": "List Coupons",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/coupons?page=1&limit=20", "host": ["{{base_url}}"], "path": ["coupons"] }
+          }
+        },
+        {
+          "name": "Get Coupon by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/coupons/{{coupon_id}}", "host": ["{{base_url}}"], "path": ["coupons","{{coupon_id}}"] }
+          }
+        },
+        {
+          "name": "Create Coupon",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('coupon_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/coupons", "host": ["{{base_url}}"], "path": ["coupons"] },
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"HEALTH20\",\n  \"discountType\": \"percent\",\n  \"discountValue\": 20,\n  \"minOrderAmount\": 300,\n  \"maxDiscount\": 150,\n  \"expiryDate\": \"2026-12-31\",\n  \"usageLimit\": 100\n}" }
+          }
+        },
+        {
+          "name": "Update Coupon",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/coupons/{{coupon_id}}", "host": ["{{base_url}}"], "path": ["coupons","{{coupon_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"discountValue\": 25,\n  \"maxDiscount\": 200\n}" }
+          }
+        },
+        {
+          "name": "Delete Coupon",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/coupons/{{coupon_id}}", "host": ["{{base_url}}"], "path": ["coupons","{{coupon_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "11 · Reviews",
+      "item": [
+        {
+          "name": "List Reviews (Public)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/reviews?lab={{lab_id}}&page=1&limit=10", "host": ["{{base_url}}"], "path": ["reviews"], "query": [
+              { "key": "lab", "value": "{{lab_id}}" },
+              { "key": "page", "value": "1" },
+              { "key": "limit", "value": "10" }
+            ]}
+          }
+        },
+        {
+          "name": "Create Review",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('review_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/reviews", "host": ["{{base_url}}"], "path": ["reviews"] },
+            "body": { "mode": "raw", "raw": "{\n  \"lab\": \"{{lab_id}}\",\n  \"booking\": \"{{booking_id}}\",\n  \"rating\": 5,\n  \"comment\": \"Excellent service and quick reports!\"\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "12 · Blogs",
+      "item": [
+        {
+          "name": "List Blogs (Public)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/blogs?page=1&limit=10", "host": ["{{base_url}}"], "path": ["blogs"] }
+          }
+        },
+        {
+          "name": "Get Blog by Slug (Public)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/blogs/importance-of-regular-health-checkup", "host": ["{{base_url}}"], "path": ["blogs","importance-of-regular-health-checkup"] }
+          }
+        },
+        {
+          "name": "Create Blog",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('blog_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/blogs", "host": ["{{base_url}}"], "path": ["blogs"] },
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Importance of Regular Health Checkups\",\n  \"slug\": \"importance-of-regular-health-checkup\",\n  \"content\": \"<p>Regular checkups help detect diseases early...</p>\",\n  \"excerpt\": \"Why you should get tested every 6 months.\",\n  \"tags\": [\"health\", \"checkup\", \"wellness\"],\n  \"published\": true\n}" }
+          }
+        },
+        {
+          "name": "Update Blog",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/blogs/{{blog_id}}", "host": ["{{base_url}}"], "path": ["blogs","{{blog_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"excerpt\": \"Updated — Why you should get tested every year.\"\n}" }
+          }
+        },
+        {
+          "name": "Delete Blog",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/blogs/{{blog_id}}", "host": ["{{base_url}}"], "path": ["blogs","{{blog_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "13 · Pages (CMS)",
+      "item": [
+        {
+          "name": "List Pages (Public)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/pages", "host": ["{{base_url}}"], "path": ["pages"] }
+          }
+        },
+        {
+          "name": "Get Page by Slug (Public)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/pages/about-us", "host": ["{{base_url}}"], "path": ["pages","about-us"] }
+          }
+        },
+        {
+          "name": "Create Page",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('page_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/pages", "host": ["{{base_url}}"], "path": ["pages"] },
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"About Us\",\n  \"slug\": \"about-us\",\n  \"content\": \"<h1>About HealthOnTime</h1><p>We are...</p>\",\n  \"metaTitle\": \"About HealthOnTime Diagnostics\",\n  \"metaDescription\": \"Learn about our mission and team.\"\n}" }
+          }
+        },
+        {
+          "name": "Update Page",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/pages/{{page_id}}", "host": ["{{base_url}}"], "path": ["pages","{{page_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"metaDescription\": \"Updated meta description for About Us page.\"\n}" }
+          }
+        },
+        {
+          "name": "Delete Page",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/pages/{{page_id}}", "host": ["{{base_url}}"], "path": ["pages","{{page_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "14 · Tickets",
+      "item": [
+        {
+          "name": "List Tickets (Admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/tickets?page=1&limit=20&status=open", "host": ["{{base_url}}"], "path": ["tickets"], "query": [
+              { "key": "page", "value": "1" },
+              { "key": "limit", "value": "20" },
+              { "key": "status", "value": "open" }
+            ]}
+          }
+        },
+        {
+          "name": "Get Ticket by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/tickets/{{ticket_id}}", "host": ["{{base_url}}"], "path": ["tickets","{{ticket_id}}"] }
+          }
+        },
+        {
+          "name": "Create Ticket (Customer)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('ticket_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/tickets", "host": ["{{base_url}}"], "path": ["tickets"] },
+            "body": { "mode": "raw", "raw": "{\n  \"subject\": \"Report not received\",\n  \"message\": \"I completed my blood test 3 days ago but haven't received my report.\",\n  \"booking\": \"{{booking_id}}\"\n}" }
+          }
+        },
+        {
+          "name": "Update Ticket (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/tickets/{{ticket_id}}", "host": ["{{base_url}}"], "path": ["tickets","{{ticket_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"resolved\",\n  \"adminReply\": \"Your report has been uploaded. Please check the reports section.\"\n}" }
+          }
+        },
+        {
+          "name": "Delete Ticket",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/tickets/{{ticket_id}}", "host": ["{{base_url}}"], "path": ["tickets","{{ticket_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "15 · CRM",
+      "item": [
+        {
+          "name": "CRM Stats",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/crm/stats", "host": ["{{base_url}}"], "path": ["crm","stats"] }
+          }
+        },
+        {
+          "name": "CRM Patient List",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/crm/patients?page=1&limit=20&q=rahul", "host": ["{{base_url}}"], "path": ["crm","patients"], "query": [
+              { "key": "page", "value": "1" },
+              { "key": "limit", "value": "20" },
+              { "key": "q", "value": "rahul" }
+            ]}
+          }
+        },
+        {
+          "name": "CRM Patient Detail",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/crm/patients/{{user_id}}", "host": ["{{base_url}}"], "path": ["crm","patients","{{user_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "16 · Leads",
+      "item": [
+        {
+          "name": "List Leads",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/leads?page=1&limit=20&status=new", "host": ["{{base_url}}"], "path": ["leads"] }
+          }
+        },
+        {
+          "name": "Create Lead",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('lead_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/leads", "host": ["{{base_url}}"], "path": ["leads"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Priya Mehta\",\n  \"mobile\": \"9812345678\",\n  \"email\": \"priya@example.com\",\n  \"source\": \"website\",\n  \"testInterest\": \"Full Body Checkup\",\n  \"city\": \"Mumbai\",\n  \"notes\": \"Called from Facebook ad\"\n}" }
+          }
+        },
+        {
+          "name": "Update Lead",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/leads/{{lead_id}}", "host": ["{{base_url}}"], "path": ["leads","{{lead_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"contacted\",\n  \"notes\": \"Spoke to patient, interested in CBC + Lipid\"\n}" }
+          }
+        },
+        {
+          "name": "Convert Lead to Booking",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/leads/{{lead_id}}/convert", "host": ["{{base_url}}"], "path": ["leads","{{lead_id}}","convert"] },
+            "body": { "mode": "raw", "raw": "{\n  \"booking\": \"{{booking_id}}\"\n}" }
+          }
+        },
+        {
+          "name": "Delete Lead",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/leads/{{lead_id}}", "host": ["{{base_url}}"], "path": ["leads","{{lead_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "17 · Follow-ups",
+      "item": [
+        {
+          "name": "List Follow-ups",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/follow-ups?page=1&limit=20&status=pending", "host": ["{{base_url}}"], "path": ["follow-ups"] }
+          }
+        },
+        {
+          "name": "Create Follow-up",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('followup_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/follow-ups", "host": ["{{base_url}}"], "path": ["follow-ups"] },
+            "body": { "mode": "raw", "raw": "{\n  \"lead\": \"{{lead_id}}\",\n  \"scheduledAt\": \"2026-08-05T10:00:00.000Z\",\n  \"type\": \"call\",\n  \"notes\": \"Remind about CBC package offer\"\n}" }
+          }
+        },
+        {
+          "name": "Update Follow-up",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/follow-ups/{{followup_id}}", "host": ["{{base_url}}"], "path": ["follow-ups","{{followup_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"done\",\n  \"notes\": \"Patient booked the test\"\n}" }
+          }
+        },
+        {
+          "name": "Delete Follow-up",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/follow-ups/{{followup_id}}", "host": ["{{base_url}}"], "path": ["follow-ups","{{followup_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "18 · Referral Doctors",
+      "item": [
+        {
+          "name": "List Referral Doctors",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/referral-doctors?page=1&limit=20", "host": ["{{base_url}}"], "path": ["referral-doctors"] }
+          }
+        },
+        {
+          "name": "Create Referral Doctor",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('doctor_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/referral-doctors", "host": ["{{base_url}}"], "path": ["referral-doctors"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Dr. Anita Verma\",\n  \"mobile\": \"9871234567\",\n  \"email\": \"anita.verma@clinic.com\",\n  \"specialization\": \"General Physician\",\n  \"clinic\": \"Verma Healthcare, Delhi\",\n  \"commissionPercent\": 5\n}" }
+          }
+        },
+        {
+          "name": "Update Referral Doctor",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/referral-doctors/{{doctor_id}}", "host": ["{{base_url}}"], "path": ["referral-doctors","{{doctor_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"commissionPercent\": 7\n}" }
+          }
+        },
+        {
+          "name": "Delete Referral Doctor",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/referral-doctors/{{doctor_id}}", "host": ["{{base_url}}"], "path": ["referral-doctors","{{doctor_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "19 · Lab CRM (Lab Role)",
+      "item": [
+        {
+          "name": "Lab CRM Stats",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/lab-crm/stats", "host": ["{{base_url}}"], "path": ["lab-crm","stats"] }
+          }
+        },
+        {
+          "name": "Lab Billing",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/lab-crm/billing?page=1&limit=20", "host": ["{{base_url}}"], "path": ["lab-crm","billing"] }
+          }
+        },
+        {
+          "name": "Lab Patient List",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/lab-crm/patients?page=1&limit=20", "host": ["{{base_url}}"], "path": ["lab-crm","patients"] }
+          }
+        },
+        {
+          "name": "Lab Patient Detail",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/lab-crm/patients/{{user_id}}", "host": ["{{base_url}}"], "path": ["lab-crm","patients","{{user_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "20 · Lab Change Requests",
+      "item": [
+        {
+          "name": "Submit Change Request (Lab Role)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('labchange_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/lab-change-requests", "host": ["{{base_url}}"], "path": ["lab-change-requests"] },
+            "body": { "mode": "raw", "raw": "{\n  \"changes\": {\n    \"phone\": \"9900001234\",\n    \"address\": \"New Address Block B, Delhi\"\n  },\n  \"reason\": \"Moved to new location\"\n}" }
+          }
+        },
+        {
+          "name": "Get My Change Requests (Lab Role)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/lab-change-requests/mine", "host": ["{{base_url}}"], "path": ["lab-change-requests","mine"] }
+          }
+        },
+        {
+          "name": "List All Change Requests (Admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/lab-change-requests?page=1&limit=20&status=pending", "host": ["{{base_url}}"], "path": ["lab-change-requests"] }
+          }
+        },
+        {
+          "name": "Approve Change Request",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/lab-change-requests/{{labchange_id}}/approve", "host": ["{{base_url}}"], "path": ["lab-change-requests","{{labchange_id}}","approve"] }
+          }
+        },
+        {
+          "name": "Reject Change Request",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/lab-change-requests/{{labchange_id}}/reject", "host": ["{{base_url}}"], "path": ["lab-change-requests","{{labchange_id}}","reject"] },
+            "body": { "mode": "raw", "raw": "{\n  \"adminNote\": \"Address change requires property documents.\"\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "21 · Newsletter",
+      "item": [
+        {
+          "name": "Subscribe (Public)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('newsletter_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/newsletter/subscribe", "host": ["{{base_url}}"], "path": ["newsletter","subscribe"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"subscriber@example.com\"\n}" }
+          }
+        },
+        {
+          "name": "List Subscribers (Admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/newsletter?page=1&limit=20", "host": ["{{base_url}}"], "path": ["newsletter"] }
+          }
+        },
+        {
+          "name": "Toggle Subscription",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/newsletter/{{newsletter_id}}/toggle", "host": ["{{base_url}}"], "path": ["newsletter","{{newsletter_id}}","toggle"] }
+          }
+        },
+        {
+          "name": "Delete Subscriber",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/newsletter/{{newsletter_id}}", "host": ["{{base_url}}"], "path": ["newsletter","{{newsletter_id}}"] }
+          }
+        },
+        {
+          "name": "Bulk Delete Subscribers",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/newsletter/bulk-delete", "host": ["{{base_url}}"], "path": ["newsletter","bulk-delete"] },
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [\"{{newsletter_id}}\"]\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "22 · Hero Slides",
+      "item": [
+        {
+          "name": "List Hero Slides (Public)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/hero-slides", "host": ["{{base_url}}"], "path": ["hero-slides"] }
+          }
+        },
+        {
+          "name": "Upload Slide Image",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/hero-slides/upload", "host": ["{{base_url}}"], "path": ["hero-slides","upload"] },
+            "body": { "mode": "formdata", "formdata": [{ "key": "image", "type": "file", "src": "/path/to/banner.jpg" }] }
+          }
+        },
+        {
+          "name": "Create Hero Slide",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('slide_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/hero-slides", "host": ["{{base_url}}"], "path": ["hero-slides"] },
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Book Lab Tests at 50% Off\",\n  \"subtitle\": \"Home collection available\",\n  \"imageUrl\": \"https://cdn.healthontime.in/banner1.jpg\",\n  \"ctaText\": \"Book Now\",\n  \"ctaLink\": \"/tests\",\n  \"order\": 1,\n  \"active\": true\n}" }
+          }
+        },
+        {
+          "name": "Update Hero Slide",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/hero-slides/{{slide_id}}", "host": ["{{base_url}}"], "path": ["hero-slides","{{slide_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Book Lab Tests at 60% Off\",\n  \"active\": true\n}" }
+          }
+        },
+        {
+          "name": "Delete Hero Slide",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/hero-slides/{{slide_id}}", "host": ["{{base_url}}"], "path": ["hero-slides","{{slide_id}}"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "23 · Home Content",
+      "item": [
+        {
+          "name": "Get Home Content (Public)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/home-content", "host": ["{{base_url}}"], "path": ["home-content"] }
+          }
+        },
+        {
+          "name": "Update Home Content (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/home-content", "host": ["{{base_url}}"], "path": ["home-content"] },
+            "body": { "mode": "raw", "raw": "{\n  \"heroTitle\": \"India's Most Trusted Diagnostics\",\n  \"heroSubtitle\": \"Book tests from 500+ certified labs near you\",\n  \"whyUsPoints\": [\n    { \"icon\": \"🏆\", \"title\": \"NABL Accredited\", \"desc\": \"Only certified labs\" },\n    { \"icon\": \"🏠\", \"title\": \"Home Collection\", \"desc\": \"At your doorstep\" },\n    { \"icon\": \"📱\", \"title\": \"Digital Reports\", \"desc\": \"Same-day PDF\" }\n  ]\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "24 · Search",
+      "item": [
+        {
+          "name": "Global Search",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/search?q=blood+test&city=Delhi", "host": ["{{base_url}}"], "path": ["search"], "query": [
+              { "key": "q", "value": "blood test" },
+              { "key": "city", "value": "Delhi" }
+            ]}
+          }
+        },
+        {
+          "name": "Suggest (Autocomplete)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/search/suggest?q=cbc", "host": ["{{base_url}}"], "path": ["search","suggest"], "query": [{ "key": "q", "value": "cbc" }] }
+          }
+        },
+        {
+          "name": "Popular Searches",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/search/popular", "host": ["{{base_url}}"], "path": ["search","popular"] }
+          }
+        },
+        {
+          "name": "Reindex All (Superadmin)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/search/reindex/all", "host": ["{{base_url}}"], "path": ["search","reindex","all"] }
+          }
+        },
+        {
+          "name": "Reindex Labs",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/search/reindex/labs", "host": ["{{base_url}}"], "path": ["search","reindex","labs"] }
+          }
+        },
+        {
+          "name": "Reindex Products",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/search/reindex/products", "host": ["{{base_url}}"], "path": ["search","reindex","products"] }
+          }
+        },
+        {
+          "name": "Reindex Pages",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/search/reindex/pages", "host": ["{{base_url}}"], "path": ["search","reindex","pages"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "25 · Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/dashboard/stats", "host": ["{{base_url}}"], "path": ["dashboard","stats"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "26 · Settings",
+      "item": [
+        {
+          "name": "Get Public Setting (No Auth)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/settings/public/booking_animation", "host": ["{{base_url}}"], "path": ["settings","public","booking_animation"] }
+          }
+        },
+        {
+          "name": "List Settings (Superadmin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/settings", "host": ["{{base_url}}"], "path": ["settings"] }
+          }
+        },
+        {
+          "name": "Create Setting",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) {",
+            "  var json = pm.response.json();",
+            "  if (json._id) pm.collectionVariables.set('setting_id', json._id);",
+            "}"
+          ], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/settings", "host": ["{{base_url}}"], "path": ["settings"] },
+            "body": { "mode": "raw", "raw": "{\n  \"key\": \"booking_animation\",\n  \"value\": {\n    \"enabled\": true,\n    \"preset\": \"lab-hero\",\n    \"gifUrl\": \"\",\n    \"duration\": 3000\n  }\n}" }
+          }
+        },
+        {
+          "name": "Update Setting",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/settings/{{setting_id}}", "host": ["{{base_url}}"], "path": ["settings","{{setting_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"key\": \"booking_animation\",\n  \"value\": {\n    \"enabled\": false,\n    \"preset\": \"rocket\",\n    \"gifUrl\": \"\",\n    \"duration\": 2500\n  }\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "27 · Upload",
+      "item": [
+        {
+          "name": "Upload Prescription",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/uploads/prescription", "host": ["{{base_url}}"], "path": ["uploads","prescription"] },
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "/path/to/prescription.pdf" }] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "28 · Email (Test)",
+      "item": [
+        {
+          "name": "Send Test Email (Superadmin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/email/test", "host": ["{{base_url}}"], "path": ["email","test"] },
+            "body": { "mode": "raw", "raw": "{\n  \"to\": \"test@example.com\",\n  \"subject\": \"Backend Email Test\",\n  \"message\": \"If you receive this, SMTP is configured correctly!\"\n}" }
+          }
+        }
+      ]
+    }
+
+  ]
+}

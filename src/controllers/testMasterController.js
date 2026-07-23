@@ -61,55 +61,77 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
+    // Capture old name BEFORE updating so we can find products by old name
+    const existing = await TestMaster.findById(req.params.id).lean();
+    if (!existing) return res.status(404).json({ message: 'Test not found' });
+    const oldName = existing.name;
+
     const test = await TestMaster.findByIdAndUpdate(req.params.id, req.body, { new: true })
       .populate('category', 'name')
       .populate('subcategory', 'name');
-    if (!test) return res.status(404).json({ message: 'Test not found' });
 
-    // Cascade: sync description + metadata to all products with the same name
     const Product = require('../models/Product');
     const { syncObjects } = require('../services/algoliaSync');
 
-    const nameRegex = new RegExp(`^${test.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+    const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const oldNameRegex = new RegExp(`^${escape(oldName)}$`, 'i');
+
+    // Build metadata update (fields other than name)
     const productUpdate = {};
-    if (req.body.description !== undefined) productUpdate.description = test.description;
-    if (req.body.sampleType  !== undefined) productUpdate.sampleType  = test.sampleType;
-    if (req.body.reportTime  !== undefined) productUpdate.reportTime  = test.reportTime;
+    if (req.body.description   !== undefined) productUpdate.description   = test.description;
+    if (req.body.sampleType    !== undefined) productUpdate.sampleType    = test.sampleType;
+    if (req.body.reportTime    !== undefined) productUpdate.reportTime    = test.reportTime;
     if (req.body.fastingRequired !== undefined) productUpdate.fastingRequired = test.fastingRequired;
     if (req.body.homeCollection  !== undefined) productUpdate.homeCollection  = test.homeCollection;
 
-    if (Object.keys(productUpdate).length) {
-      await Product.updateMany({ name: nameRegex }, { $set: productUpdate });
+    const nameChanged = req.body.name && req.body.name.trim() !== oldName.trim();
 
-      // Re-index updated products in Algolia
-      try {
-        const updated = await Product.find({ name: nameRegex })
-          .populate({ path: 'lab', select: 'name slug city state address area pincode homeCollection ratingAvg verificationStatus' })
-          .lean();
-        if (updated.length) {
-          const records = updated.map((p) => ({
-            objectID: String(p._id),
-            id: String(p._id),
-            type: p.type,
-            name: p.name,
-            slug: p.slug,
-            description: p.description || '',
-            price: p.price,
-            salePrice: p.salePrice || null,
-            reportTime: p.reportTime || '',
-            sampleType: p.sampleType || '',
-            homeCollection: !!p.homeCollection,
-            fastingRequired: !!p.fastingRequired,
-            tags: p.tags || [],
-            category: p.category ? String(p.category) : null,
-            lab: p.lab ? { _id: String(p.lab._id), name: p.lab.name, slug: p.lab.slug, city: p.lab.city, state: p.lab.state || '', address: p.lab.address || '', area: p.lab.area || '', pincode: p.lab.pincode || '' } : null,
-            isFeatured: !!p.isFeatured,
-            isActive: !!p.isActive,
-          }));
-          await syncObjects('products', records);
-        }
-      } catch { /* algolia optional */ }
+    if (nameChanged) {
+      // Update name + regenerate slug per product (slug includes lab name so must be per-document)
+      const productsToRename = await Product.find({ name: oldNameRegex })
+        .populate('lab', 'name')
+        .lean();
+
+      for (const p of productsToRename) {
+        const labSuffix = p.lab?.name ? makeSlug(p.lab.name) : '';
+        const newSlug = makeSlug(`${test.name}${labSuffix ? '-' + labSuffix : ''}-${String(p._id).slice(-5)}`);
+        await Product.findByIdAndUpdate(p._id, {
+          $set: { name: test.name, slug: newSlug, ...productUpdate },
+        });
+      }
+    } else if (Object.keys(productUpdate).length) {
+      await Product.updateMany({ name: oldNameRegex }, { $set: productUpdate });
     }
+
+    // Re-index in Algolia
+    try {
+      const newNameRegex = new RegExp(`^${escape(test.name)}$`, 'i');
+      const updated = await Product.find({ name: newNameRegex })
+        .populate({ path: 'lab', select: 'name slug city state address area pincode homeCollection ratingAvg verificationStatus' })
+        .lean();
+      if (updated.length) {
+        const records = updated.map((p) => ({
+          objectID: String(p._id),
+          id: String(p._id),
+          type: p.type,
+          name: p.name,
+          slug: p.slug,
+          description: p.description || '',
+          price: p.price,
+          salePrice: p.salePrice || null,
+          reportTime: p.reportTime || '',
+          sampleType: p.sampleType || '',
+          homeCollection: !!p.homeCollection,
+          fastingRequired: !!p.fastingRequired,
+          tags: p.tags || [],
+          category: p.category ? String(p.category) : null,
+          lab: p.lab ? { _id: String(p.lab._id), name: p.lab.name, slug: p.lab.slug, city: p.lab.city, state: p.lab.state || '', address: p.lab.address || '', area: p.lab.area || '', pincode: p.lab.pincode || '' } : null,
+          isFeatured: !!p.isFeatured,
+          isActive: !!p.isActive,
+        }));
+        await syncObjects('products', records);
+      }
+    } catch { /* algolia optional */ }
 
     res.json(test);
   } catch (err) {
