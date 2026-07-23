@@ -64,17 +64,17 @@ export default function ProductDetailPage() {
               )}
 
               <div className="flex flex-wrap gap-4 text-sm text-gray-600 border-t border-gray-100 pt-4">
-                {product.reportTime && <div className="flex items-center gap-1.5"><FiClock className="text-primary-500" /> Report in {product.reportTime}</div>}
-                {product.sampleType && <div className="flex items-center gap-1.5"><FiDroplet className="text-primary-500" /> Sample: {product.sampleType}</div>}
-                {product.homeCollection && <div className="flex items-center gap-1.5"><FiHome className="text-primary-500" /> Home Collection Available</div>}
-                {product.fastingRequired && <div className="flex items-center gap-1.5"><FiAlertCircle className="text-gray-500" /> Fasting Required</div>}
+                {(product.testMaster?.reportTime || product.reportTime) && <div className="flex items-center gap-1.5"><FiClock className="text-primary-500" /> Report in {product.testMaster?.reportTime || product.reportTime}</div>}
+                {(product.testMaster?.sampleType || product.sampleType) && <div className="flex items-center gap-1.5"><FiDroplet className="text-primary-500" /> Sample: {product.testMaster?.sampleType || product.sampleType}</div>}
+                {(product.testMaster?.homeCollection || product.homeCollection) && <div className="flex items-center gap-1.5"><FiHome className="text-primary-500" /> Home Collection Available</div>}
+                {(product.testMaster?.fastingRequired || product.fastingRequired) && <div className="flex items-center gap-1.5"><FiAlertCircle className="text-gray-500" /> Fasting Required</div>}
               </div>
             </div>
 
-            {product.description && (
+            {(product.testMaster?.description || product.description) && (
               <div className="card">
                 <h2 className="font-semibold mb-3">About this test</h2>
-                <p className="text-sm text-gray-600 leading-relaxed">{product.description}</p>
+                <p className="text-sm text-gray-600 leading-relaxed">{product.testMaster?.description || product.description}</p>
               </div>
             )}
 
@@ -108,8 +108,8 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="space-y-2 text-sm text-gray-600 mb-6">
-                {product.homeCollection && <p className="flex items-center gap-2"><FiHome className="text-green-500" /> Home collection available</p>}
-                {product.reportTime && <p className="flex items-center gap-2"><FiClock className="text-primary-500" /> Report in {product.reportTime}</p>}
+                {(product.testMaster?.homeCollection || product.homeCollection) && <p className="flex items-center gap-2"><FiHome className="text-green-500" /> Home collection available</p>}
+                {(product.testMaster?.reportTime || product.reportTime) && <p className="flex items-center gap-2"><FiClock className="text-primary-500" /> Report in {product.testMaster?.reportTime || product.reportTime}</p>}
               </div>
 
               {inCart ? (

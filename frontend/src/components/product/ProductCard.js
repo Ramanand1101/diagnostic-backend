@@ -70,9 +70,9 @@ export default function ProductCard({ product }) {
         </Link>
 
         {/* Description */}
-        {product.description && (
+        {(product.testMaster?.description || product.description) && (
           <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">
-            {product.description}
+            {product.testMaster?.description || product.description}
           </p>
         )}
 
