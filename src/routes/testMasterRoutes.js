@@ -15,6 +15,7 @@ router.post('/bulk-csv', ...admin, csvUpload.single('file'), c.bulkCsv);
 router.post('/', ...admin, c.create);
 router.delete('/bulk', ...admin, c.bulkDelete);
 router.put('/:id', ...admin, c.update);
+router.post('/:id/sync-products', ...admin, c.syncProducts);
 router.delete('/:id', ...admin, c.remove);
 
 module.exports = router;

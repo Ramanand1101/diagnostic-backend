@@ -7,7 +7,7 @@ import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiList, FiDownload, FiCheckSquare } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiList, FiDownload, FiCheckSquare, FiRefreshCw } from 'react-icons/fi';
 
 const REPORT_PRESETS = ['Same day', '4 hours', '8 hours', '12 hours', '24 hours', '48 hours', '2-3 days'];
 const SAMPLE_PRESETS = ['Blood', 'Urine', 'Stool', 'Saliva', 'Swab', 'Multiple'];
@@ -178,6 +178,9 @@ export default function TestMasterPage() {
   const [catFilter, setCatFilter] = useState('');
   const [modal, setModal] = useState(null);
   const [selected, setSelected] = useState(new Set());
+  const [syncModal, setSyncModal] = useState(null); // { test }
+  const [syncFromName, setSyncFromName] = useState('');
+  const [syncing, setSyncing] = useState(false);
   const searchTimer = useRef(null);
 
   const fetchTests = useCallback(() => {
@@ -197,6 +200,18 @@ export default function TestMasterPage() {
     if (!confirm('Delete this test from master list?')) return;
     try { await testMasterApi.delete(id); toast.success('Deleted'); fetchTests(); }
     catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const handleSync = async () => {
+    if (!syncModal) return;
+    setSyncing(true);
+    try {
+      const res = await testMasterApi.syncProducts(syncModal.test._id, syncFromName);
+      toast.success(`${res.data.synced} product(s) renamed → "${res.data.toName}"`);
+      setSyncModal(null);
+      setSyncFromName('');
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setSyncing(false); }
   };
 
   const handleBulkDelete = async () => {
@@ -323,8 +338,13 @@ export default function TestMasterPage() {
                     </td>
                     <td className="table-cell">
                       <div className="flex gap-1">
-                        <button onClick={() => setModal({ type: 'edit', test: t })} className="text-gray-400 hover:text-primary-600 p-1.5 hover:bg-gray-100 rounded-lg"><FiEdit size={14} /></button>
-                        <button onClick={() => handleDelete(t._id)} className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-lg"><FiTrash2 size={14} /></button>
+                        <button onClick={() => setModal({ type: 'edit', test: t })} className="text-gray-400 hover:text-primary-600 p-1.5 hover:bg-gray-100 rounded-lg" title="Edit"><FiEdit size={14} /></button>
+                        <button
+                          onClick={() => { setSyncModal({ test: t }); setSyncFromName(t.name); }}
+                          className="text-gray-400 hover:text-green-600 p-1.5 hover:bg-green-50 rounded-lg"
+                          title="Sync product names to this test name"
+                        ><FiRefreshCw size={14} /></button>
+                        <button onClick={() => handleDelete(t._id)} className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-lg" title="Delete"><FiTrash2 size={14} /></button>
                       </div>
                     </td>
                   </tr>
@@ -351,6 +371,59 @@ export default function TestMasterPage() {
       </Modal>
       <Modal open={modal?.type === 'edit'} onClose={() => setModal(null)} title="Edit Test" size="lg">
         <TestMasterForm initial={modal?.test} categories={categories} onSave={() => { setModal(null); fetchTests(); }} onClose={() => setModal(null)} />
+      </Modal>
+
+      {/* Sync Products Modal */}
+      <Modal
+        open={!!syncModal}
+        onClose={() => { setSyncModal(null); setSyncFromName(''); }}
+        title="Sync Product Names"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Rename all products whose name matches the <strong>"From name"</strong> below to the current test master name.
+            Use this to fix products that were created before a test name was updated.
+          </p>
+
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-sm text-blue-800">
+            <p className="font-medium mb-1">Target (new) name:</p>
+            <p className="font-mono text-base text-blue-900">{syncModal?.test?.name}</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              From name <span className="text-gray-400 font-normal">(old product name to replace)</span>
+            </label>
+            <input
+              autoFocus
+              value={syncFromName}
+              onChange={(e) => setSyncFromName(e.target.value)}
+              placeholder="e.g. Thyroid Profile (TFT)"
+              className="input w-full"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              All products with exactly this name (case-insensitive) will be renamed.
+            </p>
+          </div>
+
+          <div className="flex gap-3 justify-end pt-1">
+            <button
+              type="button"
+              onClick={() => { setSyncModal(null); setSyncFromName(''); }}
+              className="btn-secondary"
+            >Cancel</button>
+            <button
+              type="button"
+              disabled={!syncFromName.trim() || syncing}
+              onClick={handleSync}
+              className="btn-primary flex items-center gap-2"
+            >
+              <FiRefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'Syncing…' : 'Sync Products'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

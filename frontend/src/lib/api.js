@@ -222,6 +222,7 @@ export const testMasterApi = {
   demoCsv: () => api.get('/test-master/demo-csv', { responseType: 'blob' }),
   bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/test-master/bulk-csv', fd); },
   exportCsv: () => api.get('/test-master/export-csv', { responseType: 'blob' }),
+  syncProducts: (id, fromName) => api.post(`/test-master/${id}/sync-products`, { fromName }),
 };
 
 // Lab CRM (for lab role — filtered to own lab)

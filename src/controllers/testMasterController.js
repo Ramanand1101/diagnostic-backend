@@ -139,6 +139,53 @@ exports.update = async (req, res) => {
   }
 };
 
+// POST /api/v1/test-master/:id/sync-products
+// Body: { fromName: "old product name" }  — renames matching products to this test's current name
+exports.syncProducts = async (req, res) => {
+  try {
+    const test = await TestMaster.findById(req.params.id).lean();
+    if (!test) return res.status(404).json({ message: 'Test not found' });
+
+    const Product = require('../models/Product');
+    const { syncObjects } = require('../services/algoliaSync');
+    const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const fromName = (req.body.fromName || '').trim() || test.name;
+    const fromNameRegex = new RegExp(`^${escape(fromName)}$`, 'i');
+
+    const toRename = await Product.find({ name: fromNameRegex }).populate('lab', 'name').lean();
+    for (const p of toRename) {
+      const labSuffix = p.lab?.name ? makeSlug(p.lab.name) : '';
+      const newSlug = makeSlug(`${test.name}${labSuffix ? '-' + labSuffix : ''}-${String(p._id).slice(-5)}`);
+      await Product.findByIdAndUpdate(p._id, { $set: { name: test.name, slug: newSlug } });
+    }
+
+    // Re-index in Algolia
+    try {
+      const newNameRegex = new RegExp(`^${escape(test.name)}$`, 'i');
+      const updated = await Product.find({ name: newNameRegex })
+        .populate({ path: 'lab', select: 'name slug city state address area pincode' })
+        .lean();
+      if (updated.length) {
+        const records = updated.map((p) => ({
+          objectID: String(p._id), id: String(p._id), type: p.type, name: p.name, slug: p.slug,
+          description: p.description || '', price: p.price, salePrice: p.salePrice || null,
+          reportTime: p.reportTime || '', sampleType: p.sampleType || '',
+          homeCollection: !!p.homeCollection, fastingRequired: !!p.fastingRequired,
+          tags: p.tags || [], category: p.category ? String(p.category) : null,
+          lab: p.lab ? { _id: String(p.lab._id), name: p.lab.name, slug: p.lab.slug, city: p.lab.city } : null,
+          isFeatured: !!p.isFeatured, isActive: !!p.isActive,
+        }));
+        await syncObjects('products', records);
+      }
+    } catch { /* algolia optional */ }
+
+    res.json({ synced: toRename.length, fromName, toName: test.name });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 exports.remove = async (req, res) => {
   try {
     const test = await TestMaster.findByIdAndDelete(req.params.id);
