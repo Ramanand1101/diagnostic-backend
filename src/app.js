@@ -50,16 +50,19 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .map((o) => o.trim())
   .filter(Boolean);
 
-if (!ALLOWED_ORIGINS.length) {
-  // Dev fallback — allow localhost only
-  ALLOWED_ORIGINS.push('http://localhost:3000', 'http://localhost:3001');
-}
+// Default origins — always allowed
+const DEFAULT_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://healthontime.in',
+  'https://www.healthontime.in',
+];
+const ORIGIN_SET = new Set([...DEFAULT_ORIGINS, ...ALLOWED_ORIGINS]);
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return cb(null, true);
-    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    if (ORIGIN_SET.has(origin)) return cb(null, true);
     cb(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
