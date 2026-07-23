@@ -31,20 +31,21 @@ function labRecord(lab) {
 }
 
 function productRecord(p) {
+  const tm = p.testMaster || {};
   return {
     objectID: String(p._id),
     id: String(p._id),
     type: p.type,
     name: p.name,
     slug: p.slug,
-    description: p.description || '',
+    description: tm.description || p.description || '',
     price: p.price,
     salePrice: p.salePrice || null,
     discountPercent: p.discountPercent || null,
-    reportTime: p.reportTime || '',
-    sampleType: p.sampleType || '',
-    homeCollection: !!p.homeCollection,
-    fastingRequired: !!p.fastingRequired,
+    reportTime: tm.reportTime || p.reportTime || '',
+    sampleType: tm.sampleType || p.sampleType || '',
+    homeCollection: !!(tm.homeCollection ?? p.homeCollection),
+    fastingRequired: !!(tm.fastingRequired ?? p.fastingRequired),
     tags: p.tags || [],
     category: p.category ? String(p.category) : null,
     lab: p.lab && typeof p.lab === 'object'
@@ -110,18 +111,18 @@ async function mongoSearch(q, type, city, limit) {
       select: 'name slug city state address area pincode homeCollection ratingAvg verificationStatus accreditation brand',
       populate: { path: 'brand', select: 'name slug logo' },
     };
+    const tmPopulate = { path: 'testMaster', select: 'name description sampleType reportTime fastingRequired homeCollection' };
     const baseFilter = { isActive: true, ...(cityLabIds ? { lab: { $in: cityLabIds } } : {}) };
 
-    // Cascading: exact name → prefix name → partial name (never description/tags)
-    const exactRegex  = new RegExp(`^${escapeRegex(q)}$`, 'i');
-    const prefixRegex = new RegExp(`^${escapeRegex(q)}`,  'i');
+    const exactRegex   = new RegExp(`^${escapeRegex(q)}$`, 'i');
+    const prefixRegex  = new RegExp(`^${escapeRegex(q)}`,  'i');
     const partialRegex = new RegExp(escapeRegex(q), 'i');
 
-    let products = await Product.find({ ...baseFilter, name: exactRegex }).populate(labPopulate).limit(limit).lean();
+    let products = await Product.find({ ...baseFilter, name: exactRegex }).populate(labPopulate).populate(tmPopulate).limit(limit).lean();
     if (!products.length)
-      products = await Product.find({ ...baseFilter, name: prefixRegex }).populate(labPopulate).limit(limit).lean();
+      products = await Product.find({ ...baseFilter, name: prefixRegex }).populate(labPopulate).populate(tmPopulate).limit(limit).lean();
     if (!products.length)
-      products = await Product.find({ ...baseFilter, name: partialRegex }).populate(labPopulate).limit(limit).lean();
+      products = await Product.find({ ...baseFilter, name: partialRegex }).populate(labPopulate).populate(tmPopulate).limit(limit).lean();
 
     result.products = products;
   }
@@ -219,13 +220,15 @@ exports.popular = asyncHandler(async (req, res) => {
 
   const grouped = await Product.aggregate([
     { $match: matchStage },
+    { $lookup: { from: 'testmasters', localField: 'testMaster', foreignField: '_id', as: 'tm' } },
+    { $unwind: { path: '$tm', preserveNullAndEmptyArrays: true } },
     { $group: {
       _id: '$name',
       minPrice:   { $min: { $ifNull: ['$salePrice', '$price'] } },
       maxPrice:   { $max: { $ifNull: ['$salePrice', '$price'] } },
       labCount:   { $sum: 1 },
-      sampleType: { $first: '$sampleType' },
-      reportTime: { $first: '$reportTime' },
+      sampleType: { $first: { $ifNull: ['$tm.sampleType', '$sampleType'] } },
+      reportTime: { $first: { $ifNull: ['$tm.reportTime', '$reportTime'] } },
       tags:       { $first: '$tags' },
     }},
     { $sort: { labCount: -1 } },
@@ -273,16 +276,17 @@ exports.suggest = asyncHandler(async (req, res) => {
   const matchStage = { isActive: true, $or: orPatterns };
   if (cityLabIds) matchStage.lab = { $in: cityLabIds };
 
-  // Group by test name → min/max price, lab count
   const grouped = await Product.aggregate([
     { $match: matchStage },
+    { $lookup: { from: 'testmasters', localField: 'testMaster', foreignField: '_id', as: 'tm' } },
+    { $unwind: { path: '$tm', preserveNullAndEmptyArrays: true } },
     { $group: {
       _id: '$name',
-      minPrice: { $min: { $ifNull: ['$salePrice', '$price'] } },
-      maxPrice: { $max: { $ifNull: ['$salePrice', '$price'] } },
-      labCount: { $sum: 1 },
-      sampleType: { $first: '$sampleType' },
-      reportTime: { $first: '$reportTime' },
+      minPrice:   { $min: { $ifNull: ['$salePrice', '$price'] } },
+      maxPrice:   { $max: { $ifNull: ['$salePrice', '$price'] } },
+      labCount:   { $sum: 1 },
+      sampleType: { $first: { $ifNull: ['$tm.sampleType', '$sampleType'] } },
+      reportTime: { $first: { $ifNull: ['$tm.reportTime', '$reportTime'] } },
     }},
     { $sort: { labCount: -1 } },
     { $limit: limit },
@@ -419,7 +423,10 @@ async function _doReindexLabs() {
 }
 
 async function _doReindexProducts() {
-  const products = await Product.find().populate('lab', 'name slug city state address area pincode').lean();
+  const products = await Product.find()
+    .populate('lab', 'name slug city state address area pincode')
+    .populate('testMaster', 'name description sampleType reportTime fastingRequired homeCollection')
+    .lean();
   const records = products.map(productRecord);
   await setIndexSettings('products', {
     searchableAttributes: ['name', 'tags', 'description', 'type', 'sampleType'],
