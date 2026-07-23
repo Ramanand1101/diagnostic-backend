@@ -1,4 +1,3 @@
-// Server Component with ISR — Google can crawl full lab page content
 import { notFound } from 'next/navigation';
 import Navbar   from '@/components/layout/Navbar';
 import Footer   from '@/components/layout/Footer';
@@ -7,16 +6,7 @@ import LabDetailClient from './LabDetailClient';
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
 
 export const revalidate = 60;
-
-export async function generateStaticParams() {
-  try {
-    const res = await fetch(`${API}/labs?limit=100&approved=true`, { next: { revalidate: 3600 } });
-    const data = await res.json();
-    return (data.items || data.labs || []).map((l) => ({ slug: l.slug }));
-  } catch {
-    return [];
-  }
-}
+export const dynamicParams = true;
 
 export async function generateMetadata({ params }) {
   try {
