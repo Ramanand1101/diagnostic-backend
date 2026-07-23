@@ -1,19 +1,75 @@
 const asyncHandler = require('express-async-handler');
-const Product = require('../models/Product');
+const Product    = require('../models/Product');
+const TestMaster = require('../models/TestMaster');
 const { syncObjects, deleteObject } = require('../services/algoliaSync');
-const makeSlug = require('../utils/slug');
+const makeSlug   = require('../utils/slug');
 const { parseCSV } = require('../utils/csvParser');
 
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+// Resolve testMaster ObjectId and return { testMaster, name } for Product.
+// Throws if the ID is given but invalid.
+async function resolveTestMaster(tmId) {
+  if (!tmId) return {};
+  const tm = await TestMaster.findById(tmId).lean();
+  if (!tm) throw new Error('TestMaster entry not found');
+  return { testMaster: tm._id, name: tm.name };
+}
+
+// Build an Algolia record from a fully-populated product doc.
+function toAlgoliaRecord(p) {
+  const tm  = p.testMaster || {};
+  const lab = p.lab        || {};
+  return {
+    objectID:        String(p._id),
+    id:              String(p._id),
+    type:            p.type || 'test',
+    name:            p.name,
+    slug:            p.slug,
+    // metadata lives in TestMaster — read via populate
+    description:     tm.description    || '',
+    sampleType:      tm.sampleType     || '',
+    reportTime:      tm.reportTime     || '',
+    fastingRequired: !!tm.fastingRequired,
+    homeCollection:  !!tm.homeCollection,
+    category:        tm.category  ? String(tm.category._id  || tm.category)  : null,
+    categoryName:    tm.category?.name || '',
+    subcategory:     tm.subcategory ? String(tm.subcategory._id || tm.subcategory) : null,
+    // lab + pricing are per-product
+    price:           p.price        || 0,
+    salePrice:       p.salePrice    || null,
+    discountPercent: p.discountPercent || null,
+    brand:           p.brand        || '',
+    tags:            p.tags         || [],
+    lab: lab._id ? {
+      _id:     String(lab._id),
+      name:    lab.name    || '',
+      slug:    lab.slug    || '',
+      city:    lab.city    || '',
+      state:   lab.state   || '',
+      address: lab.address || '',
+      area:    lab.area    || '',
+      pincode: lab.pincode || '',
+    } : null,
+    isFeatured: !!p.isFeatured,
+    isActive:   !!p.isActive,
+  };
+}
+
+const TM_POPULATE = { path: 'testMaster', select: 'name category subcategory description sampleType reportTime fastingRequired homeCollection' };
+const LAB_SELECT  = 'name slug city state address area pincode email homeCollection ratingAvg';
+
+// ─── public routes ────────────────────────────────────────────────────────────
+
 exports.listProducts = asyncHandler(async (req, res) => {
-  const { type, q, lab, city, category, brand, featured, fastingRequired, homeCollection, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const { type, q, lab, city, page = 1, limit = 20, sort = '-createdAt',
+          brand, featured } = req.query;
+
   const filter = { isActive: true };
-  if (type) filter.type = type;
-  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }, { tags: new RegExp(q, 'i') }];
-  if (category) filter.category = category;
-  if (brand) filter.brand = new RegExp(brand, 'i');
-  if (featured !== undefined) filter.isFeatured = featured === 'true';
-  if (fastingRequired !== undefined) filter.fastingRequired = fastingRequired === 'true';
-  if (homeCollection !== undefined) filter.homeCollection = homeCollection === 'true';
+  if (type)     filter.type      = type;
+  if (q)        filter.name      = new RegExp(q, 'i');
+  if (brand)    filter.brand     = new RegExp(brand, 'i');
+  if (featured) filter.isFeatured = featured === 'true';
 
   if (city) {
     const Lab = require('../models/Lab');
@@ -24,52 +80,70 @@ exports.listProducts = asyncHandler(async (req, res) => {
   }
 
   const skip = (Number(page) - 1) * Number(limit);
-  const items = await Product.find(filter).populate('lab category').sort(sort).skip(skip).limit(Number(limit));
-  const total = await Product.countDocuments(filter);
+  const [items, total] = await Promise.all([
+    Product.find(filter)
+      .populate(TM_POPULATE)
+      .populate('lab', LAB_SELECT)
+      .sort(sort).skip(skip).limit(Number(limit)),
+    Product.countDocuments(filter),
+  ]);
   res.json({ items, page: Number(page), limit: Number(limit), total });
 });
 
 exports.getProductBySlug = asyncHandler(async (req, res) => {
-  const product = await Product.findOne({ slug: req.params.slug }).populate('lab category');
+  const product = await Product.findOne({ slug: req.params.slug })
+    .populate(TM_POPULATE)
+    .populate('lab', LAB_SELECT);
   if (!product) return res.status(404).json({ message: 'Product not found' });
   res.json(product);
 });
 
-exports.createProduct = asyncHandler(async (req, res) => {
-  if (!req.body.slug && req.body.name) {
-    const labSuffix = req.body.lab ? String(req.body.lab).slice(-6) : Date.now().toString().slice(-6);
-    req.body.slug = makeSlug(`${req.body.name}-${labSuffix}`);
+// ─── admin routes ─────────────────────────────────────────────────────────────
+
+exports.adminListProducts = asyncHandler(async (req, res) => {
+  const { q, lab, category, type, isActive, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
+  const filter = {};
+  if (type)                    filter.type     = type;
+  if (q)                       filter.name     = new RegExp(q, 'i');
+  if (lab)                     filter.lab      = lab;
+  if (isActive !== undefined)  filter.isActive = isActive === 'true';
+
+  // category filter: find TestMaster IDs with that category, then filter products
+  if (category) {
+    const tmIds = await TestMaster.find({ category }).select('_id').lean();
+    filter.testMaster = { $in: tmIds.map((t) => t._id) };
   }
-  if (['superadmin', 'subadmin'].includes(req.user?.role)) req.body.addedByAdmin = true;
-  const product = await Product.create(req.body);
-  await syncObjects('products', [{
-    objectID: String(product._id),
-    id: String(product._id),
-    type: product.type,
-    name: product.name,
-    slug: product.slug,
-    description: product.description || '',
-    price: product.price,
-    salePrice: product.salePrice || null,
-    discountPercent: product.discountPercent || null,
-    reportTime: product.reportTime || '',
-    homeCollection: !!product.homeCollection,
-    fastingRequired: !!product.fastingRequired,
-    brand: product.brand || '',
-    tags: product.tags || [],
-    category: product.category ? String(product.category) : null,
-    lab: product.lab ? String(product.lab) : null,
-    isFeatured: !!product.isFeatured,
-    isActive: !!product.isActive
-  }]);
-  res.status(201).json(product);
+
+  const skip = (Number(page) - 1) * safeLimit;
+  const [items, total] = await Promise.all([
+    Product.find(filter)
+      .populate(TM_POPULATE)
+      .populate('lab', 'name city email')
+      .sort(sort).skip(skip).limit(safeLimit),
+    Product.countDocuments(filter),
+  ]);
+  res.json({ items, page: Number(page), limit: safeLimit, total });
+});
+
+exports.createProduct = asyncHandler(async (req, res) => {
+  const tmData = await resolveTestMaster(req.body.testMaster);
+  const body = { ...req.body, ...tmData };
+
+  if (!body.slug && body.name) {
+    const labSuffix = body.lab ? String(body.lab).slice(-6) : Date.now().toString().slice(-6);
+    body.slug = makeSlug(`${body.name}-${labSuffix}`);
+  }
+  if (['superadmin', 'subadmin'].includes(req.user?.role)) body.addedByAdmin = true;
+
+  const product = await Product.create(body);
+  const populated = await product.populate([TM_POPULATE, { path: 'lab', select: LAB_SELECT }]);
+  try { await syncObjects('products', [toAlgoliaRecord(populated)]); } catch {}
+  res.status(201).json(populated);
 });
 
 exports.updateProduct = asyncHandler(async (req, res) => {
-  const payload = { ...req.body };
-  if (payload.name && !payload.slug) payload.slug = makeSlug(payload.name);
-
-  // Lab role: only update products that belong to their lab
+  // Lab role: guard to own lab only
   if (req.user.role === 'lab') {
     const Lab = require('../models/Lab');
     const myLab = await Lab.findOne({ owners: req.user._id });
@@ -78,375 +152,24 @@ exports.updateProduct = asyncHandler(async (req, res) => {
     if (!existing) return res.status(403).json({ message: 'Not your product' });
   }
 
-  const product = await Product.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
+  const tmData  = await resolveTestMaster(req.body.testMaster);
+  const payload = { ...req.body, ...tmData };
+  if (payload.name && !payload.slug) payload.slug = makeSlug(payload.name);
+
+  const product = await Product.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true })
+    .populate(TM_POPULATE)
+    .populate('lab', LAB_SELECT);
   if (!product) return res.status(404).json({ message: 'Product not found' });
-  await syncObjects('products', [{
-    objectID: String(product._id),
-    id: String(product._id),
-    type: product.type,
-    name: product.name,
-    slug: product.slug,
-    description: product.description || '',
-    price: product.price,
-    salePrice: product.salePrice || null,
-    discountPercent: product.discountPercent || null,
-    reportTime: product.reportTime || '',
-    homeCollection: !!product.homeCollection,
-    fastingRequired: !!product.fastingRequired,
-    brand: product.brand || '',
-    tags: product.tags || [],
-    category: product.category ? String(product.category) : null,
-    lab: product.lab ? String(product.lab) : null,
-    isFeatured: !!product.isFeatured,
-    isActive: !!product.isActive
-  }]);
+  try { await syncObjects('products', [toAlgoliaRecord(product)]); } catch {}
   res.json(product);
 });
 
 exports.deleteProduct = asyncHandler(async (req, res) => {
   await Product.findByIdAndDelete(req.params.id);
-  await deleteObject('products', req.params.id);
+  try { await deleteObject('products', req.params.id); } catch {}
   res.json({ message: 'Deleted' });
 });
 
-// POST /api/v1/products/bulk-tests
-// Body: { labIds: [id,...], multipliers?: { labId: number }, skipExisting?: bool }
-// Uses the shared Lucknow test catalogue to seed products for the given labs.
-exports.bulkUploadTests = asyncHandler(async (req, res) => {
-  const { labIds, multipliers = {}, skipExisting = true } = req.body;
-  if (!Array.isArray(labIds) || !labIds.length) {
-    return res.status(400).json({ message: 'labIds array is required' });
-  }
-
-  const Lab      = require('../models/Lab');
-  const Category = require('../models/Category');
-  const {
-    RAW_TESTS, roundPrice, getCategory,
-    getSampleType, isFasting, isHomeCollection, getDesc, getReportTime,
-  } = require('../data/lucknowTestsData');
-  const DISCOUNT = 0.85;
-
-  const labs = await Lab.find({ _id: { $in: labIds } }).lean();
-  if (!labs.length) return res.status(404).json({ message: 'No matching labs found' });
-
-  // Upsert categories
-  const catNames = [...new Set(RAW_TESTS.map(([name]) => getCategory(name)))];
-  const catMap = {};
-  for (const catName of catNames) {
-    let cat = await Category.findOne({ name: catName });
-    if (!cat) {
-      cat = await Category.create({ name: catName, slug: makeSlug(catName), type: 'test' });
-    }
-    catMap[catName] = cat._id;
-  }
-
-  let created = 0, skipped = 0;
-  const algoliaPayload = [];
-
-  for (const [testName, basePrice] of RAW_TESTS) {
-    const cat     = getCategory(testName);
-    const catId   = catMap[cat];
-    const sample  = getSampleType(testName);
-    const fasting = isFasting(testName);
-    const home    = isHomeCollection(testName);
-    const desc    = getDesc(cat);
-    const tags    = [testName.split(' ')[0], cat.split(' ')[0], sample].filter(Boolean);
-
-    for (const lab of labs) {
-      const multiplier = multipliers[String(lab._id)] ?? 1.0;
-      const price = roundPrice(basePrice * multiplier);
-      const sale  = roundPrice(price * DISCOUNT);
-      const slug  = makeSlug(`${testName} ${lab.name}`);
-
-      if (skipExisting) {
-        const exists = await Product.findOne({ slug });
-        if (exists) { skipped++; continue; }
-      }
-
-      const product = await Product.create({
-        name:            testName,
-        slug,
-        type:            'test',
-        category:        catId,
-        lab:             lab._id,
-        description:     desc,
-        price,
-        salePrice:       sale < price ? sale : undefined,
-        sampleType:      sample,
-        fastingRequired: fasting,
-        homeCollection:  home,
-        reportTime:      getReportTime(basePrice),
-        tags,
-        isActive:        true,
-        isFeatured:      false,
-      });
-      created++;
-
-      algoliaPayload.push({
-        objectID: String(product._id), name: product.name, slug: product.slug,
-        type: product.type, description: product.description || '',
-        price: product.price, salePrice: product.salePrice || null,
-        reportTime: product.reportTime || '', sampleType: product.sampleType || '',
-        homeCollection: !!product.homeCollection, fastingRequired: !!product.fastingRequired,
-        tags: product.tags || [], lab: String(product.lab),
-        isFeatured: false, isActive: true,
-      });
-    }
-  }
-
-  if (algoliaPayload.length) {
-    await syncObjects('products', algoliaPayload);
-  }
-
-  res.json({
-    created,
-    skipped,
-    total: created + skipped,
-    labs: labs.map((l) => ({ _id: l._id, name: l.name })),
-  });
-});
-
-// DELETE /api/v1/products/bulk-delete
-exports.bulkDeleteProducts = asyncHandler(async (req, res) => {
-  const { ids } = req.body;
-  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ message: 'ids array required' });
-  const result = await Product.deleteMany({ _id: { $in: ids } });
-  res.json({ deleted: result.deletedCount });
-});
-
-// PATCH /api/v1/products/bulk-price — set salePrice on multiple products
-exports.bulkUpdatePrice = asyncHandler(async (req, res) => {
-  const { ids, salePrice, discountPercent } = req.body;
-  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ message: 'ids array required' });
-  const update = {};
-  if (salePrice !== undefined) update.salePrice = Number(salePrice) || null;
-  if (discountPercent !== undefined) update.discountPercent = Number(discountPercent) || null;
-  const result = await Product.updateMany({ _id: { $in: ids } }, update);
-  res.json({ updated: result.modifiedCount });
-});
-
-// GET /api/v1/products/admin — lists ALL products (including inactive) for admin
-exports.adminListProducts = asyncHandler(async (req, res) => {
-  const { q, lab, category, type, isActive, page = 1, limit = 20, sort = '-createdAt' } = req.query;
-  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
-  const filter = {};
-  if (type) filter.type = type;
-  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }];
-  if (category) filter.category = category;
-  if (lab) filter.lab = lab;
-  if (isActive !== undefined) filter.isActive = isActive === 'true';
-
-  const skip = (Number(page) - 1) * safeLimit;
-  const [items, total] = await Promise.all([
-    Product.find(filter).populate('lab', 'name city').populate('category', 'name').populate('subcategory', 'name').sort(sort).skip(skip).limit(safeLimit),
-    Product.countDocuments(filter),
-  ]);
-  res.json({ items, page: Number(page), limit: safeLimit, total });
-});
-
-// GET /api/v1/products/demo-csv — generates XLSX template from TestMaster (only name column locked)
-exports.productDemoCsv = asyncHandler(async (req, res) => {
-  const XLSX = require('xlsx');
-  const TestMaster = require('../models/TestMaster');
-  const { labEmails = '', brand = '' } = req.query;
-
-  const emailList = labEmails ? labEmails.split(',').map((e) => e.trim()).filter(Boolean) : [''];
-
-  const tests = await TestMaster.find({}).populate('category', 'name').sort('name').limit(200).lean();
-
-  const FALLBACK = [
-    { name: 'CBC Complete Blood Count', reportTime: '24 hours', sampleType: 'Blood', homeCollection: false, fastingRequired: true, description: 'Measures blood components', category: { name: 'Pathology' } },
-    { name: 'Lipid Profile', reportTime: 'Same day', sampleType: 'Blood', homeCollection: false, fastingRequired: true, description: 'Cholesterol analysis', category: { name: 'Pathology' } },
-    { name: 'Full Body Checkup', reportTime: '48 hours', sampleType: 'Blood', homeCollection: false, fastingRequired: true, description: 'Comprehensive health check', category: { name: 'Packages' } },
-    { name: 'Thyroid Profile (T3 T4 TSH)', reportTime: '24 hours', sampleType: 'Blood', homeCollection: false, fastingRequired: false, description: 'Thyroid hormone levels', category: { name: 'Pathology' } },
-    { name: 'HbA1c (Glycated Haemoglobin)', reportTime: 'Same day', sampleType: 'Blood', homeCollection: false, fastingRequired: false, description: '3-month blood sugar average', category: { name: 'Diabetes' } },
-  ];
-  const source = tests.length > 0 ? tests : FALLBACK;
-
-  const headers = ['name', 'price', 'salePrice', 'reportTime', 'sampleType', 'homeCollection', 'fastingRequired', 'description', 'category', 'labEmail', 'brand'];
-  const numCols = headers.length;
-
-  const aoa = [headers];
-  for (const labEmail of emailList) {
-    for (const t of source) {
-      aoa.push([
-        t.name,
-        0, 0,
-        t.reportTime || '',
-        t.sampleType || '',
-        !!t.homeCollection,
-        !!t.fastingRequired,
-        t.description || '',
-        t.category?.name || '',
-        labEmail,
-        brand,
-      ]);
-    }
-  }
-
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [
-    { wch: 42 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 },
-    { wch: 16 }, { wch: 16 }, { wch: 40 }, { wch: 16 }, { wch: 32 }, { wch: 20 },
-  ];
-  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'products');
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="products-template.xlsx"');
-  res.send(buf);
-});
-
-// POST /api/v1/products/bulk-csv — admin only
-// CSV columns: name, price, salePrice, reportTime, sampleType, homeCollection,
-//              fastingRequired, description, category, labEmail, brand
-//
-// Lab resolution priority:
-//   1. brand column  → applies to ALL labs matching that brand (multi-lab insert per row)
-//   2. labEmail      → single lab matched by email
-//   3. neither       → product created with no lab
-exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
-  if (!req.file) return res.status(400).json({ message: 'File is required (CSV or XLSX).' });
-
-  // Parse CSV or XLSX
-  let rows;
-  const isXlsx = req.file.originalname?.toLowerCase().endsWith('.xlsx') ||
-    req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  if (isXlsx) {
-    const XLSX = require('xlsx');
-    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-    rows = rawRows.map((r) => {
-      const lower = {};
-      for (const [k, v] of Object.entries(r)) lower[k.toLowerCase().replace(/[\s_-]+/g, '')] = String(v ?? '').trim();
-      return lower;
-    });
-  } else {
-    ({ rows } = parseCSV(req.file.buffer));
-  }
-  if (!rows.length) return res.status(400).json({ message: 'File has no data rows.' });
-
-  const Lab = require('../models/Lab');
-  const Category = require('../models/Category');
-  const TestMaster = require('../models/TestMaster');
-  const algoliaRows = [];
-  let created = 0;
-  const errors = [];
-
-  // UI-selected labs override — resolve once before the loop
-  const overrideLabEmails = (req.query.labEmails || '').split(',').map((e) => e.trim()).filter(Boolean);
-  let overrideLabs = [];
-  if (overrideLabEmails.length > 0) {
-    overrideLabs = (
-      await Promise.all(
-        overrideLabEmails.map((email) =>
-          Lab.findOne({ email: new RegExp(`^${email}$`, 'i') }).select('_id name').lean()
-        )
-      )
-    ).filter(Boolean);
-  }
-
-  for (const [i, row] of rows.entries()) {
-    if (!row.name) { errors.push({ row: i + 2, error: 'name is required' }); continue; }
-    if (!row.price) { errors.push({ row: i + 2, error: 'price is required' }); continue; }
-
-    // Validate name against TestMaster list
-    const escapedRowName = row.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const masterTest = await TestMaster.findOne({ name: new RegExp(`^${escapedRowName}$`, 'i') });
-    if (!masterTest) {
-      errors.push({ row: i + 2, error: `"${row.name}" — name not found in Test Master List. Add it to Test Master first or check spelling.` });
-      continue;
-    }
-
-    try {
-      // Resolve category
-      let categoryId = null;
-      const catName = row.category || row.categoryname || '';
-      if (catName) {
-        let cat = await Category.findOne({ name: new RegExp(`^${catName}$`, 'i') });
-        if (!cat) cat = await Category.create({ name: catName, slug: makeSlug(catName) });
-        categoryId = cat._id;
-      }
-
-      // Resolve target labs
-      // Priority: 1. UI-selected labEmails param  2. brand column  3. labEmail column
-      const Brand = require('../models/Brand');
-      const brandKey = (row.brand || '').trim();
-      const emailKey = (row.labemail || row.lab_email || '').trim();
-
-      let targetLabs = [];
-      if (overrideLabEmails.length > 0) {
-        // Labs selected from UI — use those directly, ignore CSV lab columns
-        targetLabs = overrideLabs;
-      } else if (brandKey) {
-        const brandDoc = await Brand.findOne({ name: new RegExp(`^${brandKey}$`, 'i') });
-        if (!brandDoc) {
-          errors.push({ row: i + 2, error: `Brand "${brandKey}" not found. Create it in Admin → Brands first.` });
-          continue;
-        }
-        targetLabs = await Lab.find({ brand: brandDoc._id }).select('_id name').lean();
-        if (!targetLabs.length) {
-          errors.push({ row: i + 2, error: `Brand "${brandKey}" exists but has no labs assigned yet.` });
-          continue;
-        }
-      } else if (emailKey) {
-        const lab = await Lab.findOne({ email: new RegExp(`^${emailKey}$`, 'i') }).select('_id name').lean();
-        if (lab) targetLabs = [lab];
-      }
-
-      // Build base product data
-      const baseData = {
-        name: row.name,
-        price: Number(row.price) || 0,
-        salePrice: row.saleprice ? Number(row.saleprice) : undefined,
-        reportTime: row.reporttime || '',
-        sampleType: row.sampletype || '',
-        homeCollection: row.homecollection === 'true' || row.homecollection === '1',
-        fastingRequired: row.fastingrequired === 'true' || row.fastingrequired === '1',
-        description: row.description || '',
-        category: categoryId,
-        isActive: true,
-      };
-
-      if (targetLabs.length === 0) {
-        // No lab — create one product without lab
-        const product = await Product.create({ ...baseData, slug: makeSlug(`${row.name}-${Date.now()}`) });
-        algoliaRows.push(product);
-        created++;
-      } else {
-        // Create one product per target lab
-        for (const lab of targetLabs) {
-          const product = await Product.create({
-            ...baseData,
-            lab: lab._id,
-            slug: makeSlug(`${row.name}-${lab.name}-${Date.now()}`),
-          });
-          algoliaRows.push(product);
-          created++;
-        }
-      }
-    } catch (err) {
-      errors.push({ row: i + 2, error: err.message });
-    }
-  }
-
-  // Sync to Algolia
-  if (algoliaRows.length) {
-    await syncObjects('products', algoliaRows.map((p) => ({
-      objectID: String(p._id), name: p.name, slug: p.slug,
-      price: p.price, salePrice: p.salePrice || null,
-      lab: p.lab ? String(p.lab) : null, isActive: true,
-    })));
-  }
-
-  res.json({ created, errors, total: rows.length });
-});
-
-// PATCH /api/v1/products/:id/set-price — lab owner sets price for a product on their lab
 exports.setPrice = asyncHandler(async (req, res) => {
   const Lab = require('../models/Lab');
   const lab = await Lab.findOne({ owners: req.user._id });
@@ -456,150 +179,203 @@ exports.setPrice = asyncHandler(async (req, res) => {
   if (!product) return res.status(404).json({ message: 'Product not found in your lab' });
 
   const { price, salePrice, discountPercent } = req.body;
-  if (price !== undefined) product.price = Number(price);
-  if (salePrice !== undefined) product.salePrice = salePrice ? Number(salePrice) : undefined;
-  if (discountPercent !== undefined) product.discountPercent = discountPercent ? Number(discountPercent) : undefined;
+  if (price           !== undefined) product.price           = Number(price);
+  if (salePrice       !== undefined) product.salePrice       = salePrice       ? Number(salePrice)       : undefined;
+  if (discountPercent !== undefined) product.discountPercent = discountPercent  ? Number(discountPercent) : undefined;
   await product.save();
 
-  syncObjects('products', [{
-    objectID: String(product._id),
-    id: String(product._id),
-    type: product.type,
-    name: product.name,
-    slug: product.slug,
-    description: product.description || '',
-    price: product.price,
-    salePrice: product.salePrice || null,
-    discountPercent: product.discountPercent || null,
-    reportTime: product.reportTime || '',
-    homeCollection: !!product.homeCollection,
-    fastingRequired: !!product.fastingRequired,
-    brand: product.brand || '',
-    tags: product.tags || [],
-    category: product.category ? String(product.category) : null,
-    lab: product.lab ? String(product.lab) : null,
-    isFeatured: !!product.isFeatured,
-    isActive: !!product.isActive,
-  }]).catch(() => {});
-
-  res.json(product);
+  const populated = await product.populate([TM_POPULATE, { path: 'lab', select: LAB_SELECT }]);
+  try { syncObjects('products', [toAlgoliaRecord(populated)]).catch(() => {}); } catch {}
+  res.json(populated);
 });
 
-// GET /api/v1/products/export-csv — admin: download all products as CSV
-exports.exportCsv = asyncHandler(async (req, res) => {
-  const { q, lab, category } = req.query;
-  const filter = {};
-  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { description: new RegExp(q, 'i') }];
-  if (category) filter.category = category;
-  if (lab) filter.lab = lab;
+// ─── bulk operations ──────────────────────────────────────────────────────────
 
-  const items = await Product.find(filter)
-    .populate('lab', 'name city email')
-    .populate('category', 'name')
-    .populate('subcategory', 'name')
-    .sort('-createdAt')
-    .limit(10000)
-    .lean();
-
-  const escape = (v) => {
-    const s = v == null ? '' : String(v);
-    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-
-  const headers = ['name','price','salePrice','reportTime','sampleType','homeCollection','fastingRequired','description','category','subcategory','lab','labCity','labEmail','isActive','isFeatured','addedByAdmin'];
-  const rows = items.map((p) => [
-    p.name,
-    p.price || '',
-    p.salePrice || '',
-    p.reportTime || '',
-    p.sampleType || '',
-    p.homeCollection ? 'true' : 'false',
-    p.fastingRequired ? 'true' : 'false',
-    (p.description || '').replace(/\n/g, ' '),
-    p.category?.name || '',
-    p.subcategory?.name || '',
-    p.lab?.name || '',
-    p.lab?.city || '',
-    p.lab?.email || '',
-    p.isActive ? 'true' : 'false',
-    p.isFeatured ? 'true' : 'false',
-    p.addedByAdmin ? 'true' : 'false',
-  ].map(escape).join(','));
-
-  const csv = [headers.join(','), ...rows].join('\n');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="products-export-${Date.now()}.csv"`);
-  res.send(csv);
+exports.bulkDeleteProducts = asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ message: 'ids array required' });
+  await Product.deleteMany({ _id: { $in: ids } });
+  res.json({ deleted: ids.length });
 });
 
-// GET /api/v1/products/lab-demo-csv — lab user: download template
+exports.bulkUpdatePrice = asyncHandler(async (req, res) => {
+  const { ids, salePrice, discountPercent } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ message: 'ids array required' });
+  const update = {};
+  if (salePrice       !== undefined) update.salePrice       = Number(salePrice)       || null;
+  if (discountPercent !== undefined) update.discountPercent = Number(discountPercent) || null;
+  const result = await Product.updateMany({ _id: { $in: ids } }, update);
+  res.json({ updated: result.modifiedCount });
+});
+
+// ─── CSV / XLSX upload & demo ─────────────────────────────────────────────────
+
+exports.productDemoCsv = asyncHandler(async (req, res) => {
+  const XLSX = require('xlsx');
+  const { labEmails = '', brand = '' } = req.query;
+  const emailList = labEmails ? labEmails.split(',').map((e) => e.trim()).filter(Boolean) : [''];
+
+  const tests = await TestMaster.find({}).populate('category', 'name').sort('name').limit(200).lean();
+  const source = tests.length ? tests : [
+    { name: 'CBC Complete Blood Count', reportTime: '24 hours', sampleType: 'Blood', homeCollection: false, fastingRequired: true, description: 'Measures blood components', category: { name: 'Pathology' } },
+    { name: 'Lipid Profile', reportTime: 'Same day', sampleType: 'Blood', homeCollection: false, fastingRequired: true, description: 'Cholesterol analysis', category: { name: 'Pathology' } },
+  ];
+
+  const headers = ['name', 'price', 'salePrice', 'labEmail', 'brand'];
+  const aoa = [headers];
+  for (const labEmail of emailList) {
+    for (const t of source) {
+      aoa.push([t.name, 0, 0, labEmail, brand]);
+    }
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 42 }, { wch: 10 }, { wch: 10 }, { wch: 32 }, { wch: 20 }];
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'products');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="products-template.xlsx"');
+  res.send(buf);
+});
+
+exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'File is required (CSV or XLSX).' });
+
+  let rows;
+  const isXlsx = req.file.originalname?.toLowerCase().endsWith('.xlsx') ||
+    req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (isXlsx) {
+    const XLSX = require('xlsx');
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    rows = XLSX.utils.sheet_to_json(ws, { defval: '' }).map((r) => {
+      const lower = {};
+      for (const [k, v] of Object.entries(r)) lower[k.toLowerCase().replace(/[\s_-]+/g, '')] = String(v ?? '').trim();
+      return lower;
+    });
+  } else {
+    ({ rows } = parseCSV(req.file.buffer));
+  }
+  if (!rows.length) return res.status(400).json({ message: 'File has no data rows.' });
+
+  const Lab   = require('../models/Lab');
+  const Brand = require('../models/Brand');
+  const overrideLabEmails = (req.query.labEmails || '').split(',').map((e) => e.trim()).filter(Boolean);
+  let overrideLabs = [];
+  if (overrideLabEmails.length) {
+    overrideLabs = (await Promise.all(
+      overrideLabEmails.map((email) => Lab.findOne({ email: new RegExp(`^${email}$`, 'i') }).select('_id name').lean())
+    )).filter(Boolean);
+  }
+
+  let created = 0;
+  const errors = [];
+  const algoliaRows = [];
+
+  for (const [i, row] of rows.entries()) {
+    if (!row.name)  { errors.push({ row: i + 2, error: 'name is required' }); continue; }
+    if (!row.price) { errors.push({ row: i + 2, error: 'price is required' }); continue; }
+
+    const esc = row.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const tm  = await TestMaster.findOne({ name: new RegExp(`^${esc}$`, 'i') }).lean();
+    if (!tm) {
+      errors.push({ row: i + 2, error: `"${row.name}" not found in Test Master. Add it first.` });
+      continue;
+    }
+
+    try {
+      let targetLabs = [];
+      if (overrideLabEmails.length) {
+        targetLabs = overrideLabs;
+      } else if ((row.brand || '').trim()) {
+        const brandDoc = await Brand.findOne({ name: new RegExp(`^${row.brand.trim()}$`, 'i') });
+        if (!brandDoc) { errors.push({ row: i + 2, error: `Brand "${row.brand}" not found.` }); continue; }
+        targetLabs = await Lab.find({ brand: brandDoc._id }).select('_id name').lean();
+        if (!targetLabs.length) { errors.push({ row: i + 2, error: `Brand "${row.brand}" has no labs.` }); continue; }
+      } else if ((row.labemail || row.lab_email || '').trim()) {
+        const emailKey = (row.labemail || row.lab_email || '').trim();
+        const lab = await Lab.findOne({ email: new RegExp(`^${emailKey}$`, 'i') }).select('_id name').lean();
+        if (lab) targetLabs = [lab];
+      }
+
+      // Product stores ONLY: testMaster ref + name (cache) + lab + pricing
+      const base = {
+        testMaster: tm._id,
+        name:       tm.name,
+        price:      Number(row.price)    || 0,
+        salePrice:  row.saleprice ? Number(row.saleprice) : undefined,
+        isActive:   true,
+      };
+
+      const labList = targetLabs.length ? targetLabs : [null];
+      for (const lab of labList) {
+        const product = await Product.create({
+          ...base,
+          lab:  lab?._id || undefined,
+          slug: makeSlug(`${tm.name}-${lab?.name || Date.now()}-${Date.now()}`),
+        });
+        const populated = await product.populate([TM_POPULATE, { path: 'lab', select: LAB_SELECT }]);
+        algoliaRows.push(toAlgoliaRecord(populated));
+        created++;
+      }
+    } catch (err) {
+      errors.push({ row: i + 2, error: err.message });
+    }
+  }
+
+  try { if (algoliaRows.length) await syncObjects('products', algoliaRows); } catch {}
+  res.json({ created, errors, total: rows.length });
+});
+
 exports.labDemoCsv = (req, res) => {
-  const rows = [
-    'name,price,salePrice,reportTime,sampleType,fastingRequired,homeCollection,description,category,tags',
-    'Complete Blood Count (CBC),500,399,Same day,Blood,true,false,Full blood analysis including RBC WBC platelets,Pathology,cbc;blood',
-    'Urine Routine Examination,200,149,Same day,Urine,false,false,Complete urine analysis,Pathology,urine;routine',
-    'Thyroid Profile (T3 T4 TSH),800,599,Within 24 hours,Blood,false,false,Checks thyroid hormone levels,Hormones,thyroid;tsh',
-    'Lipid Profile,600,449,Same day,Blood,true,false,Cholesterol and triglyceride panel,Cardiology,cholesterol;lipid',
-    'HbA1c (Glycated Haemoglobin),700,549,Same day,Blood,false,false,3-month average blood sugar indicator,Diabetes,hba1c;diabetes',
+  const csv = [
+    'name,price,salePrice,tags',
+    'Complete Blood Count (CBC),500,399,cbc;blood',
+    'Urine Routine Examination,200,149,urine;routine',
+    'Thyroid Profile (T3 T4 TSH),800,599,thyroid;tsh',
+    'Lipid Profile,600,449,cholesterol;lipid',
   ].join('\n');
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="lab-tests-template.csv"');
-  res.send(rows);
+  res.send(csv);
 };
 
-// POST /api/v1/products/lab-bulk-csv — lab user: upload tests for their own lab
 exports.labBulkCsv = asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'CSV file is required.' });
-
   const Lab = require('../models/Lab');
-  const Category = require('../models/Category');
-
   const lab = await Lab.findOne({ owners: req.user._id });
   if (!lab) return res.status(403).json({ message: 'No lab found for your account' });
 
   const { rows } = parseCSV(req.file.buffer);
   if (!rows.length) return res.status(400).json({ message: 'CSV has no data rows.' });
 
-  const created = [];
-  const errors = [];
-  const algoliaRows = [];
+  const created = [], errors = [], algoliaRows = [];
 
   for (const [i, row] of rows.entries()) {
-    if (!row.name) { errors.push({ row: i + 2, error: 'name is required' }); continue; }
+    if (!row.name)  { errors.push({ row: i + 2, error: 'name is required' }); continue; }
     if (!row.price) { errors.push({ row: i + 2, error: 'price is required' }); continue; }
 
+    const esc = row.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const tm  = await TestMaster.findOne({ name: new RegExp(`^${esc}$`, 'i') }).lean();
+    if (!tm) { errors.push({ row: i + 2, error: `"${row.name}" not found in Test Master.` }); continue; }
+
     try {
-      // Resolve category
-      let categoryId = null;
-      const catName = (row.category || '').trim();
-      if (catName) {
-        let cat = await Category.findOne({ name: new RegExp(`^${catName}$`, 'i') });
-        if (!cat) cat = await Category.create({ name: catName, slug: makeSlug(catName) });
-        categoryId = cat._id;
-      }
-
-      const labSuffix = String(lab._id).slice(-6);
-      const slug = makeSlug(`${row.name}-${labSuffix}-${Date.now()}`);
-      const tags = (row.tags || '').split(/[;,]/).map((t) => t.trim()).filter(Boolean);
-
+      const tags    = (row.tags || '').split(/[;,]/).map((t) => t.trim()).filter(Boolean);
       const product = await Product.create({
-        name: row.name,
-        slug,
-        lab: lab._id,
-        price: Number(row.price) || 0,
-        salePrice: row.saleprice ? Number(row.saleprice) : undefined,
-        reportTime: row.reporttime || '',
-        sampleType: row.sampletype || '',
-        homeCollection: row.homecollection === 'true' || row.homecollection === '1',
-        fastingRequired: row.fastingrequired === 'true' || row.fastingrequired === '1',
-        description: row.description || '',
-        category: categoryId,
+        testMaster: tm._id,
+        name:       tm.name,
+        slug:       makeSlug(`${tm.name}-${String(lab._id).slice(-6)}-${Date.now()}`),
+        lab:        lab._id,
+        price:      Number(row.price)    || 0,
+        salePrice:  row.saleprice ? Number(row.saleprice) : undefined,
         tags,
-        isActive: true,
-        addedByAdmin: false,
+        isActive:   true,
       });
-
-      algoliaRows.push({ objectID: String(product._id), name: product.name, lab: lab.name });
+      const populated = await product.populate([TM_POPULATE, { path: 'lab', select: LAB_SELECT }]);
+      algoliaRows.push(toAlgoliaRecord(populated));
       created.push(product._id);
     } catch (err) {
       errors.push({ row: i + 2, error: err.message });
@@ -607,11 +383,139 @@ exports.labBulkCsv = asyncHandler(async (req, res) => {
   }
 
   try { if (algoliaRows.length) await syncObjects('products', algoliaRows); } catch {}
+  res.json({ message: `${created.length} test(s) uploaded`, created: created.length, errors, total: rows.length });
+});
 
-  res.json({
-    message: `${created.length} test(s) uploaded successfully`,
-    created: created.length,
-    errors,
-    total: rows.length,
-  });
+exports.exportCsv = asyncHandler(async (req, res) => {
+  const { q, lab, category } = req.query;
+  const filter = {};
+  if (q)   filter.name = new RegExp(q, 'i');
+  if (lab) filter.lab  = lab;
+  if (category) {
+    const tmIds = await TestMaster.find({ category }).select('_id').lean();
+    filter.testMaster = { $in: tmIds.map((t) => t._id) };
+  }
+
+  const items = await Product.find(filter)
+    .populate(TM_POPULATE)
+    .populate('lab', 'name city email')
+    .sort('-createdAt').limit(10000).lean();
+
+  const esc = (v) => { const s = String(v ?? ''); return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s; };
+  const headers = ['name','price','salePrice','reportTime','sampleType','homeCollection','fastingRequired','description','category','lab','labCity','labEmail','isActive','isFeatured'];
+  const rows = items.map((p) => [
+    p.name,
+    p.price           || '',
+    p.salePrice       || '',
+    p.testMaster?.reportTime     || '',
+    p.testMaster?.sampleType     || '',
+    p.testMaster?.homeCollection  ? 'true' : 'false',
+    p.testMaster?.fastingRequired ? 'true' : 'false',
+    (p.testMaster?.description || '').replace(/\n/g, ' '),
+    p.testMaster?.category?.name  || '',
+    p.lab?.name  || '',
+    p.lab?.city  || '',
+    p.lab?.email || '',
+    p.isActive   ? 'true' : 'false',
+    p.isFeatured ? 'true' : 'false',
+  ].map(esc).join(','));
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="products-export-${Date.now()}.csv"`);
+  res.send([headers.join(','), ...rows].join('\n'));
+});
+
+// ─── bulk-tests (Lucknow catalogue seed) ─────────────────────────────────────
+
+exports.bulkUploadTests = asyncHandler(async (req, res) => {
+  const { labIds, multipliers = {}, skipExisting = true } = req.body;
+  if (!Array.isArray(labIds) || !labIds.length) return res.status(400).json({ message: 'labIds array is required' });
+
+  const Lab = require('../models/Lab');
+  const { RAW_TESTS, roundPrice, getCategory, getSampleType, isFasting, isHomeCollection, getDesc, getReportTime } = require('../data/lucknowTestsData');
+  const Category = require('../models/Category');
+  const DISCOUNT = 0.85;
+
+  const labs = await Lab.find({ _id: { $in: labIds } }).lean();
+  if (!labs.length) return res.status(404).json({ message: 'No matching labs found' });
+
+  const catNames = [...new Set(RAW_TESTS.map(([n]) => getCategory(n)))];
+  const catMap   = {};
+  for (const catName of catNames) {
+    let cat = await Category.findOne({ name: catName });
+    if (!cat) cat = await Category.create({ name: catName, slug: makeSlug(catName), type: 'test' });
+    catMap[catName] = cat._id;
+  }
+
+  let created = 0, skipped = 0;
+  const algoliaPayload = [];
+
+  for (const [testName, basePrice] of RAW_TESTS) {
+    const cat     = getCategory(testName);
+    const catId   = catMap[cat];
+    const tags    = [testName.split(' ')[0], cat.split(' ')[0], getSampleType(testName)].filter(Boolean);
+
+    // Upsert TestMaster entry
+    const esc = testName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let tm = await TestMaster.findOne({ name: new RegExp(`^${esc}$`, 'i') });
+    if (!tm) {
+      tm = await TestMaster.create({
+        name:            testName,
+        category:        catId,
+        sampleType:      getSampleType(testName),
+        fastingRequired: isFasting(testName),
+        homeCollection:  isHomeCollection(testName),
+        description:     getDesc(cat),
+        reportTime:      getReportTime(basePrice),
+      });
+    }
+
+    for (const lab of labs) {
+      const multiplier = multipliers[String(lab._id)] ?? 1.0;
+      const price = roundPrice(basePrice * multiplier);
+      const sale  = roundPrice(price * DISCOUNT);
+      const slug  = makeSlug(`${testName} ${lab.name}`);
+
+      if (skipExisting && await Product.findOne({ slug })) { skipped++; continue; }
+
+      const product = await Product.create({
+        testMaster: tm._id,
+        name:       tm.name,
+        slug,
+        type:       'test',
+        lab:        lab._id,
+        price,
+        salePrice:  sale < price ? sale : undefined,
+        tags,
+        isActive:   true,
+      });
+      created++;
+
+      const populated = await product.populate([TM_POPULATE, { path: 'lab', select: LAB_SELECT }]);
+      algoliaPayload.push(toAlgoliaRecord(populated));
+    }
+  }
+
+  try { if (algoliaPayload.length) await syncObjects('products', algoliaPayload); } catch {}
+  res.json({ created, skipped, total: created + skipped, labs: labs.map((l) => ({ _id: l._id, name: l.name })) });
+});
+
+// ─── migration — link existing products to TestMaster by name ─────────────────
+
+exports.migrateTestMaster = asyncHandler(async (req, res) => {
+  const escape  = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const unlinked = await Product.find({ testMaster: null }).lean();
+  let linked = 0, notFound = 0;
+
+  for (const p of unlinked) {
+    const tm = await TestMaster.findOne({ name: new RegExp(`^${escape(p.name)}$`, 'i') }).lean();
+    if (tm) {
+      await Product.findByIdAndUpdate(p._id, { $set: { testMaster: tm._id, name: tm.name } });
+      linked++;
+    } else {
+      notFound++;
+    }
+  }
+
+  res.json({ total: unlinked.length, linked, notFound });
 });

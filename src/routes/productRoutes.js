@@ -11,6 +11,7 @@ router.get('/export-csv', protect, allowRoles('superadmin', 'subadmin'), control
 router.get('/demo-csv', controller.productDemoCsv);
 router.get('/lab-demo-csv', protect, allowRoles('lab'), controller.labDemoCsv);
 router.post('/bulk-tests', protect, allowRoles('superadmin', 'subadmin'), controller.bulkUploadTests);
+router.post('/migrate-testmaster', protect, allowRoles('superadmin'), controller.migrateTestMaster);
 router.post('/bulk-csv', protect, allowRoles('superadmin', 'subadmin'), csvUpload.single('file'), controller.bulkUploadProductsCsv);
 router.post('/lab-bulk-csv', protect, allowRoles('lab'), csvUpload.single('file'), controller.labBulkCsv);
 router.delete('/bulk-delete', protect, allowRoles('superadmin', 'subadmin'), controller.bulkDeleteProducts);

@@ -6,57 +6,27 @@ import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiDollarSign, FiDownload } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiDollarSign, FiDownload, FiLink } from 'react-icons/fi';
 
-function formatReportTime(val) {
-  if (!val) return '';
-  const trimmed = val.trim();
-  if (/^\d+$/.test(trimmed)) return `${trimmed} hours`;
-  return trimmed;
-}
 
 function ProductForm({ initial, labs, onSave, onClose }) {
+  // Product only stores: testMaster ref, name (cache), lab, pricing, isActive, isFeatured
+  // Everything else (sampleType, reportTime, category, etc.) comes from TestMaster via populate
   const [form, setForm] = useState({
+    testMaster: initial?.testMaster?._id || initial?.testMaster || '',
     name: initial?.name || '',
-    category: initial?.category?._id || initial?.category || '',
-    subcategory: initial?.subcategory?._id || initial?.subcategory || '',
     lab: initial?.lab?._id || initial?.lab || '',
     price: initial?.price || '',
     salePrice: initial?.salePrice || '',
     discountPercent: initial?.discountPercent || '',
-    description: initial?.description || '',
-    reportTime: initial?.reportTime || '',
-    sampleType: initial?.sampleType || '',
-    homeCollection: initial?.homeCollection || false,
-    fastingRequired: initial?.fastingRequired || false,
     isActive: initial?.isActive ?? true,
     isFeatured: initial?.isFeatured || false,
   });
+  // Read-only TestMaster metadata shown as info panel after test is selected
+  const [tmInfo, setTmInfo] = useState(
+    initial?.testMaster && typeof initial.testMaster === 'object' ? initial.testMaster : null
+  );
   const [loading, setLoading] = useState(false);
-
-  // Auto-populate from test master when editing an existing product
-  useEffect(() => {
-    if (!initial?.name) return;
-    testMasterApi.search(initial.name.trim())
-      .then((r) => {
-        const items = r.data.items || [];
-        const match = items.find((t) => t.name.toLowerCase() === initial.name.trim().toLowerCase()) || items[0];
-        if (!match) return;
-        setNameQuery(match.name);
-        setForm((f) => ({
-          ...f,
-          name: match.name,
-          sampleType: match.sampleType || f.sampleType,
-          reportTime: match.reportTime || f.reportTime,
-          fastingRequired: match.fastingRequired ?? f.fastingRequired,
-          homeCollection: match.homeCollection ?? f.homeCollection,
-          description: match.description || f.description,
-          category: match.category?._id || match.category || f.category,
-          subcategory: match.subcategory?._id || match.subcategory || '',
-        }));
-      })
-      .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // TestMaster autocomplete
   const [nameQuery, setNameQuery] = useState(initial?.name || '');
@@ -89,17 +59,8 @@ function ProductForm({ initial, labs, onSave, onClose }) {
 
   const handleSelectTest = (test) => {
     setNameQuery(test.name);
-    setForm((f) => ({
-      ...f,
-      name: test.name,
-      category: test.category?._id || test.category || f.category,
-      subcategory: test.subcategory?._id || test.subcategory || '',
-      sampleType: test.sampleType || f.sampleType,
-      reportTime: test.reportTime || f.reportTime,
-      fastingRequired: test.fastingRequired ?? f.fastingRequired,
-      homeCollection: test.homeCollection ?? f.homeCollection,
-      description: test.description || f.description,
-    }));
+    setForm((f) => ({ ...f, testMaster: test._id, name: test.name }));
+    setTmInfo(test);
     setSuggestions([]);
     setShowSuggestions(false);
   };
@@ -111,11 +72,14 @@ function ProductForm({ initial, labs, onSave, onClose }) {
     setLoading(true);
     try {
       const payload = {
-        ...form,
-        reportTime: formatReportTime(form.reportTime),
-        subcategory: form.subcategory || null,
-        price: form.price ? Number(form.price) : undefined,
-        salePrice: form.salePrice ? Number(form.salePrice) : undefined,
+        testMaster: form.testMaster || undefined,
+        name:       form.name,
+        lab:        form.lab,
+        price:      form.price       ? Number(form.price)       : undefined,
+        salePrice:  form.salePrice   ? Number(form.salePrice)   : undefined,
+        discountPercent: form.discountPercent ? Number(form.discountPercent) : undefined,
+        isActive:   form.isActive,
+        isFeatured: form.isFeatured,
       };
       if (initial?._id) await productApi.update(initial._id, payload);
       else await productApi.create(payload);
@@ -130,116 +94,96 @@ function ProductForm({ initial, labs, onSave, onClose }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        {/* Name with TestMaster autocomplete */}
-        <div className="col-span-2 relative">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Test Name *
-            <span className="ml-2 text-xs font-normal text-primary-500">
-              — Choose from Test Master List
-            </span>
-          </label>
-          <input
-            required
-            autoComplete="off"
-            value={nameQuery}
-            onChange={handleNameInput}
-            onFocus={handleNameFocus}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-            className="input pr-10"
-            placeholder="Click to see all tests or type to search…"
-          />
-          {/* dropdown arrow indicator */}
-          <span className="pointer-events-none absolute right-3 top-9 text-gray-400 text-xs">▼</span>
+      {/* TestMaster autocomplete */}
+      <div className="relative">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Test Name *
+          <span className="ml-2 text-xs font-normal text-primary-500">— Choose from Test Master</span>
+        </label>
+        <input
+          required
+          autoComplete="off"
+          value={nameQuery}
+          onChange={handleNameInput}
+          onFocus={handleNameFocus}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          className="input pr-10"
+          placeholder="Click to see all tests or type to search…"
+        />
+        <span className="pointer-events-none absolute right-3 top-9 text-gray-400 text-xs">▼</span>
 
-          {showSuggestions && (
-            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
-              {suggestionsLoading ? (
-                <div className="px-4 py-3 text-sm text-gray-400 text-center">Loading tests…</div>
-              ) : suggestions.length === 0 ? (
-                <div className="px-4 py-4 text-center">
-                  <p className="text-sm text-gray-500">No tests in master list yet.</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Go to <span className="font-medium text-primary-600">Test Master List</span> to add tests first.
-                  </p>
-                </div>
-              ) : (
-                <ul className="max-h-60 overflow-y-auto divide-y divide-gray-50">
-                  {suggestions.map((t) => (
-                    <li
-                      key={t._id}
-                      onMouseDown={() => handleSelectTest(t)}
-                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-primary-50 cursor-pointer transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{t.name}</p>
-                        <div className="flex gap-2 mt-0.5 flex-wrap">
-                          {t.category?.name && (
-                            <span className="text-xs text-primary-600 bg-primary-50 rounded px-1.5 py-0.5">{t.category.name}</span>
-                          )}
-                          {t.sampleType && (
-                            <span className="text-xs text-gray-500">{t.sampleType}</span>
-                          )}
-                          {t.reportTime && (
-                            <span className="text-xs text-gray-400">⏱ {t.reportTime}</span>
-                          )}
-                        </div>
+        {showSuggestions && (
+          <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+            {suggestionsLoading ? (
+              <div className="px-4 py-3 text-sm text-gray-400 text-center">Loading tests…</div>
+            ) : suggestions.length === 0 ? (
+              <div className="px-4 py-4 text-center">
+                <p className="text-sm text-gray-500">No tests in master list yet.</p>
+                <p className="text-xs text-gray-400 mt-1">Go to <span className="font-medium text-primary-600">Test Master</span> to add tests first.</p>
+              </div>
+            ) : (
+              <ul className="max-h-60 overflow-y-auto divide-y divide-gray-50">
+                {suggestions.map((t) => (
+                  <li key={t._id} onMouseDown={() => handleSelectTest(t)}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-primary-50 cursor-pointer transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{t.name}</p>
+                      <div className="flex gap-2 mt-0.5 flex-wrap">
+                        {t.category?.name && <span className="text-xs text-primary-600 bg-primary-50 rounded px-1.5 py-0.5">{t.category.name}</span>}
+                        {t.sampleType && <span className="text-xs text-gray-500">{t.sampleType}</span>}
+                        {t.reportTime && <span className="text-xs text-gray-400">⏱ {t.reportTime}</span>}
                       </div>
-                      {t.fastingRequired && (
-                        <span className="text-xs text-orange-600 bg-orange-50 rounded px-1.5 py-0.5 shrink-0">Fasting</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </div>
+                    </div>
+                    {t.fastingRequired && <span className="text-xs text-orange-600 bg-orange-50 rounded px-1.5 py-0.5 shrink-0">Fasting</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
+      {/* Read-only TestMaster metadata panel */}
+      {tmInfo && (
+        <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-gray-600 space-y-1">
+          <p className="font-semibold text-blue-700 text-xs mb-1.5">From Test Master (read-only)</p>
+          <div className="flex flex-wrap gap-3">
+            {tmInfo.category?.name && <span><span className="text-gray-400">Category:</span> {tmInfo.category.name}</span>}
+            {tmInfo.sampleType     && <span><span className="text-gray-400">Sample:</span> {tmInfo.sampleType}</span>}
+            {tmInfo.reportTime     && <span><span className="text-gray-400">Report:</span> {tmInfo.reportTime}</span>}
+            {tmInfo.fastingRequired && <span className="text-orange-600 font-medium">Fasting required</span>}
+            {tmInfo.homeCollection  && <span className="text-green-600 font-medium">Home collection</span>}
+          </div>
+          {tmInfo.description && <p className="text-gray-500 mt-1 line-clamp-2">{tmInfo.description}</p>}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Lab</label>
-          <select value={form.lab} onChange={(e) => setForm({ ...form, lab: e.target.value })} className="input">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Lab *</label>
+          <select value={form.lab} onChange={(e) => setForm({ ...form, lab: e.target.value })} className="input" required>
             <option value="">Select lab</option>
             {labs.map((l) => <option key={l._id} value={l._id}>{l.name}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Report Time</label>
-          <input
-            value={form.reportTime}
-            onChange={(e) => setForm({ ...form, reportTime: e.target.value })}
-            onBlur={() => setForm((f) => ({ ...f, reportTime: formatReportTime(f.reportTime) }))}
-            className="input"
-            placeholder="Type number (e.g. 24) → auto becomes '24 hours'"
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Price (₹) <span className="text-xs font-normal text-gray-400">lab can set later</span>
+          </label>
+          <input type="number" min="0" value={form.price}
+            onChange={(e) => setForm({ ...form, price: e.target.value })} className="input" placeholder="e.g. 499" />
         </div>
-        {/* Price fields */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Price (₹)
-            <span className="ml-1 text-xs font-normal text-gray-400">optional — lab can set later</span>
+            Sale Price (₹) <span className="text-xs font-normal text-gray-400">discounted price</span>
           </label>
-          <input
-            type="number"
-            min="0"
-            value={form.price}
-            onChange={(e) => setForm({ ...form, price: e.target.value })}
-            className="input"
-            placeholder="e.g. 499"
-          />
+          <input type="number" min="0" value={form.salePrice}
+            onChange={(e) => setForm({ ...form, salePrice: e.target.value })} className="input" placeholder="e.g. 349" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Sale Price (₹)
-            <span className="ml-1 text-xs font-normal text-gray-400">discounted price</span>
-          </label>
-          <input
-            type="number"
-            min="0"
-            value={form.salePrice}
-            onChange={(e) => setForm({ ...form, salePrice: e.target.value })}
-            className="input"
-            placeholder="e.g. 349"
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Discount %</label>
+          <input type="number" min="0" max="100" value={form.discountPercent}
+            onChange={(e) => setForm({ ...form, discountPercent: e.target.value })} className="input" placeholder="e.g. 20" />
         </div>
         {form.price && form.salePrice && Number(form.salePrice) >= Number(form.price) && (
           <div className="col-span-2">
@@ -247,12 +191,7 @@ function ProductForm({ initial, labs, onSave, onClose }) {
           </div>
         )}
         <div className="col-span-2 flex flex-wrap gap-4">
-          {[
-            { key: 'homeCollection', label: 'Home Collection' },
-            { key: 'fastingRequired', label: 'Fasting Required' },
-            { key: 'isActive', label: 'Active' },
-            { key: 'isFeatured', label: 'Featured' },
-          ].map(({ key, label }) => (
+          {[{ key: 'isActive', label: 'Active' }, { key: 'isFeatured', label: 'Featured' }].map(({ key, label }) => (
             <label key={key} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
               <input type="checkbox" checked={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.checked })} className="w-4 h-4 rounded text-primary-600" />
               {label}
@@ -433,6 +372,19 @@ export default function AdminProductsPage() {
           >
             <FiDownload className={downloading ? 'animate-spin' : ''} />
             {downloading ? 'Downloading…' : 'Download All CSV'}
+          </button>
+          <button
+            title="Link existing products to Test Master (run once after migration)"
+            onClick={async () => {
+              if (!confirm('This will link all existing products to their Test Master entry by name. Run once. Continue?')) return;
+              try {
+                const res = await productApi.migrateTestMaster();
+                toast.success(`Migration done — ${res.data.linked} linked, ${res.data.notFound} not found in Test Master`);
+              } catch (err) { toast.error(getErrorMessage(err)); }
+            }}
+            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+          >
+            <FiLink size={14} /> Link Test Master
           </button>
           <button onClick={() => setModal({ type: 'add' })} className="btn-primary flex items-center gap-2 text-sm">
             <FiPlus /> Add Product

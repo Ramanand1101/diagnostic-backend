@@ -72,41 +72,55 @@ exports.update = async (req, res) => {
 
     const Product = require('../models/Product');
     const { syncObjects } = require('../services/algoliaSync');
-
     const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const oldNameRegex = new RegExp(`^${escape(oldName)}$`, 'i');
 
-    // Build metadata update (fields other than name)
-    const productUpdate = {};
-    if (req.body.description   !== undefined) productUpdate.description   = test.description;
-    if (req.body.sampleType    !== undefined) productUpdate.sampleType    = test.sampleType;
-    if (req.body.reportTime    !== undefined) productUpdate.reportTime    = test.reportTime;
-    if (req.body.fastingRequired !== undefined) productUpdate.fastingRequired = test.fastingRequired;
-    if (req.body.homeCollection  !== undefined) productUpdate.homeCollection  = test.homeCollection;
+    // All metadata that syncs to products
+    const syncPayload = {
+      name:            test.name,
+      description:     test.description,
+      sampleType:      test.sampleType,
+      reportTime:      test.reportTime,
+      fastingRequired: test.fastingRequired,
+      homeCollection:  test.homeCollection,
+      category:        test.category   || null,
+      subcategory:     test.subcategory || null,
+    };
 
     const nameChanged = req.body.name && req.body.name.trim() !== oldName.trim();
 
-    if (nameChanged) {
-      // Update name + regenerate slug per product (slug includes lab name so must be per-document)
-      const productsToRename = await Product.find({ name: oldNameRegex })
-        .populate('lab', 'name')
-        .lean();
-
-      for (const p of productsToRename) {
+    // --- Linked products (have testMaster ObjectId) — simple, reliable ---
+    const linkedProducts = await Product.find({ testMaster: test._id }).populate('lab', 'name').lean();
+    for (const p of linkedProducts) {
+      const update = { ...syncPayload };
+      if (nameChanged) {
         const labSuffix = p.lab?.name ? makeSlug(p.lab.name) : '';
-        const newSlug = makeSlug(`${test.name}${labSuffix ? '-' + labSuffix : ''}-${String(p._id).slice(-5)}`);
+        update.slug = makeSlug(`${test.name}${labSuffix ? '-' + labSuffix : ''}-${String(p._id).slice(-5)}`);
+      }
+      await Product.findByIdAndUpdate(p._id, { $set: update });
+    }
+
+    // --- Legacy products (no testMaster link yet) — match by old name string, and link them ---
+    if (nameChanged || linkedProducts.length === 0) {
+      const oldNameRegex = new RegExp(`^${escape(oldName)}$`, 'i');
+      const legacyProducts = await Product.find({ testMaster: null, name: oldNameRegex }).populate('lab', 'name').lean();
+      for (const p of legacyProducts) {
+        const labSuffix = p.lab?.name ? makeSlug(p.lab.name) : '';
         await Product.findByIdAndUpdate(p._id, {
-          $set: { name: test.name, slug: newSlug, ...productUpdate },
+          $set: {
+            ...syncPayload,
+            testMaster: test._id,   // link them now
+            slug: nameChanged
+              ? makeSlug(`${test.name}${labSuffix ? '-' + labSuffix : ''}-${String(p._id).slice(-5)}`)
+              : p.slug,
+          },
         });
       }
-    } else if (Object.keys(productUpdate).length) {
-      await Product.updateMany({ name: oldNameRegex }, { $set: productUpdate });
     }
 
     // Re-index in Algolia
     try {
       const newNameRegex = new RegExp(`^${escape(test.name)}$`, 'i');
-      const updated = await Product.find({ name: newNameRegex })
+      const updated = await Product.find({ $or: [{ testMaster: test._id }, { name: newNameRegex }] })
         .populate({ path: 'lab', select: 'name slug city state address area pincode homeCollection ratingAvg verificationStatus' })
         .lean();
       if (updated.length) {
@@ -153,11 +167,28 @@ exports.syncProducts = async (req, res) => {
     const fromName = (req.body.fromName || '').trim() || test.name;
     const fromNameRegex = new RegExp(`^${escape(fromName)}$`, 'i');
 
-    const toRename = await Product.find({ name: fromNameRegex }).populate('lab', 'name').lean();
+    // Match by provided old name OR already-linked testMaster
+    const toRename = await Product.find({
+      $or: [{ name: fromNameRegex }, { testMaster: test._id }],
+    }).populate('lab', 'name').lean();
+
     for (const p of toRename) {
       const labSuffix = p.lab?.name ? makeSlug(p.lab.name) : '';
       const newSlug = makeSlug(`${test.name}${labSuffix ? '-' + labSuffix : ''}-${String(p._id).slice(-5)}`);
-      await Product.findByIdAndUpdate(p._id, { $set: { name: test.name, slug: newSlug } });
+      await Product.findByIdAndUpdate(p._id, {
+        $set: {
+          testMaster:      test._id,   // link while syncing
+          name:            test.name,
+          slug:            newSlug,
+          category:        test.category    || null,
+          subcategory:     test.subcategory || null,
+          description:     test.description || '',
+          sampleType:      test.sampleType  || '',
+          reportTime:      test.reportTime  || '',
+          fastingRequired: !!test.fastingRequired,
+          homeCollection:  !!test.homeCollection,
+        },
+      });
     }
 
     // Re-index in Algolia
