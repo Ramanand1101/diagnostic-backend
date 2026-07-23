@@ -1,12 +1,15 @@
 const asyncHandler = require('express-async-handler');
 const Booking = require('../models/Booking');
-const Coupon = require('../models/Coupon');
+const Coupon  = require('../models/Coupon');
 const Product = require('../models/Product');
-const User = require('../models/User');
-const { sendMail } = require('../config/email');
+const User    = require('../models/User');
+const Counter = require('../models/Counter');
+const { queueEmail } = require('../queues/index');
 
-function bookingNo() {
-  return `BK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+// Atomic, collision-safe booking number — HOT-000123
+async function nextBookingNo() {
+  const seq = await Counter.nextSeq('booking');
+  return `HOT-${String(seq).padStart(6, '0')}`;
 }
 
 exports.createBooking = asyncHandler(async (req, res) => {
@@ -56,7 +59,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
   const total = subtotal - discount + tax;
 
   const booking = await Booking.create({
-    bookingNo: bookingNo(),
+    bookingNo: await nextBookingNo(),
     user: user._id,
     guest: payload.guest,
     lab: payload.lab,
@@ -83,18 +86,19 @@ exports.createBooking = asyncHandler(async (req, res) => {
     prescriptionUrl: payload.prescriptionUrl
   });
 
-  // Send booking confirmation email (non-blocking)
-  try {
-    const populated = await Booking.findById(booking._id).populate('lab', 'name address city phone');
-    const userRecord = await User.findById(user._id).select('name email mobile').lean();
-    const toEmail = userRecord?.email || user.email || payload.guest?.email;
-    if (toEmail) {
+  // Queue confirmation email — response is sent before email completes
+  ;(async () => {
+    try {
+      const populated = await Booking.findById(booking._id).populate('lab', 'name address city phone');
+      const userRecord = await User.findById(user._id).select('name email mobile').lean();
+      const toEmail = userRecord?.email || user.email || payload.guest?.email;
+      if (!toEmail) return;
       const lab = populated.lab;
       const itemsHtml = booking.items.map((i) =>
         `<tr><td style="padding:6px 12px;border-bottom:1px solid #f0f0f0">${i.name}</td><td style="padding:6px 12px;border-bottom:1px solid #f0f0f0;text-align:right">₹${i.price}</td></tr>`
       ).join('');
       const labAddress = lab ? [lab.address, lab.city].filter(Boolean).join(', ') : '';
-      await sendMail({
+      await queueEmail({
         to: toEmail,
         subject: `Booking Confirmed – ${booking.bookingNo}`,
         html: `
@@ -130,10 +134,10 @@ exports.createBooking = asyncHandler(async (req, res) => {
             </div>
           </div>`,
       });
+    } catch (emailErr) {
+      console.error('[Booking] email queue failed:', emailErr.message);
     }
-  } catch (emailErr) {
-    console.error('Booking email failed:', emailErr.message);
-  }
+  })();
 
   res.status(201).json(booking);
 });

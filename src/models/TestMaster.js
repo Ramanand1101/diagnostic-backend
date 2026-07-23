@@ -13,6 +13,7 @@ const testMasterSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 testMasterSchema.index({ name: 'text' });
-testMasterSchema.index({ category: 1 });
+testMasterSchema.index({ category: 1, isActive: 1 });
+testMasterSchema.index({ isActive: 1, name:     1 });
 
 module.exports = mongoose.model('TestMaster', testMasterSchema);

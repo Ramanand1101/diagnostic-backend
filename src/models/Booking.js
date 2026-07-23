@@ -54,4 +54,11 @@ const bookingSchema = new mongoose.Schema({
   deletedAt: Date
 }, { timestamps: true });
 
+// Compound indexes for all common query patterns
+bookingSchema.index({ user: 1, isDeleted: 1, createdAt: -1 });
+bookingSchema.index({ lab:  1, isDeleted: 1, createdAt: -1 });
+bookingSchema.index({ lab:  1, slotDate:  1 });
+bookingSchema.index({ status: 1, createdAt: -1 });
+bookingSchema.index({ paymentStatus: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Booking', bookingSchema);

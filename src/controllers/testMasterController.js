@@ -61,7 +61,6 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    // Capture old name BEFORE updating so we can find products by old name
     const existing = await TestMaster.findById(req.params.id).lean();
     if (!existing) return res.status(404).json({ message: 'Test not found' });
     const oldName = existing.name;
@@ -71,81 +70,68 @@ exports.update = async (req, res) => {
       .populate('subcategory', 'name');
 
     const Product = require('../models/Product');
-    const { syncObjects } = require('../services/algoliaSync');
+    const { queueAlgoliaSync } = require('../queues/index');
     const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    // All metadata that syncs to products
-    const syncPayload = {
-      name:            test.name,
-      description:     test.description,
-      sampleType:      test.sampleType,
-      reportTime:      test.reportTime,
-      fastingRequired: test.fastingRequired,
-      homeCollection:  test.homeCollection,
-      category:        test.category   || null,
-      subcategory:     test.subcategory || null,
-    };
-
     const nameChanged = req.body.name && req.body.name.trim() !== oldName.trim();
 
-    // --- Linked products (have testMaster ObjectId) — simple, reliable ---
-    const linkedProducts = await Product.find({ testMaster: test._id }).populate('lab', 'name').lean();
-    for (const p of linkedProducts) {
-      const update = { ...syncPayload };
-      if (nameChanged) {
+    const metaUpdate = {
+      name: test.name, description: test.description,
+      sampleType: test.sampleType, reportTime: test.reportTime,
+      fastingRequired: test.fastingRequired, homeCollection: test.homeCollection,
+      category: test.category || null, subcategory: test.subcategory || null,
+    };
+
+    // Bulk update all linked products — one query instead of N loops
+    await Product.updateMany({ testMaster: test._id }, { $set: metaUpdate });
+
+    // Slug requires per-doc update (contains lab name) — only when name changed
+    if (nameChanged) {
+      const linked = await Product.find({ testMaster: test._id }).populate('lab', 'name').lean();
+      const bulkOps = linked.map((p) => {
         const labSuffix = p.lab?.name ? makeSlug(p.lab.name) : '';
-        update.slug = makeSlug(`${test.name}${labSuffix ? '-' + labSuffix : ''}-${String(p._id).slice(-5)}`);
-      }
-      await Product.findByIdAndUpdate(p._id, { $set: update });
+        return { updateOne: { filter: { _id: p._id }, update: { $set: { slug: makeSlug(`${test.name}${labSuffix ? '-' + labSuffix : ''}-${String(p._id).slice(-5)}`) } } } };
+      });
+      if (bulkOps.length) await Product.bulkWrite(bulkOps);
     }
 
-    // --- Legacy products (no testMaster link yet) — match by old name string, and link them ---
-    if (nameChanged || linkedProducts.length === 0) {
-      const oldNameRegex = new RegExp(`^${escape(oldName)}$`, 'i');
-      const legacyProducts = await Product.find({ testMaster: null, name: oldNameRegex }).populate('lab', 'name').lean();
-      for (const p of legacyProducts) {
-        const labSuffix = p.lab?.name ? makeSlug(p.lab.name) : '';
-        await Product.findByIdAndUpdate(p._id, {
-          $set: {
-            ...syncPayload,
-            testMaster: test._id,   // link them now
-            slug: nameChanged
-              ? makeSlug(`${test.name}${labSuffix ? '-' + labSuffix : ''}-${String(p._id).slice(-5)}`)
-              : p.slug,
-          },
+    // Link any legacy products (no testMaster) matching old name
+    if (nameChanged || !(await Product.exists({ testMaster: test._id }))) {
+      const oldRx = new RegExp(`^${escape(oldName)}$`, 'i');
+      const legacy = await Product.find({ testMaster: null, name: oldRx }).populate('lab', 'name').lean();
+      if (legacy.length) {
+        const legacyOps = legacy.map((p) => {
+          const labSuffix = p.lab?.name ? makeSlug(p.lab.name) : '';
+          return { updateOne: { filter: { _id: p._id }, update: { $set: { ...metaUpdate, testMaster: test._id, ...(nameChanged && { slug: makeSlug(`${test.name}${labSuffix ? '-' + labSuffix : ''}-${String(p._id).slice(-5)}`) }) } } } };
         });
+        await Product.bulkWrite(legacyOps);
       }
     }
 
-    // Re-index in Algolia
-    try {
-      const newNameRegex = new RegExp(`^${escape(test.name)}$`, 'i');
-      const updated = await Product.find({ $or: [{ testMaster: test._id }, { name: newNameRegex }] })
-        .populate({ path: 'lab', select: 'name slug city state address area pincode homeCollection ratingAvg verificationStatus' })
-        .lean();
-      if (updated.length) {
+    // Queue Algolia re-index — non-blocking, response goes out now
+    ;(async () => {
+      try {
+        const TM_POP = { path: 'testMaster', select: 'name category subcategory description sampleType reportTime fastingRequired homeCollection' };
+        const updated = await Product.find({ testMaster: test._id })
+          .populate(TM_POP)
+          .populate({ path: 'lab', select: 'name slug city state address area pincode' })
+          .lean();
+        if (!updated.length) return;
         const records = updated.map((p) => ({
-          objectID: String(p._id),
-          id: String(p._id),
-          type: p.type,
-          name: p.name,
-          slug: p.slug,
-          description: p.description || '',
-          price: p.price,
-          salePrice: p.salePrice || null,
-          reportTime: p.reportTime || '',
-          sampleType: p.sampleType || '',
-          homeCollection: !!p.homeCollection,
-          fastingRequired: !!p.fastingRequired,
-          tags: p.tags || [],
-          category: p.category ? String(p.category) : null,
-          lab: p.lab ? { _id: String(p.lab._id), name: p.lab.name, slug: p.lab.slug, city: p.lab.city, state: p.lab.state || '', address: p.lab.address || '', area: p.lab.area || '', pincode: p.lab.pincode || '' } : null,
-          isFeatured: !!p.isFeatured,
-          isActive: !!p.isActive,
+          objectID: String(p._id), id: String(p._id), type: p.type, name: p.name, slug: p.slug,
+          description:     p.testMaster?.description    || '',
+          sampleType:      p.testMaster?.sampleType     || '',
+          reportTime:      p.testMaster?.reportTime     || '',
+          fastingRequired: !!p.testMaster?.fastingRequired,
+          homeCollection:  !!p.testMaster?.homeCollection,
+          category:   p.testMaster?.category   ? String(p.testMaster.category._id  || p.testMaster.category)   : null,
+          subcategory: p.testMaster?.subcategory ? String(p.testMaster.subcategory._id || p.testMaster.subcategory) : null,
+          price: p.price, salePrice: p.salePrice || null, tags: p.tags || [],
+          lab: p.lab ? { _id: String(p.lab._id), name: p.lab.name, slug: p.lab.slug, city: p.lab.city } : null,
+          isFeatured: !!p.isFeatured, isActive: !!p.isActive,
         }));
-        await syncObjects('products', records);
-      }
-    } catch { /* algolia optional */ }
+        await queueAlgoliaSync('products', records);
+      } catch (e) { console.error('[TestMaster] algolia queue error:', e.message); }
+    })();
 
     res.json(test);
   } catch (err) {

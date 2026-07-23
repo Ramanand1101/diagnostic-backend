@@ -29,4 +29,11 @@ const productSchema = new mongoose.Schema({
 // fastingRequired, homeCollection) lives in TestMaster.
 // Fetch it with: Product.find(...).populate('testMaster lab')
 
+// Compound indexes for all hot query paths
+productSchema.index({ lab: 1, isActive: 1, price: 1 });
+productSchema.index({ testMaster: 1, isActive: 1 });
+productSchema.index({ testMaster: 1, lab: 1 }, { unique: true, sparse: true });
+productSchema.index({ isFeatured: 1, isActive: 1, createdAt: -1 });
+productSchema.index({ name: 'text' });
+
 module.exports = mongoose.model('Product', productSchema);

@@ -46,4 +46,9 @@ const labSchema = new mongoose.Schema({
   seoDescription: String
 }, { timestamps: true });
 
+labSchema.index({ city: 1, approved: 1 });
+labSchema.index({ brand: 1, approved: 1 });
+labSchema.index({ approved: 1, featured: -1, ratingAvg: -1 });
+labSchema.index({ name: 'text', address: 'text', city: 'text' });
+
 module.exports = mongoose.model('Lab', labSchema);
