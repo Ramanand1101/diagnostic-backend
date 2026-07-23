@@ -394,16 +394,11 @@ export default function HeroSlider({ heroContent }) {
 
                 {showPopular && popularTests.length === 0 && (
                   <div className="px-4 py-5 text-center text-sm text-gray-400">
-                    {city
-                      ? popularLoading
-                        ? 'Loading popular tests…'
-                        : <span>Service not available in <strong>{city}</strong>.{' '}
-                            <button type="button" onClick={() => setCityModalOpen(true)} className="text-sky-600 font-semibold hover:underline">Try a different city</button>
-                          </span>
-                      : <span>
-                          <button type="button" onClick={() => setCityModalOpen(true)} className="text-sky-600 font-semibold hover:underline">Select your city</button>
-                          {' '}to see popular tests nearby
-                        </span>
+                    {popularLoading
+                      ? 'Loading popular tests…'
+                      : !city
+                        ? <span><button type="button" onClick={() => setCityModalOpen(true)} className="text-sky-600 font-semibold hover:underline">Select your city</button>{' '}to see popular tests nearby</span>
+                        : 'Type to search for tests & labs'
                     }
                   </div>
                 )}

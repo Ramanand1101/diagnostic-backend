@@ -212,11 +212,11 @@ exports.popular = asyncHandler(async (req, res) => {
     if (inactiveBrandIds.length) cityFilter.$or = [{ brand: { $nin: inactiveBrandIds } }, { brand: null }];
     const cityLabs = await Lab.find(cityFilter).select('_id').lean();
     cityLabIds = cityLabs.map((l) => l._id);
-    if (!cityLabIds.length) return res.json({ tests: [] });
+    // If no labs found in city, fall back to all cities (don't show empty)
   }
 
   const matchStage = { isActive: true };
-  if (cityLabIds) matchStage.lab = { $in: cityLabIds };
+  if (cityLabIds && cityLabIds.length) matchStage.lab = { $in: cityLabIds };
 
   const grouped = await Product.aggregate([
     { $match: matchStage },
@@ -263,18 +263,17 @@ exports.suggest = asyncHandler(async (req, res) => {
   const terms = expandQuery(q);
   const orPatterns = terms.map((t) => ({ name: new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }));
 
-  // Optional city filter — get lab IDs once
   let cityLabIds = null;
   if (city) {
     const cityFilter = { city: new RegExp(city, 'i'), approved: true };
     if (inactiveBrandIds.length) cityFilter.$or = [{ brand: { $nin: inactiveBrandIds } }, { brand: null }];
     const cityLabs = await Lab.find(cityFilter).select('_id').lean();
     cityLabIds = cityLabs.map((l) => l._id);
-    if (!cityLabIds.length) return res.json({ tests: [], labs: [] });
+    // If no labs in city, fall back to all (don't return empty)
   }
 
   const matchStage = { isActive: true, $or: orPatterns };
-  if (cityLabIds) matchStage.lab = { $in: cityLabIds };
+  if (cityLabIds && cityLabIds.length) matchStage.lab = { $in: cityLabIds };
 
   const grouped = await Product.aggregate([
     { $match: matchStage },
