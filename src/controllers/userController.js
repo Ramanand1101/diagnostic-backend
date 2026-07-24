@@ -180,7 +180,8 @@ exports.resetPassword = asyncHandler(async (req, res) => {
     Array.from({ length: 4 }, () => rand(chars)).join(''),
   ].join('-');
 
-  user.password = await bcrypt.hash(newPassword, 10);
+  // Set plain text — User pre-save hook hashes it (avoid double-hash)
+  user.password = newPassword;
   user.passwordChangedAt = new Date();
   await user.save({ validateBeforeSave: false });
 
