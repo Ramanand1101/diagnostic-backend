@@ -34,11 +34,28 @@ const corporateSchema = new mongoose.Schema({
   // HealthOnTime staff (subadmin/superadmin) responsible for this account
   relationshipManager: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 
+  // Packages assigned to this corporate, with a possibly negotiated price override
+  packages: [{
+    package: { type: mongoose.Schema.Types.ObjectId, ref: 'CorporatePackage' },
+    price: Number,
+    assignedAt: { type: Date, default: Date.now },
+  }],
+
   creditLimit: { type: Number, default: 0 },
   active: { type: Boolean, default: true },
 
   agreementStartDate: Date,
   agreementExpiryDate: Date,
+  // Set when the expiry reminder for that threshold has already gone out, so it isn't repeated daily
+  agreementReminder60SentAt: Date,
+  agreementReminder30SentAt: Date,
+
+  settings: {
+    // Days before agreementExpiryDate to send a reminder (default: 60 and 30 days)
+    reminderDaysBefore: { type: [Number], default: [60, 30] },
+    // Default channels used when notifying employees of appointment updates
+    defaultNotifyChannels: { type: [String], default: ['email'] },
+  },
 
   notes: String,
 }, { timestamps: true });

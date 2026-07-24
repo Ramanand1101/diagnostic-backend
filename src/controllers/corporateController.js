@@ -4,12 +4,14 @@ const User = require('../models/User');
 const { sendMail } = require('../config/email');
 
 exports.listCorporates = asyncHandler(async (req, res) => {
-  const { q, city, active, page = 1, limit = 20 } = req.query;
+  const { q, city, active, mine, page = 1, limit = 20 } = req.query;
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const filter = {};
   if (q) filter.$or = [{ companyName: new RegExp(q, 'i') }, { city: new RegExp(q, 'i') }, { email: new RegExp(q, 'i') }];
   if (city) filter.city = new RegExp(city, 'i');
   if (active !== undefined) filter.active = active === 'true';
+  // Relationship managers can filter to just the accounts assigned to them
+  if (mine === 'true') filter.relationshipManager = req.user._id;
 
   const skip = (Number(page) - 1) * safeLimit;
   const [items, total] = await Promise.all([
@@ -17,6 +19,7 @@ exports.listCorporates = asyncHandler(async (req, res) => {
       .populate('owners', 'name email mobile isActive')
       .populate('assignedLabs', 'name city')
       .populate('relationshipManager', 'name email role')
+      .populate('packages.package', 'name basePrice')
       .sort('-createdAt').skip(skip).limit(safeLimit),
     Corporate.countDocuments(filter),
   ]);
@@ -27,7 +30,8 @@ exports.getCorporate = asyncHandler(async (req, res) => {
   const corporate = await Corporate.findById(req.params.id)
     .populate('owners', 'name email mobile isActive')
     .populate('assignedLabs', 'name city address')
-    .populate('relationshipManager', 'name email role');
+    .populate('relationshipManager', 'name email role')
+    .populate('packages.package', 'name basePrice items');
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
   res.json(corporate);
 });
@@ -35,7 +39,8 @@ exports.getCorporate = asyncHandler(async (req, res) => {
 // Corporate-role user viewing their own company (used to scope appointment scheduling)
 exports.getMyCorporate = asyncHandler(async (req, res) => {
   const corporate = await Corporate.findOne({ owners: req.user._id })
-    .populate('assignedLabs', 'name city address phone');
+    .populate('assignedLabs', 'name city address phone')
+    .populate('packages.package', 'name basePrice items');
   res.json(corporate || null);
 });
 
@@ -53,6 +58,8 @@ exports.updateCorporate = asyncHandler(async (req, res) => {
   delete payload.owners;            // managed via dedicated account-manager endpoints
   delete payload.assignedLabs;      // managed via /labs endpoint
   delete payload.relationshipManager; // managed via /relationship-manager endpoint
+  delete payload.packages;          // managed via /packages endpoint
+  delete payload.settings;          // managed via /settings endpoint
 
   const corporate = await Corporate.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
@@ -80,6 +87,24 @@ exports.assignLabs = asyncHandler(async (req, res) => {
   if (!Array.isArray(labIds)) return res.status(400).json({ message: 'labIds array is required.' });
   const corporate = await Corporate.findByIdAndUpdate(req.params.id, { assignedLabs: labIds }, { new: true })
     .populate('assignedLabs', 'name city');
+  if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
+  res.json(corporate);
+});
+
+// PATCH /:id/packages — replace the assigned packages list (with corporate-specific pricing)
+exports.assignPackages = asyncHandler(async (req, res) => {
+  const { packages } = req.body;
+  if (!Array.isArray(packages)) return res.status(400).json({ message: 'packages array is required.' });
+  const CorporatePackage = require('../models/CorporatePackage');
+  const normalized = [];
+  for (const p of packages) {
+    const pkgId = p.package || p.packageId || p;
+    const pkgDoc = await CorporatePackage.findById(pkgId).select('basePrice');
+    if (!pkgDoc) return res.status(400).json({ message: `Package ${pkgId} not found.` });
+    normalized.push({ package: pkgId, price: p.price != null ? Number(p.price) : pkgDoc.basePrice });
+  }
+  const corporate = await Corporate.findByIdAndUpdate(req.params.id, { packages: normalized }, { new: true })
+    .populate('packages.package', 'name basePrice');
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
   res.json(corporate);
 });
@@ -152,4 +177,60 @@ exports.removeAccountManager = asyncHandler(async (req, res) => {
   ).populate('owners', 'name email mobile isActive');
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
   res.json(corporate);
+});
+
+// PATCH /:id/settings — reminder-days config + default employee notification channels
+exports.updateSettings = asyncHandler(async (req, res) => {
+  const { reminderDaysBefore, defaultNotifyChannels } = req.body;
+  const update = {};
+  if (Array.isArray(reminderDaysBefore)) update['settings.reminderDaysBefore'] = reminderDaysBefore.map(Number).filter((n) => n > 0);
+  if (Array.isArray(defaultNotifyChannels)) update['settings.defaultNotifyChannels'] = defaultNotifyChannels.filter((c) => ['email', 'whatsapp'].includes(c));
+
+  const corporate = await Corporate.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+  if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
+  res.json(corporate);
+});
+
+// GET /:id/billing — day/month/year-wise billing view, based on billable (confirmed/completed) appointments
+exports.getBilling = asyncHandler(async (req, res) => {
+  const corporate = await Corporate.findById(req.params.id);
+  if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
+
+  const { from, to, groupBy = 'day' } = req.query;
+  const CorporateAppointment = require('../models/CorporateAppointment');
+
+  const filter = { corporate: corporate._id, status: { $in: ['confirmed', 'completed'] } };
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = new Date(from + 'T00:00:00.000Z');
+    if (to) filter.createdAt.$lte = new Date(to + 'T23:59:59.999Z');
+  }
+
+  const dateFormat = { day: '%Y-%m-%d', month: '%Y-%m', year: '%Y' }[groupBy] || '%Y-%m-%d';
+
+  const [summaryAgg, unbilledAgg, byPeriod, appointments] = await Promise.all([
+    CorporateAppointment.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+    ]),
+    CorporateAppointment.aggregate([
+      { $match: { ...filter, invoiced: false } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+    ]),
+    CorporateAppointment.aggregate([
+      { $match: filter },
+      { $group: { _id: { $dateToString: { format: dateFormat, date: '$createdAt' } }, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]),
+    CorporateAppointment.find(filter).sort('-createdAt').limit(500).populate('lab', 'name'),
+  ]);
+
+  res.json({
+    totalAmount: summaryAgg[0]?.total || 0,
+    totalCount: summaryAgg[0]?.count || 0,
+    unbilledAmount: unbilledAgg[0]?.total || 0,
+    unbilledCount: unbilledAgg[0]?.count || 0,
+    byPeriod,
+    appointments,
+  });
 });

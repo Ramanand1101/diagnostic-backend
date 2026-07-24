@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { corporateApi, labApi, userApi } from '@/lib/api';
+import { corporateApi, labApi, userApi, corporatePackageApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
@@ -115,6 +115,9 @@ function CorporateForm({ initial, onSave, onClose }) {
     state: initial?.state || '',
     pincode: initial?.pincode || '',
     gstNumber: initial?.gstNumber || '',
+    creditLimit: initial?.creditLimit ?? 0,
+    agreementStartDate: initial?.agreementStartDate ? initial.agreementStartDate.slice(0, 10) : '',
+    agreementExpiryDate: initial?.agreementExpiryDate ? initial.agreementExpiryDate.slice(0, 10) : '',
     hr: {
       name: initial?.hr?.name || '',
       department: initial?.hr?.department || '',
@@ -196,9 +199,25 @@ function CorporateForm({ initial, onSave, onClose }) {
             <input value={form.pincode} onChange={(e) => set('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))} className="input" maxLength={6} />
           </div>
         </div>
-        <div className="mt-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">GST Number</label>
-          <input value={form.gstNumber} onChange={(e) => set('gstNumber', e.target.value.toUpperCase())} className="input" placeholder="22AAAAA0000A1Z5" />
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">GST Number</label>
+            <input value={form.gstNumber} onChange={(e) => set('gstNumber', e.target.value.toUpperCase())} className="input" placeholder="22AAAAA0000A1Z5" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Credit Limit (₹)</label>
+            <input type="number" value={form.creditLimit} onChange={(e) => set('creditLimit', e.target.value)} className="input" placeholder="0" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Agreement Start Date</label>
+            <input type="date" value={form.agreementStartDate} onChange={(e) => set('agreementStartDate', e.target.value)} className="input" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Agreement Expiry Date</label>
+            <input type="date" value={form.agreementExpiryDate} onChange={(e) => set('agreementExpiryDate', e.target.value)} className="input" />
+          </div>
         </div>
       </div>
 
@@ -260,12 +279,23 @@ function CorporateForm({ initial, onSave, onClose }) {
 function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
   const [labs, setLabs] = useState([]);
   const [staff, setStaff] = useState([]);
+  const [catalogPackages, setCatalogPackages] = useState([]);
   const [selectedLabs, setSelectedLabs] = useState((corporate.assignedLabs || []).map((l) => l._id || l));
   const [rmId, setRmId] = useState(corporate.relationshipManager?._id || corporate.relationshipManager || '');
+  const [selectedPackages, setSelectedPackages] = useState(
+    (corporate.packages || []).map((p) => ({ packageId: p.package?._id || p.package, price: p.price }))
+  );
   const [savingLabs, setSavingLabs] = useState(false);
   const [savingRm, setSavingRm] = useState(false);
+  const [savingPkgs, setSavingPkgs] = useState(false);
   const [amForm, setAmForm] = useState({ name: '', email: '', mobile: '' });
   const [addingAm, setAddingAm] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({
+    reminderDaysBefore: (corporate.settings?.reminderDaysBefore?.length ? corporate.settings.reminderDaysBefore : [60, 30]).join(', '),
+    notifyEmail: corporate.settings?.defaultNotifyChannels?.includes('email') ?? true,
+    notifyWhatsapp: corporate.settings?.defaultNotifyChannels?.includes('whatsapp') ?? false,
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     labApi.getAll({ limit: 500 }).then((r) => setLabs(r.data.items || []));
@@ -273,6 +303,7 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
       const all = r.data.items || r.data.users || [];
       setStaff(all.filter((u) => u.role === 'superadmin' || u.role === 'subadmin'));
     });
+    corporatePackageApi.getAll({ limit: 200, active: 'true' }).then((r) => setCatalogPackages(r.data.items || []));
   }, []);
 
   const labItems = labs.map((l) => ({ id: l._id, label: `${l.name}${l.city ? ` (${l.city})` : ''}` }));
@@ -295,6 +326,41 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
       onChanged();
     } catch (err) { toast.error(getErrorMessage(err)); }
     finally { setSavingRm(false); }
+  };
+
+  const togglePackage = (pkg) => {
+    setSelectedPackages((prev) => {
+      const exists = prev.find((p) => p.packageId === pkg._id);
+      if (exists) return prev.filter((p) => p.packageId !== pkg._id);
+      return [...prev, { packageId: pkg._id, price: pkg.basePrice }];
+    });
+  };
+  const updatePackagePrice = (packageId, price) => {
+    setSelectedPackages((prev) => prev.map((p) => p.packageId === packageId ? { ...p, price } : p));
+  };
+
+  const savePackages = async () => {
+    setSavingPkgs(true);
+    try {
+      await corporateApi.assignPackages(corporate._id, selectedPackages.map((p) => ({ package: p.packageId, price: Number(p.price) || 0 })));
+      toast.success('Assigned packages updated');
+      onChanged();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setSavingPkgs(false); }
+  };
+
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const channels = [];
+      if (settingsForm.notifyEmail) channels.push('email');
+      if (settingsForm.notifyWhatsapp) channels.push('whatsapp');
+      const reminderDaysBefore = settingsForm.reminderDaysBefore.split(',').map((s) => Number(s.trim())).filter((n) => n > 0);
+      await corporateApi.updateSettings(corporate._id, { reminderDaysBefore, defaultNotifyChannels: channels });
+      toast.success('Settings updated');
+      onChanged();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setSavingSettings(false); }
   };
 
   const handleAddAm = async (e) => {
@@ -387,6 +453,31 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
         </button>
       </div>
 
+      {/* Assigned Packages */}
+      <div>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Assigned Packages</p>
+        <p className="text-xs text-gray-400 mb-2">Tick a package and set the negotiated price for this corporate.</p>
+        <div className="space-y-1.5">
+          {catalogPackages.length === 0 && <p className="text-xs text-gray-400">No packages in catalog yet — create one under Corporate Packages.</p>}
+          {catalogPackages.map((pkg) => {
+            const sel = selectedPackages.find((p) => p.packageId === pkg._id);
+            return (
+              <div key={pkg._id} className={`flex items-center gap-3 rounded-lg px-3 py-2 border ${sel ? 'bg-primary-50 border-primary-200' : 'bg-gray-50 border-gray-100'}`}>
+                <input type="checkbox" checked={!!sel} onChange={() => togglePackage(pkg)} className="w-4 h-4 text-primary-600 rounded shrink-0" />
+                <span className="text-sm text-gray-800 flex-1">{pkg.name} <span className="text-xs text-gray-400">(list ₹{pkg.basePrice})</span></span>
+                {sel && (
+                  <input type="number" value={sel.price} onChange={(e) => updatePackagePrice(pkg._id, e.target.value)}
+                    className="input w-24 text-sm py-1" placeholder="Price" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <button onClick={savePackages} disabled={savingPkgs} className="btn-primary text-xs mt-2 px-3 py-1.5">
+          {savingPkgs ? 'Saving...' : 'Save Assigned Packages'}
+        </button>
+      </div>
+
       {/* Relationship Manager */}
       <div>
         <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">HealthOnTime Relationship Manager</p>
@@ -397,6 +488,35 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
           </select>
           <button onClick={saveRm} disabled={savingRm} className="btn-primary text-xs px-3">
             {savingRm ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      {/* Corporate Settings */}
+      <div>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Corporate Settings</p>
+        <div className="bg-gray-50 rounded-lg p-3 space-y-2.5">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Agreement reminder — days before expiry (comma separated)</label>
+            <input value={settingsForm.reminderDaysBefore}
+              onChange={(e) => setSettingsForm((f) => ({ ...f, reminderDaysBefore: e.target.value }))}
+              className="input text-sm" placeholder="60, 30" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1.5">Default employee notification channels</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={settingsForm.notifyEmail} onChange={(e) => setSettingsForm((f) => ({ ...f, notifyEmail: e.target.checked }))} className="w-4 h-4 text-primary-600 rounded" />
+                Email
+              </label>
+              <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={settingsForm.notifyWhatsapp} onChange={(e) => setSettingsForm((f) => ({ ...f, notifyWhatsapp: e.target.checked }))} className="w-4 h-4 text-primary-600 rounded" />
+                WhatsApp
+              </label>
+            </div>
+          </div>
+          <button onClick={saveSettings} disabled={savingSettings} className="btn-primary text-xs px-3 py-1.5">
+            {savingSettings ? 'Saving...' : 'Save Settings'}
           </button>
         </div>
       </div>
@@ -457,6 +577,7 @@ export default function AdminCorporatePage() {
   const [limit, setLimit] = useState(20);
   const [q, setQ] = useState('');
   const [filterActive, setFilterActive] = useState('');
+  const [mineOnly, setMineOnly] = useState(false);
   const [modal, setModal] = useState(null);
   const searchTimer = useRef(null);
 
@@ -464,10 +585,11 @@ export default function AdminCorporatePage() {
     setLoading(true);
     const params = { page, limit, q: q || undefined };
     if (filterActive) params.active = filterActive;
+    if (mineOnly) params.mine = 'true';
     corporateApi.getAll(params)
       .then((res) => { setCorporates(res.data.items || []); setTotal(res.data.total || 0); })
       .finally(() => setLoading(false));
-  }, [page, limit, q, filterActive]);
+  }, [page, limit, q, filterActive, mineOnly]);
 
   useEffect(() => { fetchCorporates(); }, [fetchCorporates]);
 
@@ -517,6 +639,12 @@ export default function AdminCorporatePage() {
               }`}>{label}</button>
           ))}
         </div>
+        <button onClick={() => { setMineOnly((v) => !v); setPage(1); }}
+          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+            mineOnly ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-300'
+          }`}>
+          My Corporates
+        </button>
         <span className="ml-auto text-xs text-gray-400">{total} total</span>
       </div>
 

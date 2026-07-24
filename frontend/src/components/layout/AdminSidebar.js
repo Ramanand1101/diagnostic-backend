@@ -33,7 +33,10 @@ const navSections = [
   {
     label: 'Corporate',
     items: [
-      { href: '/admin/corporate', label: 'Corporate Accounts', icon: FiBriefcase, permission: 'corporate' },
+      { href: '/admin/corporate',              label: 'Corporate Accounts',    icon: FiBriefcase, permission: 'corporate' },
+      { href: '/admin/corporate/packages',     label: 'Corporate Packages',    icon: FiPackage,   permission: 'corporate' },
+      { href: '/admin/corporate/appointments', label: 'Corporate Appointments', icon: FiCalendar,  permission: 'corporate' },
+      { href: '/admin/corporate/billing',      label: 'Corporate Billing',     icon: FiDollarSign, permission: 'corporate' },
     ],
   },
   {

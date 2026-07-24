@@ -55,6 +55,7 @@ export default function CsvUploadSection({
   onUpload,         // (file) => Promise — calls bulk-csv API
   demoFileName = 'template.csv',
   onSuccess,        // called after successful upload
+  accept = '.csv',
 }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -102,13 +103,15 @@ export default function CsvUploadSection({
             {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
           </div>
           <div className="flex gap-2 shrink-0">
-            <button
-              onClick={handleDemoDownload}
-              className="flex items-center gap-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors font-medium"
-            >
-              <FiDownload size={12} /> Demo CSV
-            </button>
-            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
+            {onDemoDownload && (
+              <button
+                onClick={handleDemoDownload}
+                className="flex items-center gap-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors font-medium"
+              >
+                <FiDownload size={12} /> Demo CSV
+              </button>
+            )}
+            <input ref={fileRef} type="file" accept={accept} className="hidden" onChange={handleFileChange} />
             <button
               onClick={() => fileRef.current?.click()}
               disabled={uploading}

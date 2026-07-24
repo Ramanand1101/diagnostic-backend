@@ -2,10 +2,12 @@
 // PM2 starts this alongside the API server (see ecosystem.config.js)
 require('dotenv').config();
 const { Worker } = require('bullmq');
+const cron = require('node-cron');
 const { connectRedis }  = require('../config/redis');
 const { sendMail }      = require('../config/email');
 const { syncObjects, deleteObjects } = require('../services/algoliaSync');
 const connectDB         = require('../config/db');
+const { checkAgreementReminders } = require('../jobs/agreementReminders');
 
 const conn = {
   host:     process.env.REDIS_HOST     || 'localhost',
@@ -45,7 +47,14 @@ async function start() {
     console.error(`[AlgoliaWorker] job ${job?.id} failed:`, err.message);
   });
 
-  console.log('[Workers] email + algolia workers started');
+  // ── Daily cron: corporate agreement expiry reminders (60/30 days out) ───────
+  // Runs at 9 AM server time — matches the "server timezone is authoritative" convention
+  // used elsewhere (e.g. booking late-night/short-notice warnings).
+  cron.schedule('0 9 * * *', () => {
+    checkAgreementReminders().catch((err) => console.error('[AgreementReminder] run failed:', err.message));
+  });
+
+  console.log('[Workers] email + algolia workers started, agreement-reminder cron scheduled (09:00 daily)');
 
   process.on('SIGTERM', async () => {
     await emailWorker.close();

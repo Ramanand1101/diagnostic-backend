@@ -14,9 +14,13 @@ router.delete('/:id', protect, adminOnly, corporate.deleteCorporate);
 
 router.patch('/:id/status', protect, adminOnly, corporate.setStatus);
 router.patch('/:id/labs', protect, adminOnly, corporate.assignLabs);
+router.patch('/:id/packages', protect, adminOnly, corporate.assignPackages);
 router.patch('/:id/relationship-manager', protect, adminOnly, corporate.assignRelationshipManager);
+router.patch('/:id/settings', protect, adminOnly, corporate.updateSettings);
 
 router.post('/:id/account-managers', protect, adminOnly, corporate.addAccountManager);
 router.delete('/:id/account-managers/:userId', protect, adminOnly, corporate.removeAccountManager);
+
+router.get('/:id/billing', protect, adminOnly, corporate.getBilling);
 
 module.exports = router;

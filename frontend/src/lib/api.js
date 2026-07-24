@@ -88,6 +88,49 @@ export const corporateApi = {
   assignRelationshipManager: (id, userId) => api.patch(`/corporates/${id}/relationship-manager`, { userId }),
   addAccountManager: (id, data) => api.post(`/corporates/${id}/account-managers`, data),
   removeAccountManager: (id, userId) => api.delete(`/corporates/${id}/account-managers/${userId}`),
+  assignPackages: (id, packages) => api.patch(`/corporates/${id}/packages`, { packages }),
+  updateSettings: (id, data) => api.patch(`/corporates/${id}/settings`, data),
+  getBilling: (id, params) => api.get(`/corporates/${id}/billing`, { params }),
+};
+
+// Corporate Invoices
+export const corporateInvoiceApi = {
+  getAll: (params) => api.get('/corporate-invoices', { params }),
+  getOne: (id) => api.get(`/corporate-invoices/${id}`),
+  generate: (corporateId, data) => api.post(`/corporate-invoices/${corporateId}/generate`, data),
+  updateStatus: (id, status) => api.patch(`/corporate-invoices/${id}/status`, { status }),
+};
+
+// Corporate Packages
+export const corporatePackageApi = {
+  getAll: (params) => api.get('/corporate-packages', { params }),
+  getOne: (id) => api.get(`/corporate-packages/${id}`),
+  create: (data) => api.post('/corporate-packages', data),
+  update: (id, data) => api.put(`/corporate-packages/${id}`, data),
+  delete: (id) => api.delete(`/corporate-packages/${id}`),
+};
+
+// Corporate Appointments
+export const corporateAppointmentApi = {
+  getAll: (params) => api.get('/corporate-appointments', { params }),
+  getOne: (id) => api.get(`/corporate-appointments/${id}`),
+  create: (data) => api.post('/corporate-appointments', data),
+  bulkUpload: (corporateId, file) => {
+    const fd = new FormData(); fd.append('file', file);
+    return api.post(`/corporate-appointments/bulk-upload/${corporateId}`, fd);
+  },
+  sendToLab: (id) => api.patch(`/corporate-appointments/${id}/send-to-lab`),
+  confirm: (id) => api.patch(`/corporate-appointments/${id}/confirm`),
+  reject: (id) => api.patch(`/corporate-appointments/${id}/reject`),
+  requestAlternate: (id, data) => api.patch(`/corporate-appointments/${id}/request-alternate`, data),
+  reschedule: (id, data) => api.patch(`/corporate-appointments/${id}/reschedule`, data),
+  cancel: (id, reason) => api.patch(`/corporate-appointments/${id}/cancel`, { reason }),
+  notifyEmployee: (id, channels) => api.post(`/corporate-appointments/${id}/notify-employee`, { channels }),
+  uploadReport: (id, file) => {
+    const fd = new FormData(); fd.append('file', file);
+    return api.post(`/corporate-appointments/${id}/report`, fd);
+  },
+  getReportUrl: (id) => api.get(`/corporate-appointments/${id}/report-url`),
 };
 
 // Categories

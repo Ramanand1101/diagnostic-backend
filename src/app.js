@@ -39,6 +39,9 @@ const testMasterRoutes     = require('./routes/testMasterRoutes');
 const homeContentRoutes    = require('./routes/homeContentRoutes');
 const labChangeRequestRoutes = require('./routes/labChangeRequestRoutes');
 const corporateRoutes      = require('./routes/corporateRoutes');
+const corporatePackageRoutes = require('./routes/corporatePackageRoutes');
+const corporateAppointmentRoutes = require('./routes/corporateAppointmentRoutes');
+const corporateInvoiceRoutes = require('./routes/corporateInvoiceRoutes');
 
 const app = express();
 
@@ -147,6 +150,9 @@ app.use('/api/v1/test-master',        testMasterRoutes);
 app.use('/api/v1/home-content',       homeContentRoutes);
 app.use('/api/v1/lab-change-requests', labChangeRequestRoutes);
 app.use('/api/v1/corporates',         corporateRoutes);
+app.use('/api/v1/corporate-packages', corporatePackageRoutes);
+app.use('/api/v1/corporate-appointments', corporateAppointmentRoutes);
+app.use('/api/v1/corporate-invoices', corporateInvoiceRoutes);
 
 // ── Error handlers ────────────────────────────────────────────────────────────
 app.use(notFound);
