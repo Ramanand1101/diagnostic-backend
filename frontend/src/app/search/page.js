@@ -78,39 +78,44 @@ function DescriptionPanel({ product }) {
   }
 
   // Fields may come from Algolia (flat) or mongoSearch (nested testMaster) — use both
-  const tm = product.testMaster || {};
+  const tm             = product.testMaster || {};
+  const lab            = product.lab || {};
   const description    = product.description    || tm.description    || '';
   const sampleType     = product.sampleType     || tm.sampleType     || '';
   const reportTime     = product.reportTime     || tm.reportTime     || '';
   const fastingRequired = product.fastingRequired ?? tm.fastingRequired ?? false;
-  const homeCollection  = product.homeCollection  ?? tm.homeCollection  ?? false;
-
-  const lab          = product.lab || {};
-  const homeCollection = lab.homeCollection ?? tm.homeCollection ?? product.homeCollection ?? false;
+  const homeCollection  = lab.homeCollection ?? tm.homeCollection ?? product.homeCollection ?? false;
 
   return (
     <div className="bg-white rounded-xl border border-primary-100 shadow-sm p-5 transition-all">
-      {product.type && (
-        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-          {product.type}
-        </span>
-      )}
+      {/* Type + sample badges */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {product.type && (
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+            {product.type}
+          </span>
+        )}
+        {sampleType && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-orange-50 text-orange-600 border-orange-100 capitalize">
+            {sampleType}
+          </span>
+        )}
+      </div>
 
       {/* Title */}
-      <h3 className="font-bold text-gray-900 text-base leading-snug mt-2 mb-3">{product.name}</h3>
+      <h3 className="font-bold text-gray-900 text-base leading-snug mb-2">{product.name}</h3>
 
-      {/* Key details below title */}
-      <div className="flex flex-col gap-1.5 mb-3">
-        {sampleType && (
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <FiDroplet className="text-primary-400 flex-shrink-0" size={12} />
-            <span><span className="text-gray-400">Sample:</span> <strong>{sampleType}</strong></span>
-          </div>
-        )}
+      {/* Description */}
+      {description && (
+        <p className="text-xs text-gray-500 leading-relaxed mb-3">{description}</p>
+      )}
+
+      {/* Key details — checkmark style like screenshot */}
+      <div className="flex flex-col gap-1.5 border-t border-gray-100 pt-3">
         {reportTime && (
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <FiClock className="text-primary-400 flex-shrink-0" size={12} />
-            <span><span className="text-gray-400">Report in:</span> <strong>{reportTime}</strong></span>
+          <div className="flex items-center gap-2 text-xs text-gray-700">
+            <FiCheck className="text-green-500 flex-shrink-0" size={12} />
+            <span>Report ready in <strong className="text-green-600">{reportTime}</strong></span>
           </div>
         )}
         {fastingRequired && (
@@ -120,22 +125,17 @@ function DescriptionPanel({ product }) {
           </div>
         )}
         {homeCollection && (
-          <div className="flex items-center gap-2 text-xs text-green-600">
-            <FiHome className="flex-shrink-0" size={12} />
-            <span className="font-medium">Home Collection Available</span>
+          <div className="flex items-center gap-2 text-xs text-gray-700">
+            <FiHome className="text-gray-500 flex-shrink-0" size={12} />
+            <span>Home collection available</span>
           </div>
         )}
       </div>
 
-      {/* Description */}
-      {description ? (
-        <p className="text-xs text-gray-500 leading-relaxed border-t border-gray-100 pt-3">{description}</p>
-      ) : null}
-
       {/* Lab */}
       {lab.name && (
-        <div className="flex items-center gap-2 text-xs text-gray-500 mt-3">
-          <div className={`w-4 h-4 ${labColor(lab.name)} rounded-full flex-shrink-0`} />
+        <div className="flex items-center gap-2 text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
+          <div className={`w-3 h-3 ${labColor(lab.name)} rounded-full flex-shrink-0`} />
           <span>{lab.name}{lab.city ? `, ${lab.city}` : ''}</span>
         </div>
       )}
@@ -230,7 +230,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
                 </span>
               </span>
             )}
-            {products.some((p) => p.homeCollection) && <span className="text-green-600">🏠 Home</span>}
+            {(labInfo.homeCollection || products.some((p) => p.homeCollection)) && <span className="text-green-600">🏠 Home</span>}
             {labInfo.ratingAvg > 0 && <span>★ {labInfo.ratingAvg.toFixed(1)}</span>}
             {labInfo.openingHours && (
               <span className="hidden sm:flex items-center gap-0.5">
