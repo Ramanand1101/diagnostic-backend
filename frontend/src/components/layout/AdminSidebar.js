@@ -95,6 +95,14 @@ export default function AdminSidebar() {
     }))
     .filter((section) => section.items.length > 0);
 
+  // Pick the single longest matching href as "active" — prevents a parent route
+  // (e.g. /admin/corporate) from also lighting up on its own sub-pages
+  // (e.g. /admin/corporate/packages).
+  const allHrefs = visibleSections.flatMap((s) => s.items.map((i) => i.href));
+  const activeHref = allHrefs
+    .filter((href) => pathname === href || (href !== '/admin' && pathname.startsWith(href + '/')))
+    .sort((a, b) => b.length - a.length)[0];
+
   return (
     <aside
       className="bg-gray-900 h-screen sticky top-0 flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden"
@@ -138,7 +146,7 @@ export default function AdminSidebar() {
             )}
 
             {section.items.map(({ href, label, icon: Icon }) => {
-              const active = pathname === href || (href !== '/admin' && pathname.startsWith(href));
+              const active = href === activeHref;
               return (
                 <Link
                   key={href}
