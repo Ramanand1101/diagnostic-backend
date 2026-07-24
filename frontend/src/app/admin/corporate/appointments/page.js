@@ -230,7 +230,7 @@ function BulkUploadForm({ onSave, onClose }) {
 // ── Appointment management modal ───────────────────────────────────────────────
 function AppointmentDetail({ appointment, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
-  const [rescheduleForm, setRescheduleForm] = useState({ slotDate: '', slotTime: '', reason: '' });
+  const [rescheduleForm, setRescheduleForm] = useState({ slotDate: TODAY, slotTime: '', reason: '' });
   const [showReschedule, setShowReschedule] = useState(false);
   const [altType, setAltType] = useState('date');
   const [altNote, setAltNote] = useState('');

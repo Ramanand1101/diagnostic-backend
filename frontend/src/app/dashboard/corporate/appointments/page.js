@@ -165,7 +165,7 @@ function ScheduleForm({ myCorporate, onSave, onClose }) {
 function AppointmentDetail({ appointment, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [showReschedule, setShowReschedule] = useState(false);
-  const [rescheduleForm, setRescheduleForm] = useState({ slotDate: '', slotTime: '', reason: '' });
+  const [rescheduleForm, setRescheduleForm] = useState({ slotDate: TODAY, slotTime: '', reason: '' });
   const a = appointment;
 
   const run = async (fn, successMsg) => {
