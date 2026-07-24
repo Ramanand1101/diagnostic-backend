@@ -230,7 +230,8 @@ exports.updateSettings = asyncHandler(async (req, res) => {
   res.json(corporate);
 });
 
-// GET /:id/billing — day/month/year-wise billing view, based on billable (confirmed/completed) appointments
+// GET /:id/billing — day/month/year-wise billing view. Only appointments whose report is
+// FULLY uploaded (status: 'completed') are billable — a partial report does not count.
 exports.getBilling = asyncHandler(async (req, res) => {
   const corporate = await Corporate.findById(req.params.id);
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
@@ -238,7 +239,7 @@ exports.getBilling = asyncHandler(async (req, res) => {
   const { from, to, groupBy = 'day' } = req.query;
   const CorporateAppointment = require('../models/CorporateAppointment');
 
-  const filter = { corporate: corporate._id, status: { $in: ['confirmed', 'completed'] } };
+  const filter = { corporate: corporate._id, status: 'completed' };
   if (from || to) {
     filter.createdAt = {};
     if (from) filter.createdAt.$gte = new Date(from + 'T00:00:00.000Z');

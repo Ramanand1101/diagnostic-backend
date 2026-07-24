@@ -12,7 +12,8 @@ async function nextInvoiceNo() {
   return `INV-${yyyy}${mm}-${String(seq).padStart(4, '0')}`;
 }
 
-// POST /corporate-invoices/:corporateId/generate — bills all un-invoiced, billable appointments in [from, to]
+// POST /corporate-invoices/:corporateId/generate — bills all un-invoiced appointments in [from, to]
+// whose report is FULLY uploaded (status: 'completed'). A partial report is never billed.
 exports.generateInvoice = asyncHandler(async (req, res) => {
   const { from, to } = req.body;
   if (!from || !to) return res.status(400).json({ message: 'from and to dates are required.' });
@@ -22,7 +23,7 @@ exports.generateInvoice = asyncHandler(async (req, res) => {
 
   const filter = {
     corporate: corporate._id,
-    status: { $in: ['confirmed', 'completed'] },
+    status: 'completed',
     invoiced: false,
     createdAt: { $gte: new Date(from + 'T00:00:00.000Z'), $lte: new Date(to + 'T23:59:59.999Z') },
   };

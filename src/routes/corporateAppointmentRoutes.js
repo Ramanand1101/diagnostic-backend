@@ -23,6 +23,7 @@ router.patch('/:id/cancel', protect, adminOrCorporate, appt.cancelAppointment);
 router.post('/:id/notify-employee', protect, adminOnly, appt.notifyEmployee);
 
 router.post('/:id/report', protect, adminOnly, reportUpload.single('file'), appt.uploadReport);
+router.patch('/:id/report/mark-done', protect, adminOnly, appt.markReportDone);
 router.get('/:id/report-url', protect, adminOrCorporate, appt.getReportUrl);
 
 module.exports = router;

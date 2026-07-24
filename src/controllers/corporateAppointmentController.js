@@ -402,27 +402,72 @@ exports.notifyEmployee = asyncHandler(async (req, res) => {
 });
 
 // POST /:id/report — upload a test report file (multer-s3 middleware puts the S3 key on req.file.key)
-// Only allowed once the lab has confirmed the appointment; uploading marks it completed.
+// Only allowed once the lab has confirmed the appointment.
+// body.type: 'complete' (default) marks the appointment completed & billable;
+// body.type: 'partial' keeps it pending completion, records which tests are still missing,
+// and emails the lab asking for the rest — it does NOT unlock billing.
 exports.uploadReport = asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'File is required.' });
 
-  const existing = await CorporateAppointment.findById(req.params.id).select('status');
+  const existing = await CorporateAppointment.findById(req.params.id).populate('lab', 'name email');
   if (!existing) return res.status(404).json({ message: 'Appointment not found' });
   if (!['confirmed', 'completed'].includes(existing.status)) {
     return res.status(400).json({ message: 'Report can only be uploaded after the appointment is confirmed.' });
   }
 
-  const appointment = await CorporateAppointment.findByIdAndUpdate(
-    req.params.id,
-    {
-      reportKey: req.file.key,
-      reportFileName: req.file.originalname,
-      reportUploadedAt: new Date(),
-      reportUploadedBy: req.user._id,
-      status: 'completed',
-    },
-    { new: true }
-  );
+  const type = req.body.type === 'partial' ? 'partial' : 'complete';
+  let missingTests = [];
+  if (type === 'partial') {
+    try {
+      missingTests = JSON.parse(req.body.missingTests || '[]');
+    } catch {
+      missingTests = String(req.body.missingTests || '').split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    if (!missingTests.length) return res.status(400).json({ message: 'List which tests are still missing for a partial report.' });
+  }
+
+  existing.reportKey = req.file.key;
+  existing.reportFileName = req.file.originalname;
+  existing.reportUploadedAt = new Date();
+  existing.reportUploadedBy = req.user._id;
+  existing.reportStatus = type;
+  existing.missingTests = type === 'partial' ? missingTests : [];
+  if (type === 'complete') existing.status = 'completed';
+  await existing.save();
+
+  if (type === 'partial' && existing.lab?.email) {
+    try {
+      await queueEmail({
+        to: existing.lab.email,
+        subject: `Partial Report Received — ${existing.appointmentNo} — tests still pending`,
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+            <h2 style="color:#b45309">Partial Report Received</h2>
+            <p>We received a partial report for appointment <strong>${existing.appointmentNo}</strong> (${existing.employee?.name || ''}).</p>
+            <p>The following test(s) are still pending — please send the remaining report at the earliest:</p>
+            <ul>${missingTests.map((t) => `<li>${t}</li>`).join('')}</ul>
+          </div>`,
+      });
+    } catch (e) {
+      console.error('[CorporateAppointment] partial-report lab email failed:', e.message);
+    }
+  }
+
+  res.json(existing);
+});
+
+// PATCH /:id/report/mark-done — admin confirms the previously-uploaded report is now complete
+// (e.g. the missing tests arrived separately). This is what unlocks billing for the appointment.
+exports.markReportDone = asyncHandler(async (req, res) => {
+  const appointment = await CorporateAppointment.findById(req.params.id);
+  if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+  if (!appointment.reportKey) return res.status(400).json({ message: 'No report has been uploaded yet.' });
+  if (appointment.reportStatus === 'complete') return res.status(400).json({ message: 'Report is already marked complete.' });
+
+  appointment.reportStatus = 'complete';
+  appointment.missingTests = [];
+  appointment.status = 'completed';
+  await appointment.save();
   res.json(appointment);
 });
 

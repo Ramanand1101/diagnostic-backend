@@ -64,6 +64,10 @@ const corporateAppointmentSchema = new mongoose.Schema({
   reportFileName: String,
   reportUploadedAt: Date,
   reportUploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  // 'partial' = some tests still pending (see missingTests) — not billable yet.
+  // 'complete' = every test is in the report — this is what unlocks billing.
+  reportStatus: { type: String, enum: ['none', 'partial', 'complete'], default: 'none' },
+  missingTests: [String],
 
   // Set once billed on a CorporateInvoice, so it isn't double-billed
   invoiced: { type: Boolean, default: false, index: true },

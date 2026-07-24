@@ -17,7 +17,7 @@ const STATUS_LABEL = {
   alternate_requested: 'Alternate Requested',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
-  completed: 'Report Uploaded',
+  completed: 'Report Complete',
 };
 const STATUS_COLOR = {
   pending: 'bg-gray-100 text-gray-600',
@@ -236,6 +236,9 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
   const [altNote, setAltNote] = useState('');
   const [showAlt, setShowAlt] = useState(false);
   const [uploadingReport, setUploadingReport] = useState(false);
+  const [reportFile, setReportFile] = useState(null);
+  const [reportType, setReportType] = useState('complete');
+  const [missingSelected, setMissingSelected] = useState([]);
   const reportFileRef = useRef(null);
 
   const run = async (fn, successMsg) => {
@@ -248,14 +251,29 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
     finally { setBusy(false); }
   };
 
-  const handleReportFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
+  const toggleMissing = (name) => {
+    setMissingSelected((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
+  };
+
+  const handleUploadReport = async () => {
+    if (!reportFile) return toast.error('Choose a file first');
+    if (reportType === 'partial' && missingSelected.length === 0) return toast.error('Select which test(s) are still missing');
     setUploadingReport(true);
     try {
-      await corporateAppointmentApi.uploadReport(appointment._id, file);
-      toast.success('Report uploaded!');
+      await corporateAppointmentApi.uploadReport(appointment._id, reportFile, { type: reportType, missingTests: missingSelected });
+      toast.success(reportType === 'partial' ? 'Partial report uploaded — lab notified of missing tests' : 'Report uploaded — appointment marked complete');
+      setReportFile(null);
+      setMissingSelected([]);
+      onChanged();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setUploadingReport(false); }
+  };
+
+  const handleMarkDone = async () => {
+    setUploadingReport(true);
+    try {
+      await corporateAppointmentApi.markReportDone(appointment._id);
+      toast.success('Report marked complete — appointment is now billable');
       onChanged();
     } catch (err) { toast.error(getErrorMessage(err)); }
     finally { setUploadingReport(false); }
@@ -366,24 +384,68 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
         {!['confirmed', 'completed'].includes(a.status) ? (
           <p className="text-xs text-gray-400">Report can be uploaded once this appointment is confirmed by the lab.</p>
         ) : (
-          <div className="flex items-center gap-2">
-            {a.reportKey ? (
-              <>
+          <div className="space-y-3">
+            {a.reportKey && (
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5">
                   <FiFileText size={12} /> {a.reportFileName || 'report.pdf'}
+                </span>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${a.reportStatus === 'complete' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {a.reportStatus === 'complete' ? 'Complete' : 'Partial'}
                 </span>
                 <button onClick={handleDownloadReport} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-primary-600 hover:border-primary-300 flex items-center gap-1">
                   <FiDownload size={11} /> Download
                 </button>
-              </>
-            ) : (
-              <p className="text-xs text-gray-400">No report uploaded yet.</p>
+                {a.reportStatus === 'partial' && (
+                  <button onClick={handleMarkDone} disabled={uploadingReport} className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                    ✓ Mark as Done
+                  </button>
+                )}
+              </div>
             )}
-            <input ref={reportFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleReportFile} />
-            <button onClick={() => reportFileRef.current?.click()} disabled={uploadingReport}
-              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-primary-300 flex items-center gap-1 disabled:opacity-50">
-              <FiUploadCloud size={11} /> {uploadingReport ? 'Uploading...' : a.reportKey ? 'Replace' : 'Upload Report'}
-            </button>
+            {a.reportStatus === 'partial' && (a.missingTests || []).length > 0 && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Still missing: <span className="font-semibold">{a.missingTests.join(', ')}</span> — lab has been notified. Billing is on hold until the report is marked complete.
+              </p>
+            )}
+
+            <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+              <div className="flex gap-4">
+                <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                  <input type="radio" checked={reportType === 'complete'} onChange={() => { setReportType('complete'); setMissingSelected([]); }} className="text-primary-600" />
+                  Complete Report
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                  <input type="radio" checked={reportType === 'partial'} onChange={() => setReportType('partial')} className="text-primary-600" />
+                  Partial Report
+                </label>
+              </div>
+
+              {reportType === 'partial' && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Tick the test(s) still missing from this upload:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(a.items || []).map((item) => (
+                      <label key={item.name} className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-full px-2.5 py-1 cursor-pointer">
+                        <input type="checkbox" checked={missingSelected.includes(item.name)} onChange={() => toggleMissing(item.name)} className="text-amber-600" />
+                        {item.name}
+                      </label>
+                    ))}
+                    {(a.items || []).length === 0 && <p className="text-xs text-gray-400">No tests listed on this appointment.</p>}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <input ref={reportFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  onChange={(e) => setReportFile(e.target.files?.[0] || null)}
+                  className="text-xs flex-1" />
+                <button onClick={handleUploadReport} disabled={uploadingReport || !reportFile}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 flex items-center gap-1 whitespace-nowrap">
+                  <FiUploadCloud size={11} /> {uploadingReport ? 'Uploading...' : a.reportKey ? 'Replace' : 'Upload'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

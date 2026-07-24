@@ -126,10 +126,14 @@ export const corporateAppointmentApi = {
   reschedule: (id, data) => api.patch(`/corporate-appointments/${id}/reschedule`, data),
   cancel: (id, reason) => api.patch(`/corporate-appointments/${id}/cancel`, { reason }),
   notifyEmployee: (id, channels) => api.post(`/corporate-appointments/${id}/notify-employee`, { channels }),
-  uploadReport: (id, file) => {
-    const fd = new FormData(); fd.append('file', file);
+  uploadReport: (id, file, { type = 'complete', missingTests = [] } = {}) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('type', type);
+    if (type === 'partial') fd.append('missingTests', JSON.stringify(missingTests));
     return api.post(`/corporate-appointments/${id}/report`, fd);
   },
+  markReportDone: (id) => api.patch(`/corporate-appointments/${id}/report/mark-done`),
   getReportUrl: (id) => api.get(`/corporate-appointments/${id}/report-url`),
 };
 

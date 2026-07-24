@@ -18,7 +18,7 @@ const STATUS_LABEL = {
   alternate_requested: 'Alternate Requested',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
-  completed: 'Report Uploaded',
+  completed: 'Report Complete',
 };
 const STATUS_COLOR = {
   pending: 'bg-gray-100 text-gray-600',
@@ -207,6 +207,12 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
         </div>
       )}
 
+      {a.reportStatus === 'partial' && (a.missingTests || []).length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+          Partial report received — still pending: <span className="font-semibold">{a.missingTests.join(', ')}</span>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {!['cancelled', 'rejected', 'completed'].includes(a.status) && (
           <>
@@ -215,7 +221,7 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
           </>
         )}
         {a.reportKey && (
-          <button onClick={handleDownloadReport} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-primary-600 hover:border-primary-300 flex items-center gap-1"><FiDownload size={11} /> Download Report</button>
+          <button onClick={handleDownloadReport} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-primary-600 hover:border-primary-300 flex items-center gap-1"><FiDownload size={11} /> Download Report ({a.reportStatus === 'complete' ? 'Complete' : 'Partial'})</button>
         )}
       </div>
 
