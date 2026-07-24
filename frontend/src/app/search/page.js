@@ -85,7 +85,8 @@ function DescriptionPanel({ product }) {
   const fastingRequired = product.fastingRequired ?? tm.fastingRequired ?? false;
   const homeCollection  = product.homeCollection  ?? tm.homeCollection  ?? false;
 
-  const lab = product.lab || {};
+  const lab          = product.lab || {};
+  const homeCollection = lab.homeCollection ?? tm.homeCollection ?? product.homeCollection ?? false;
 
   return (
     <div className="bg-white rounded-xl border border-primary-100 shadow-sm p-5 transition-all">
@@ -94,12 +95,44 @@ function DescriptionPanel({ product }) {
           {product.type}
         </span>
       )}
-      <h3 className="font-bold text-gray-900 text-base leading-snug mt-2 mb-2">{product.name}</h3>
+
+      {/* Title */}
+      <h3 className="font-bold text-gray-900 text-base leading-snug mt-2 mb-3">{product.name}</h3>
+
+      {/* Key details below title */}
+      <div className="flex flex-col gap-1.5 mb-3">
+        {sampleType && (
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <FiDroplet className="text-primary-400 flex-shrink-0" size={12} />
+            <span><span className="text-gray-400">Sample:</span> <strong>{sampleType}</strong></span>
+          </div>
+        )}
+        {reportTime && (
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <FiClock className="text-primary-400 flex-shrink-0" size={12} />
+            <span><span className="text-gray-400">Report in:</span> <strong>{reportTime}</strong></span>
+          </div>
+        )}
+        {fastingRequired && (
+          <div className="flex items-center gap-2 text-xs text-orange-600">
+            <FiAlertCircle className="flex-shrink-0" size={12} />
+            <span className="font-medium">Fasting Required</span>
+          </div>
+        )}
+        {homeCollection && (
+          <div className="flex items-center gap-2 text-xs text-green-600">
+            <FiHome className="flex-shrink-0" size={12} />
+            <span className="font-medium">Home Collection Available</span>
+          </div>
+        )}
+      </div>
+
+      {/* Description */}
       {description ? (
-        <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
-      ) : (
-        <p className="text-sm text-gray-300 italic">No description available for this test.</p>
-      )}
+        <p className="text-xs text-gray-500 leading-relaxed border-t border-gray-100 pt-3">{description}</p>
+      ) : null}
+
+      {/* Lab */}
       {lab.name && (
         <div className="flex items-center gap-2 text-xs text-gray-500 mt-3">
           <div className={`w-4 h-4 ${labColor(lab.name)} rounded-full flex-shrink-0`} />
