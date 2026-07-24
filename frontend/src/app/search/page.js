@@ -77,6 +77,14 @@ function DescriptionPanel({ product }) {
     );
   }
 
+  // Fields may come from Algolia (flat) or mongoSearch (nested testMaster) — use both
+  const tm = product.testMaster || {};
+  const description    = product.description    || tm.description    || '';
+  const sampleType     = product.sampleType     || tm.sampleType     || '';
+  const reportTime     = product.reportTime     || tm.reportTime     || '';
+  const fastingRequired = product.fastingRequired ?? tm.fastingRequired ?? false;
+  const homeCollection  = product.homeCollection  ?? tm.homeCollection  ?? false;
+
   const lab = product.lab || {};
   return (
     <div className="bg-white rounded-xl border border-primary-100 shadow-sm p-5 transition-all">
@@ -86,31 +94,31 @@ function DescriptionPanel({ product }) {
             {product.type}
           </span>
         )}
-        {product.fastingRequired && (
+        {fastingRequired && (
           <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-orange-50 text-orange-700 border border-orange-100 flex items-center gap-1">
             <FiAlertCircle className="text-[10px]" /> Fasting Required
           </span>
         )}
-        {product.sampleType && (
+        {sampleType && (
           <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-gray-50 text-gray-500 border border-gray-200 flex items-center gap-1">
-            <FiDroplet className="text-[10px]" /> {product.sampleType}
+            <FiDroplet className="text-[10px]" /> {sampleType}
           </span>
         )}
       </div>
       <h3 className="font-bold text-gray-900 text-base leading-snug mb-3">{product.name}</h3>
-      {product.description ? (
-        <p className="text-sm text-gray-600 leading-relaxed mb-4">{product.description}</p>
+      {description ? (
+        <p className="text-sm text-gray-600 leading-relaxed mb-4">{description}</p>
       ) : (
         <p className="text-sm text-gray-300 italic mb-4">No description available for this test.</p>
       )}
       <div className="space-y-1.5 mb-4">
-        {product.reportTime && (
+        {reportTime && (
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <FiClock className="text-gray-400 flex-shrink-0" />
-            <span>Report ready in <strong>{product.reportTime}</strong></span>
+            <span>Report ready in <strong>{reportTime}</strong></span>
           </div>
         )}
-        {product.homeCollection && (
+        {homeCollection && (
           <div className="flex items-center gap-2 text-xs text-green-600">
             <FiHome className="flex-shrink-0" />
             <span>Home collection available</span>

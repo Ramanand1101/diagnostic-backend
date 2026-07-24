@@ -168,26 +168,61 @@ function ProductForm({ initial, labs, onSave, onClose }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Price (₹) <span className="text-xs font-normal text-gray-400">lab can set later</span>
+            Price (₹) <span className="text-xs font-normal text-gray-400">MRP / original price</span>
           </label>
           <input type="number" min="0" value={form.price}
-            onChange={(e) => setForm({ ...form, price: e.target.value })} className="input" placeholder="e.g. 499" />
+            onChange={(e) => {
+              const price = e.target.value;
+              // Recalculate salePrice from discountPercent when price changes
+              let salePrice = form.salePrice;
+              if (price && form.discountPercent) {
+                salePrice = Math.round(Number(price) - (Number(price) * Number(form.discountPercent)) / 100);
+              }
+              setForm({ ...form, price, salePrice: salePrice !== '' ? String(salePrice) : '' });
+            }}
+            className="input" placeholder="e.g. 500" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Sale Price (₹) <span className="text-xs font-normal text-gray-400">discounted price</span>
+            Sale Price (₹) <span className="text-xs font-normal text-gray-400">auto-fills from Discount %</span>
           </label>
           <input type="number" min="0" value={form.salePrice}
-            onChange={(e) => setForm({ ...form, salePrice: e.target.value })} className="input" placeholder="e.g. 349" />
+            onChange={(e) => {
+              const salePrice = e.target.value;
+              // Auto-calculate discount % from sale price
+              let discountPercent = form.discountPercent;
+              if (salePrice && form.price && Number(form.price) > 0) {
+                discountPercent = Math.round(((Number(form.price) - Number(salePrice)) / Number(form.price)) * 100);
+                if (discountPercent < 0) discountPercent = 0;
+              }
+              setForm({ ...form, salePrice, discountPercent: String(discountPercent) });
+            }}
+            className="input" placeholder="e.g. 350" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Discount %</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Discount % <span className="text-xs font-normal text-gray-400">auto-fills Sale Price</span>
+          </label>
           <input type="number" min="0" max="100" value={form.discountPercent}
-            onChange={(e) => setForm({ ...form, discountPercent: e.target.value })} className="input" placeholder="e.g. 20" />
+            onChange={(e) => {
+              const discountPercent = e.target.value;
+              // Auto-calculate sale price from discount %
+              let salePrice = form.salePrice;
+              if (discountPercent && form.price && Number(form.price) > 0) {
+                salePrice = Math.round(Number(form.price) - (Number(form.price) * Number(discountPercent)) / 100);
+              }
+              setForm({ ...form, discountPercent, salePrice: salePrice !== '' ? String(salePrice) : '' });
+            }}
+            className="input" placeholder="e.g. 30" />
         </div>
         {form.price && form.salePrice && Number(form.salePrice) >= Number(form.price) && (
           <div className="col-span-2">
             <p className="text-xs text-red-500">Sale price should be less than the regular price</p>
+          </div>
+        )}
+        {form.price && form.salePrice && Number(form.salePrice) < Number(form.price) && (
+          <div className="col-span-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-xs text-green-700 font-medium">
+            ✓ Customer saves ₹{Number(form.price) - Number(form.salePrice)} ({form.discountPercent}% off)
           </div>
         )}
         <div className="col-span-2 flex flex-wrap gap-4">
