@@ -161,11 +161,11 @@ exports.createBooking = asyncHandler(async (req, res) => {
               <p style="text-align:right;margin:8px 0 0;font-weight:700;font-size:16px;color:#0ea5e9">Total: ₹${booking.total}</p>
               ${warnings.includes('lateNight') ? `
               <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-top:16px">
-                <p style="margin:0;font-size:13px;color:#92400e">🌙 <strong>Late-night booking notice:</strong> You booked after 9 PM. Your sample collection is scheduled for tomorrow. Our team will reach out to confirm the timing.</p>
+                <p style="margin:0;font-size:13px;color:#92400e">🌙 <strong>Important Notice:</strong> Your booking was placed after 9 PM for the next day. If the center is closed or opens late, please cooperate with the diagnostic center. We appreciate your understanding.</p>
               </div>` : ''}
               ${warnings.includes('shortNotice') ? `
               <div style="background:#fef2f2;border:1px solid #f87171;border-radius:8px;padding:12px 16px;margin-top:12px">
-                <p style="margin:0;font-size:13px;color:#991b1b">⏰ <strong>Short notice booking:</strong> Your appointment is within the next 10 hours. Please be ready and keep your phone accessible. Fasting requirements (if any) apply from now.</p>
+                <p style="margin:0;font-size:13px;color:#991b1b">⏰ <strong>Important Notice:</strong> Your appointment is within the next 10 hours. Please check with the Diagnostic/lab for availability before visiting.</p>
               </div>` : ''}
               <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
               <p style="font-size:12px;color:#94a3b8;margin:0">If you have any questions, reply to this email or call the lab directly.</p>

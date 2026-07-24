@@ -912,9 +912,9 @@ function SuccessScreen({ bookings }) {
         <div className="mb-4 text-left bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex gap-3 items-start">
           <span className="text-xl shrink-0">🌙</span>
           <div>
-            <p className="text-sm font-semibold text-amber-800">Late-night booking notice</p>
+            <p className="text-sm font-semibold text-amber-800">Important Notice</p>
             <p className="text-xs text-amber-700 mt-0.5">
-              Your booking was placed after 9 PM. Your sample collection is scheduled for tomorrow. Our team will contact you to confirm the exact timing.
+              Your booking was placed after 9 PM for the next day. If the center is closed or opens late, please cooperate with the diagnostic center. We appreciate your understanding.
             </p>
           </div>
         </div>
@@ -923,9 +923,9 @@ function SuccessScreen({ bookings }) {
         <div className="mb-4 text-left bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex gap-3 items-start">
           <span className="text-xl shrink-0">⏰</span>
           <div>
-            <p className="text-sm font-semibold text-red-800">Short notice booking</p>
+            <p className="text-sm font-semibold text-red-800">Important Notice</p>
             <p className="text-xs text-red-700 mt-0.5">
-              Your appointment is within the next 10 hours. Please be ready and keep your phone accessible. If fasting is required, begin fasting now.
+              Please check with the Diagnostic/lab for availability before visiting.
             </p>
           </div>
         </div>
