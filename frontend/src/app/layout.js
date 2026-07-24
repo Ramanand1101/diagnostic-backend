@@ -1,5 +1,5 @@
 import './globals.css';
-import { Toaster, ToastBar, toast } from 'react-hot-toast';
+import ToasterWithClose from '@/components/ui/ToasterWithClose';
 import { AuthProvider } from '@/context/AuthContext';
 import { CityProvider } from '@/context/CityContext';
 import { CartProvider } from '@/context/CartContext';
@@ -25,27 +25,7 @@ export default function RootLayout({ children }) {
             <CityProvider>
               <CartProvider>
                 {children}
-                <Toaster position="top-right" toastOptions={{ duration: 4000 }}>
-                  {(t) => (
-                    <ToastBar toast={t}>
-                      {({ icon, message }) => (
-                        <>
-                          {icon}
-                          {message}
-                          <button
-                            onClick={() => toast.dismiss(t.id)}
-                            style={{
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              color: '#9ca3af', fontSize: '14px', lineHeight: 1,
-                              padding: '0 2px 0 4px', flexShrink: 0,
-                            }}
-                            aria-label="Close"
-                          >✕</button>
-                        </>
-                      )}
-                    </ToastBar>
-                  )}
-                </Toaster>
+                <ToasterWithClose />
                 <CookieConsent />
               </CartProvider>
             </CityProvider>
