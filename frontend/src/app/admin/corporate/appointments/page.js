@@ -6,6 +6,7 @@ import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import CsvUploadSection from '@/components/ui/CsvUploadSection';
+import { DateSelectPicker, TimeSlotPicker } from '@/components/booking/DateTimePicker';
 import toast from 'react-hot-toast';
 import { FiPlus, FiSearch, FiUploadCloud, FiMail, FiPhone, FiRefreshCw, FiX, FiFileText, FiDownload } from 'react-icons/fi';
 
@@ -39,6 +40,11 @@ function ScheduleForm({ onSave, onClose }) {
   });
   const [customItems, setCustomItems] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const _td = new Date();
+  const today = `${_td.getFullYear()}-${String(_td.getMonth() + 1).padStart(2, '0')}-${String(_td.getDate()).padStart(2, '0')}`;
+  const _maxD = new Date(_td); _maxD.setDate(_maxD.getDate() + 30);
+  const maxBookingDate = `${_maxD.getFullYear()}-${String(_maxD.getMonth() + 1).padStart(2, '0')}-${String(_maxD.getDate()).padStart(2, '0')}`;
 
   useEffect(() => { corporateApi.getAll({ limit: 200, active: 'true' }).then((r) => setCorporates(r.data.items || [])); }, []);
   useEffect(() => {
@@ -153,15 +159,22 @@ function ScheduleForm({ onSave, onClose }) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Date</label>
-          <input type="date" value={form.slotDate} onChange={(e) => set('slotDate', e.target.value)} className="input" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Time</label>
-          <input type="time" value={form.slotTime} onChange={(e) => set('slotTime', e.target.value)} className="input" />
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Date</label>
+        <DateSelectPicker
+          value={form.slotDate}
+          onChange={(v) => set('slotDate', v)}
+          minDate={today}
+          maxDate={maxBookingDate}
+        />
+        <p className="text-[10px] text-gray-400 mt-1">Appointments can be scheduled up to 30 days in advance</p>
+      </div>
+      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+        <TimeSlotPicker
+          value={form.slotTime}
+          onChange={(v) => set('slotTime', v)}
+          slotDate={form.slotDate}
+        />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
