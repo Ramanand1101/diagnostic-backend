@@ -230,7 +230,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
                 </span>
               </span>
             )}
-            {(labInfo.homeCollection || products.some((p) => p.homeCollection)) && <span className="text-green-600">🏠 Home</span>}
+            {(labInfo.homeCollection || products.some((p) => p.homeCollection)) && <span className="text-green-600">🏠 Home Collection Available</span>}
             {labInfo.ratingAvg > 0 && <span>★ {labInfo.ratingAvg.toFixed(1)}</span>}
             {labInfo.openingHours && (
               <span className="hidden sm:flex items-center gap-0.5">
