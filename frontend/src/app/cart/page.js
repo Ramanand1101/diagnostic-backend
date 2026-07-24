@@ -374,10 +374,16 @@ function BookingForm({ groups, onReadyForPayment }) {
       }
     } catch {}
 
+    const _now = new Date();
+    const todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+    // If saved date is in the past, reset to today
+    const savedDate = saved.slotDate && saved.slotDate >= todayStr ? saved.slotDate : todayStr;
+
     const firstAddr = user?.addresses?.[0];
     setForm({
       ...DEFAULT_FORM,
       ...saved,
+      slotDate: savedDate,
       ...(user ? {
         patientName: saved.patientName || user.name || '',
         phone: user.mobile || saved.phone || '',
