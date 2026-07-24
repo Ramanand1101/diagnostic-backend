@@ -86,65 +86,89 @@ function DescriptionPanel({ product }) {
   const homeCollection  = product.homeCollection  ?? tm.homeCollection  ?? false;
 
   const lab = product.lab || {};
+
+  const CERT_META = {
+    'NABL':      { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',   icon: '🔬' },
+    'ISO 15189': { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  icon: '✅' },
+    'CAP':       { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: '🏆' },
+    'NABL-ISO':  { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200',   icon: '⭐' },
+    'JCI':       { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  icon: '🌐' },
+  };
+
   return (
     <div className="bg-white rounded-xl border border-primary-100 shadow-sm p-5 transition-all">
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {product.type && (
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-            {product.type}
-          </span>
+
+      {/* Type badge */}
+      {product.type && (
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+          {product.type}
+        </span>
+      )}
+
+      {/* Title */}
+      <h3 className="font-bold text-gray-900 text-base leading-snug mt-2 mb-3">{product.name}</h3>
+
+      {/* ── Key test details (below title) ── */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {sampleType && (
+          <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+            <FiDroplet className="text-primary-500 flex-shrink-0" size={13} />
+            <div>
+              <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">Sample</p>
+              <p className="text-xs font-semibold text-gray-700">{sampleType}</p>
+            </div>
+          </div>
+        )}
+        {reportTime && (
+          <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+            <FiClock className="text-primary-500 flex-shrink-0" size={13} />
+            <div>
+              <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">Report</p>
+              <p className="text-xs font-semibold text-gray-700">{reportTime}</p>
+            </div>
+          </div>
         )}
         {fastingRequired && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-orange-50 text-orange-700 border border-orange-100 flex items-center gap-1">
-            <FiAlertCircle className="text-[10px]" /> Fasting Required
-          </span>
-        )}
-        {sampleType && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-gray-50 text-gray-500 border border-gray-200 flex items-center gap-1">
-            <FiDroplet className="text-[10px]" /> {sampleType}
-          </span>
-        )}
-      </div>
-      <h3 className="font-bold text-gray-900 text-base leading-snug mb-3">{product.name}</h3>
-      {description ? (
-        <p className="text-sm text-gray-600 leading-relaxed mb-4">{description}</p>
-      ) : (
-        <p className="text-sm text-gray-300 italic mb-4">No description available for this test.</p>
-      )}
-      <div className="space-y-1.5 mb-4">
-        {reportTime && (
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <FiClock className="text-gray-400 flex-shrink-0" />
-            <span>Report ready in <strong>{reportTime}</strong></span>
+          <div className="flex items-center gap-2 bg-orange-50 rounded-lg px-3 py-2">
+            <FiAlertCircle className="text-orange-500 flex-shrink-0" size={13} />
+            <div>
+              <p className="text-[9px] font-semibold text-orange-400 uppercase tracking-wide">Fasting</p>
+              <p className="text-xs font-semibold text-orange-700">Required</p>
+            </div>
           </div>
         )}
         {homeCollection && (
-          <div className="flex items-center gap-2 text-xs text-green-600">
-            <FiHome className="flex-shrink-0" />
-            <span>Home collection available</span>
-          </div>
-        )}
-        {lab.name && (
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <div className={`w-4 h-4 ${labColor(lab.name)} rounded-full flex-shrink-0`} />
-            <span>{lab.name}{lab.city ? `, ${lab.city}` : ''}</span>
+          <div className="flex items-center gap-2 bg-green-50 rounded-lg px-3 py-2">
+            <FiHome className="text-green-500 flex-shrink-0" size={13} />
+            <div>
+              <p className="text-[9px] font-semibold text-green-400 uppercase tracking-wide">Collection</p>
+              <p className="text-xs font-semibold text-green-700">Home Available</p>
+            </div>
           </div>
         )}
       </div>
 
+      {/* Description */}
+      {description && (
+        <p className="text-xs text-gray-500 leading-relaxed mb-3 border-t border-gray-100 pt-3">{description}</p>
+      )}
+
+      {/* Lab info */}
+      {lab.name && (
+        <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+          <div className={`w-4 h-4 ${labColor(lab.name)} rounded-full flex-shrink-0`} />
+          <span className="font-medium text-gray-700">{lab.name}</span>
+          {lab.city && <span className="text-gray-400">· {lab.city}</span>}
+        </div>
+      )}
+
       {/* Lab certifications */}
       {lab.accreditation?.length > 0 && (
-        <div className="pt-3 border-t border-gray-100">
+        <div className="border-t border-gray-100 pt-3">
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Certifications</p>
           <div className="flex flex-wrap gap-1.5">
             {lab.accreditation.map((cert) => {
-              const meta = {
-                'NABL':      { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',   icon: '🔬' },
-                'ISO 15189': { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  icon: '✅' },
-                'CAP':       { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: '🏆' },
-                'NABL-ISO':  { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200',   icon: '⭐' },
-                'JCI':       { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  icon: '🌐' },
-              }[cert] || { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200', icon: '✓' };
+              const meta = CERT_META[cert] || { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200', icon: '✓' };
               return (
                 <span key={cert} className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full border ${meta.bg} ${meta.text} ${meta.border}`}>
                   <span>{meta.icon}</span> {cert}
@@ -156,7 +180,7 @@ function DescriptionPanel({ product }) {
       )}
 
       {product.tags?.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-3 border-t border-gray-100">
+        <div className="flex flex-wrap gap-1.5 pt-3 border-t border-gray-100 mt-3">
           {product.tags.map((tag) => (
             <span key={tag} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{tag}</span>
           ))}
