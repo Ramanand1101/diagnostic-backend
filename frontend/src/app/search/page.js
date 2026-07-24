@@ -87,103 +87,23 @@ function DescriptionPanel({ product }) {
 
   const lab = product.lab || {};
 
-  const CERT_META = {
-    'NABL':      { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',   icon: '🔬' },
-    'ISO 15189': { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  icon: '✅' },
-    'CAP':       { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: '🏆' },
-    'NABL-ISO':  { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200',   icon: '⭐' },
-    'JCI':       { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  icon: '🌐' },
-  };
-
   return (
     <div className="bg-white rounded-xl border border-primary-100 shadow-sm p-5 transition-all">
-
-      {/* Type badge */}
       {product.type && (
         <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border capitalize ${TYPE_COLOR[product.type] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
           {product.type}
         </span>
       )}
-
-      {/* Title */}
-      <h3 className="font-bold text-gray-900 text-base leading-snug mt-2 mb-3">{product.name}</h3>
-
-      {/* ── Key test details (below title) ── */}
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        {sampleType && (
-          <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-            <FiDroplet className="text-primary-500 flex-shrink-0" size={13} />
-            <div>
-              <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">Sample</p>
-              <p className="text-xs font-semibold text-gray-700">{sampleType}</p>
-            </div>
-          </div>
-        )}
-        {reportTime && (
-          <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-            <FiClock className="text-primary-500 flex-shrink-0" size={13} />
-            <div>
-              <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">Report</p>
-              <p className="text-xs font-semibold text-gray-700">{reportTime}</p>
-            </div>
-          </div>
-        )}
-        {fastingRequired && (
-          <div className="flex items-center gap-2 bg-orange-50 rounded-lg px-3 py-2">
-            <FiAlertCircle className="text-orange-500 flex-shrink-0" size={13} />
-            <div>
-              <p className="text-[9px] font-semibold text-orange-400 uppercase tracking-wide">Fasting</p>
-              <p className="text-xs font-semibold text-orange-700">Required</p>
-            </div>
-          </div>
-        )}
-        {homeCollection && (
-          <div className="flex items-center gap-2 bg-green-50 rounded-lg px-3 py-2">
-            <FiHome className="text-green-500 flex-shrink-0" size={13} />
-            <div>
-              <p className="text-[9px] font-semibold text-green-400 uppercase tracking-wide">Collection</p>
-              <p className="text-xs font-semibold text-green-700">Home Available</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Description */}
-      {description && (
-        <p className="text-xs text-gray-500 leading-relaxed mb-3 border-t border-gray-100 pt-3">{description}</p>
+      <h3 className="font-bold text-gray-900 text-base leading-snug mt-2 mb-2">{product.name}</h3>
+      {description ? (
+        <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
+      ) : (
+        <p className="text-sm text-gray-300 italic">No description available for this test.</p>
       )}
-
-      {/* Lab info */}
       {lab.name && (
-        <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+        <div className="flex items-center gap-2 text-xs text-gray-500 mt-3">
           <div className={`w-4 h-4 ${labColor(lab.name)} rounded-full flex-shrink-0`} />
-          <span className="font-medium text-gray-700">{lab.name}</span>
-          {lab.city && <span className="text-gray-400">· {lab.city}</span>}
-        </div>
-      )}
-
-      {/* Lab certifications */}
-      {lab.accreditation?.length > 0 && (
-        <div className="border-t border-gray-100 pt-3">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Certifications</p>
-          <div className="flex flex-wrap gap-1.5">
-            {lab.accreditation.map((cert) => {
-              const meta = CERT_META[cert] || { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200', icon: '✓' };
-              return (
-                <span key={cert} className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full border ${meta.bg} ${meta.text} ${meta.border}`}>
-                  <span>{meta.icon}</span> {cert}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {product.tags?.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-3 border-t border-gray-100 mt-3">
-          {product.tags.map((tag) => (
-            <span key={tag} className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{tag}</span>
-          ))}
+          <span>{lab.name}{lab.city ? `, ${lab.city}` : ''}</span>
         </div>
       )}
     </div>
@@ -229,9 +149,18 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
             {labInfo.verificationStatus === 'verified' && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 font-semibold">✓ Verified</span>
             )}
-            {labInfo.accreditation?.slice(0, 1).map((a) => (
-              <span key={a} className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100 font-semibold">{a}</span>
-            ))}
+            {labInfo.accreditation?.map((a) => {
+              const colors = {
+                'NABL':      'bg-blue-50 text-blue-700 border-blue-100',
+                'ISO 15189': 'bg-green-50 text-green-700 border-green-100',
+                'CAP':       'bg-purple-50 text-purple-700 border-purple-100',
+                'NABL-ISO':  'bg-teal-50 text-teal-700 border-teal-100',
+                'JCI':       'bg-amber-50 text-amber-700 border-amber-100',
+              }[a] || 'bg-gray-50 text-gray-600 border-gray-200';
+              return (
+                <span key={a} className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold ${colors}`}>{a}</span>
+              );
+            })}
             {coverage && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${
                 hasAll ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'
