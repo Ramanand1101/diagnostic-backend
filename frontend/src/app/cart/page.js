@@ -920,7 +920,7 @@ function SuccessScreen({ bookings }) {
           <div>
             <p className="text-sm font-semibold text-amber-800">Important Notice</p>
             <p className="text-xs text-amber-700 mt-0.5">
-              Your booking was placed after 9 PM for the next day. If the center is closed or opens late, please cooperate with the diagnostic center. We appreciate your understanding.
+              Note: If the diagnostic center is closed or opens late, please cooperate. Please inform us, Our team will coordinate with the diagnostic center and update you if any schedule changes are required.
             </p>
           </div>
         </div>
@@ -931,7 +931,7 @@ function SuccessScreen({ bookings }) {
           <div>
             <p className="text-sm font-semibold text-red-800">Important Notice</p>
             <p className="text-xs text-red-700 mt-0.5">
-              Please check with the Diagnostic/lab for availability before visiting.
+              Please check with the diagnostic center/lab regarding appointment availability before visiting.
             </p>
           </div>
         </div>
