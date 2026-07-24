@@ -131,6 +131,30 @@ function DescriptionPanel({ product }) {
           </div>
         )}
       </div>
+
+      {/* Lab certifications */}
+      {lab.accreditation?.length > 0 && (
+        <div className="pt-3 border-t border-gray-100">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Certifications</p>
+          <div className="flex flex-wrap gap-1.5">
+            {lab.accreditation.map((cert) => {
+              const meta = {
+                'NABL':      { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',   icon: '🔬' },
+                'ISO 15189': { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  icon: '✅' },
+                'CAP':       { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: '🏆' },
+                'NABL-ISO':  { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200',   icon: '⭐' },
+                'JCI':       { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  icon: '🌐' },
+              }[cert] || { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200', icon: '✓' };
+              return (
+                <span key={cert} className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full border ${meta.bg} ${meta.text} ${meta.border}`}>
+                  <span>{meta.icon}</span> {cert}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {product.tags?.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-3 border-t border-gray-100">
           {product.tags.map((tag) => (

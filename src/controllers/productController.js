@@ -42,14 +42,17 @@ function toAlgoliaRecord(p) {
     brand:           p.brand        || '',
     tags:            p.tags         || [],
     lab: lab._id ? {
-      _id:     String(lab._id),
-      name:    lab.name    || '',
-      slug:    lab.slug    || '',
-      city:    lab.city    || '',
-      state:   lab.state   || '',
-      address: lab.address || '',
-      area:    lab.area    || '',
-      pincode: lab.pincode || '',
+      _id:              String(lab._id),
+      name:             lab.name             || '',
+      slug:             lab.slug             || '',
+      city:             lab.city             || '',
+      state:            lab.state            || '',
+      address:          lab.address          || '',
+      area:             lab.area             || '',
+      pincode:          lab.pincode          || '',
+      accreditation:    lab.accreditation    || [],
+      verificationStatus: lab.verificationStatus || '',
+      homeCollection:   !!lab.homeCollection,
     } : null,
     isFeatured: !!p.isFeatured,
     isActive:   !!p.isActive,
@@ -57,7 +60,7 @@ function toAlgoliaRecord(p) {
 }
 
 const TM_POPULATE = { path: 'testMaster', select: 'name category subcategory description sampleType reportTime fastingRequired homeCollection' };
-const LAB_SELECT  = 'name slug city state address area pincode email homeCollection ratingAvg';
+const LAB_SELECT  = 'name slug city state address area pincode email homeCollection ratingAvg accreditation verificationStatus';
 
 // ─── public routes ────────────────────────────────────────────────────────────
 
