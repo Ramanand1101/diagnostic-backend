@@ -137,9 +137,24 @@ function CorporateForm({ initial, onSave, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    const PHONE_RE = /^[+\d][\d\s\-().]{6,19}$/;
+
     if (!form.companyName.trim()) return toast.error('Company name is required');
     if (!form.email.trim()) return toast.error('Company email is required');
+    if (!EMAIL_RE.test(form.email.trim())) return toast.error('Enter a valid company email address');
     if (!form.phone.trim()) return toast.error('Company phone is required');
+    if (!PHONE_RE.test(form.phone.trim())) return toast.error('Enter a valid company phone number');
+    if (form.pincode && !/^\d{6}$/.test(form.pincode)) return toast.error('Company pincode must be exactly 6 digits');
+    for (const e of form.emails) { if (e && !EMAIL_RE.test(e.trim())) return toast.error(`Extra company email "${e}" is not valid`); }
+    for (const p of form.phones) { if (p && !PHONE_RE.test(p.trim())) return toast.error(`Extra company phone "${p}" is not valid`); }
+
+    if (form.hr.email && !EMAIL_RE.test(form.hr.email.trim())) return toast.error('Enter a valid HR email address');
+    if (form.hr.phone && !PHONE_RE.test(form.hr.phone.trim())) return toast.error('Enter a valid HR phone number');
+    if (form.hr.pincode && !/^\d{6}$/.test(form.hr.pincode)) return toast.error('HR pincode must be exactly 6 digits');
+    for (const e of form.hr.emails) { if (e && !EMAIL_RE.test(e.trim())) return toast.error(`Extra HR email "${e}" is not valid`); }
+    for (const p of form.hr.phones) { if (p && !PHONE_RE.test(p.trim())) return toast.error(`Extra HR phone "${p}" is not valid`); }
+
     setLoading(true);
     try {
       if (initial?._id) await corporateApi.update(initial._id, form);

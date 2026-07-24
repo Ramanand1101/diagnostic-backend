@@ -2,6 +2,37 @@ const asyncHandler = require('express-async-handler');
 const Corporate = require('../models/Corporate');
 const User = require('../models/User');
 const { sendMail } = require('../config/email');
+const { isValidEmail, isValidPhone, isValidPincode } = require('../utils/validators');
+
+// Validates company + HR contact fields (required ones + any optional ones that were provided).
+// Returns an error message string, or null if everything looks valid.
+function validateCorporatePayload(payload) {
+  if (payload.email !== undefined && !isValidEmail(payload.email)) return 'Enter a valid company email address.';
+  if (payload.phone !== undefined && !isValidPhone(payload.phone)) return 'Enter a valid company phone number.';
+  if (payload.pincode && !isValidPincode(payload.pincode)) return 'Company pincode must be exactly 6 digits.';
+
+  for (const e of payload.emails || []) {
+    if (e && !isValidEmail(e)) return `Extra company email "${e}" is not valid.`;
+  }
+  for (const p of payload.phones || []) {
+    if (p && !isValidPhone(p)) return `Extra company phone "${p}" is not valid.`;
+  }
+
+  const hr = payload.hr;
+  if (hr) {
+    if (hr.email && !isValidEmail(hr.email)) return 'Enter a valid HR email address.';
+    if (hr.phone && !isValidPhone(hr.phone)) return 'Enter a valid HR phone number.';
+    if (hr.pincode && !isValidPincode(hr.pincode)) return 'HR pincode must be exactly 6 digits.';
+    for (const e of hr.emails || []) {
+      if (e && !isValidEmail(e)) return `Extra HR email "${e}" is not valid.`;
+    }
+    for (const p of hr.phones || []) {
+      if (p && !isValidPhone(p)) return `Extra HR phone "${p}" is not valid.`;
+    }
+  }
+
+  return null;
+}
 
 exports.listCorporates = asyncHandler(async (req, res) => {
   const { q, city, active, mine, page = 1, limit = 20 } = req.query;
@@ -49,6 +80,9 @@ exports.createCorporate = asyncHandler(async (req, res) => {
   if (!companyName || !email || !phone) {
     return res.status(400).json({ message: 'Company name, email and phone are required.' });
   }
+  const validationError = validateCorporatePayload(req.body);
+  if (validationError) return res.status(400).json({ message: validationError });
+
   const corporate = await Corporate.create(req.body);
   res.status(201).json(corporate);
 });
@@ -60,6 +94,9 @@ exports.updateCorporate = asyncHandler(async (req, res) => {
   delete payload.relationshipManager; // managed via /relationship-manager endpoint
   delete payload.packages;          // managed via /packages endpoint
   delete payload.settings;          // managed via /settings endpoint
+
+  const validationError = validateCorporatePayload(payload);
+  if (validationError) return res.status(400).json({ message: validationError });
 
   const corporate = await Corporate.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
@@ -128,6 +165,8 @@ exports.assignRelationshipManager = asyncHandler(async (req, res) => {
 exports.addAccountManager = asyncHandler(async (req, res) => {
   const { name, email, mobile } = req.body;
   if (!name || !email) return res.status(400).json({ message: 'Name and email are required.' });
+  if (!isValidEmail(email)) return res.status(400).json({ message: 'Enter a valid email address.' });
+  if (mobile && !isValidPhone(mobile)) return res.status(400).json({ message: 'Enter a valid mobile number.' });
 
   const corporate = await Corporate.findById(req.params.id);
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
