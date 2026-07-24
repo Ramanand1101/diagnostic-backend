@@ -32,6 +32,8 @@ const STATUS_COLOR = {
 
 const _td0 = new Date();
 const TODAY = `${_td0.getFullYear()}-${String(_td0.getMonth() + 1).padStart(2, '0')}-${String(_td0.getDate()).padStart(2, '0')}`;
+const _maxD0 = new Date(); _maxD0.setDate(_maxD0.getDate() + 30);
+const MAX_BOOKING_DATE = `${_maxD0.getFullYear()}-${String(_maxD0.getMonth() + 1).padStart(2, '0')}-${String(_maxD0.getDate()).padStart(2, '0')}`;
 
 // ── Schedule form (no corporate picker — always "my" corporate) ───────────────
 function ScheduleForm({ myCorporate, onSave, onClose }) {
@@ -41,9 +43,6 @@ function ScheduleForm({ myCorporate, onSave, onClose }) {
   });
   const [customItems, setCustomItems] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const _maxD = new Date(); _maxD.setDate(_maxD.getDate() + 30);
-  const maxBookingDate = `${_maxD.getFullYear()}-${String(_maxD.getMonth() + 1).padStart(2, '0')}-${String(_maxD.getDate()).padStart(2, '0')}`;
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const addCustomItem = () => setCustomItems([...customItems, { name: '', price: '' }]);
@@ -143,7 +142,7 @@ function ScheduleForm({ myCorporate, onSave, onClose }) {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Date</label>
-        <DateSelectPicker value={form.slotDate} onChange={(v) => set('slotDate', v)} minDate={TODAY} maxDate={maxBookingDate} />
+        <DateSelectPicker value={form.slotDate} onChange={(v) => set('slotDate', v)} minDate={TODAY} maxDate={MAX_BOOKING_DATE} />
         <p className="text-[10px] text-gray-400 mt-1">Appointments can be scheduled up to 30 days in advance</p>
       </div>
       <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
@@ -221,10 +220,23 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
       </div>
 
       {showReschedule && (
-        <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <input type="date" value={rescheduleForm.slotDate} onChange={(e) => setRescheduleForm((f) => ({ ...f, slotDate: e.target.value }))} className="input text-sm" />
-            <input type="time" value={rescheduleForm.slotTime} onChange={(e) => setRescheduleForm((f) => ({ ...f, slotTime: e.target.value }))} className="input text-sm" />
+        <div className="bg-gray-50 rounded-lg p-3 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">New Date</label>
+            <DateSelectPicker
+              value={rescheduleForm.slotDate}
+              onChange={(v) => setRescheduleForm((f) => ({ ...f, slotDate: v }))}
+              minDate={TODAY}
+              maxDate={MAX_BOOKING_DATE}
+            />
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-3">
+            <TimeSlotPicker
+              value={rescheduleForm.slotTime}
+              onChange={(v) => setRescheduleForm((f) => ({ ...f, slotTime: v }))}
+              slotDate={rescheduleForm.slotDate}
+              onlyMorning
+            />
           </div>
           <input value={rescheduleForm.reason} onChange={(e) => setRescheduleForm((f) => ({ ...f, reason: e.target.value }))} className="input text-sm" placeholder="Remark (optional)" />
           <button disabled={busy} onClick={() => run(() => corporateAppointmentApi.reschedule(a._id, rescheduleForm), 'Appointment rescheduled')} className="btn-primary text-xs px-3 py-1.5">Save Reschedule</button>
