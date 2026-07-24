@@ -108,7 +108,7 @@ exports.listUsers = asyncHandler(async (req, res) => {
 });
 
 exports.updateRole = asyncHandler(async (req, res) => {
-  const VALID_ROLES = ['superadmin', 'subadmin', 'lab', 'customer'];
+  const VALID_ROLES = ['superadmin', 'subadmin', 'lab', 'corporate', 'customer'];
   const { role } = req.body;
   if (!VALID_ROLES.includes(role))
     return res.status(400).json({ message: `Invalid role. Allowed: ${VALID_ROLES.join(', ')}` });
@@ -133,6 +133,7 @@ const VALID_PERMISSIONS = [
   'labs','brands','products','categories','test-master','bulk-upload',
   'crm','bookings','reports','lab-changes','users','reviews','tickets',
   'hero-slides','home-settings','coupons','blogs','newsletter','pages','settings',
+  'corporate',
 ];
 
 exports.updatePermissions = asyncHandler(async (req, res) => {

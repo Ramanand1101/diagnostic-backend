@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema({
   googleId: { type: String, unique: true, sparse: true },
   role: {
     type: String,
-    enum: ['superadmin', 'subadmin', 'lab', 'customer'],
+    enum: ['superadmin', 'subadmin', 'lab', 'corporate', 'customer'],
     default: 'customer'
   },
   isActive: { type: Boolean, default: true },

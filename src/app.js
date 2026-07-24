@@ -38,6 +38,7 @@ const labCrmRoutes         = require('./routes/labCrmRoutes');
 const testMasterRoutes     = require('./routes/testMasterRoutes');
 const homeContentRoutes    = require('./routes/homeContentRoutes');
 const labChangeRequestRoutes = require('./routes/labChangeRequestRoutes');
+const corporateRoutes      = require('./routes/corporateRoutes');
 
 const app = express();
 
@@ -145,6 +146,7 @@ app.use('/api/v1/lab-crm',            labCrmRoutes);
 app.use('/api/v1/test-master',        testMasterRoutes);
 app.use('/api/v1/home-content',       homeContentRoutes);
 app.use('/api/v1/lab-change-requests', labChangeRequestRoutes);
+app.use('/api/v1/corporates',         corporateRoutes);
 
 // ── Error handlers ────────────────────────────────────────────────────────────
 app.use(notFound);

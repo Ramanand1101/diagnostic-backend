@@ -31,6 +31,12 @@ const navSections = [
     ],
   },
   {
+    label: 'Corporate',
+    items: [
+      { href: '/admin/corporate', label: 'Corporate Accounts', icon: FiBriefcase, permission: 'corporate' },
+    ],
+  },
+  {
     label: 'CRM',
     items: [
       { href: '/admin/crm',              label: 'CRM Dashboard',    icon: FiActivity,  permission: 'crm' },

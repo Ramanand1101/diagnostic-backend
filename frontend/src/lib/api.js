@@ -75,6 +75,21 @@ export const labApi = {
   exportCsv: (params) => api.get('/labs/export-csv', { params, responseType: 'blob' }),
 };
 
+// Corporates
+export const corporateApi = {
+  getAll: (params) => api.get('/corporates', { params }),
+  getOne: (id) => api.get(`/corporates/${id}`),
+  getMine: () => api.get('/corporates/mine'),
+  create: (data) => api.post('/corporates', data),
+  update: (id, data) => api.put(`/corporates/${id}`, data),
+  delete: (id) => api.delete(`/corporates/${id}`),
+  setStatus: (id, active) => api.patch(`/corporates/${id}/status`, { active }),
+  assignLabs: (id, labIds) => api.patch(`/corporates/${id}/labs`, { labIds }),
+  assignRelationshipManager: (id, userId) => api.patch(`/corporates/${id}/relationship-manager`, { userId }),
+  addAccountManager: (id, data) => api.post(`/corporates/${id}/account-managers`, data),
+  removeAccountManager: (id, userId) => api.delete(`/corporates/${id}/account-managers/${userId}`),
+};
+
 // Categories
 export const categoryApi = {
   getAll: (params) => api.get('/categories', { params }),
