@@ -83,8 +83,6 @@ export function TimeSlotPicker({ value, onChange, slotDate, onlyMorning }) {
 }
 
 // ── DD / MM / YYYY date picker ────────────────────────────────────────────────
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
 export function DateSelectPicker({ value, onChange, minDate, maxDate }) {
   const [dd, setDd] = useState('');
   const [mm, setMm] = useState('');
@@ -113,7 +111,12 @@ export function DateSelectPicker({ value, onChange, minDate, maxDate }) {
   const [maxY, maxM, maxD] = max ? max.split('-').map(Number) : [9999, 12, 31];
 
   const nowYear = new Date().getFullYear();
-  const yearOpts = [nowYear, nowYear + 1, nowYear + 2].filter((y) => y <= maxY);
+  // When a minDate is given (e.g. appointment scheduling, always today-forward), keep a tight
+  // "next few years" list. Otherwise (e.g. agreement dates, which can be past or future) offer
+  // a wide practical range.
+  const yearOpts = minDate
+    ? [nowYear, nowYear + 1, nowYear + 2].filter((y) => y <= maxY)
+    : Array.from({ length: 21 }, (_, i) => nowYear - 10 + i).filter((y) => y >= minY && y <= maxY);
 
   const monthOpts = Array.from({ length: 12 }, (_, i) => i + 1).filter((m) => {
     if (Number(yyyy) === minY && m < minM) return false;
@@ -165,7 +168,7 @@ export function DateSelectPicker({ value, onChange, minDate, maxDate }) {
         <select value={mm} onChange={(e) => handleMonth(e.target.value)} className={sel}>
           <option value="">MM</option>
           {monthOpts.map((m) => (
-            <option key={m} value={String(m).padStart(2, '0')}>{MONTHS[m - 1]}</option>
+            <option key={m} value={String(m).padStart(2, '0')}>{String(m).padStart(2, '0')}</option>
           ))}
         </select>
         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>

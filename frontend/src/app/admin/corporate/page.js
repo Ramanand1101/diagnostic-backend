@@ -5,6 +5,7 @@ import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
+import { DateSelectPicker } from '@/components/booking/DateTimePicker';
 import toast from 'react-hot-toast';
 import {
   FiPlus, FiEdit, FiEye, FiTrash2, FiSearch, FiMapPin, FiPhone, FiMail,
@@ -227,11 +228,11 @@ function CorporateForm({ initial, onSave, onClose }) {
         <div className="grid grid-cols-2 gap-3 mt-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Agreement Start Date</label>
-            <input type="date" value={form.agreementStartDate} onChange={(e) => set('agreementStartDate', e.target.value)} className="input" />
+            <DateSelectPicker value={form.agreementStartDate} onChange={(v) => set('agreementStartDate', v)} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Agreement Expiry Date</label>
-            <input type="date" value={form.agreementExpiryDate} onChange={(e) => set('agreementExpiryDate', e.target.value)} className="input" />
+            <DateSelectPicker value={form.agreementExpiryDate} onChange={(v) => set('agreementExpiryDate', v)} />
           </div>
         </div>
       </div>
