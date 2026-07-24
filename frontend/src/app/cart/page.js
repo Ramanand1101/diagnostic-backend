@@ -99,7 +99,7 @@ function TimeSlotPicker({ value, onChange, slotDate }) {
 // ── DD / MM / YYYY date picker ────────────────────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function DateSelectPicker({ value, onChange, minDate }) {
+function DateSelectPicker({ value, onChange, minDate, maxDate }) {
   const [dd, setDd] = useState('');
   const [mm, setMm] = useState('');
   const [yyyy, setYyyy] = useState('');
@@ -124,30 +124,35 @@ function DateSelectPicker({ value, onChange, minDate }) {
 
   const min = minDate || '';
   const [minY, minM, minD] = min ? min.split('-').map(Number) : [0, 0, 0];
+  const max = maxDate || '';
+  const [maxY, maxM, maxD] = max ? max.split('-').map(Number) : [9999, 12, 31];
 
-  // Year options: today's year to +2
+  // Year options: today's year bounded by maxDate's year
   const nowYear = new Date().getFullYear();
-  const yearOpts = [nowYear, nowYear + 1, nowYear + 2];
+  const yearOpts = [nowYear, nowYear + 1, nowYear + 2].filter((y) => y <= maxY);
 
-  // Month options: filter past months if year == minYear
+  // Month options: filter past months if year == minYear, future months if year == maxYear
   const monthOpts = Array.from({ length: 12 }, (_, i) => i + 1).filter((m) => {
-    if (Number(yyyy) === minY) return m >= minM;
+    if (Number(yyyy) === minY && m < minM) return false;
+    if (Number(yyyy) === maxY && m > maxM) return false;
     return true;
   });
 
-  // Day options: filter by month length and past days if same month/year
+  // Day options: filter by month length, past days (min), and future days (max)
   const daysInMonth = yyyy && mm ? new Date(Number(yyyy), Number(mm), 0).getDate() : 31;
   const dayOpts = Array.from({ length: daysInMonth }, (_, i) => i + 1).filter((d) => {
-    if (Number(yyyy) === minY && Number(mm) === minM) return d >= minD;
+    if (Number(yyyy) === minY && Number(mm) === minM && d < minD) return false;
+    if (Number(yyyy) === maxY && Number(mm) === maxM && d > maxD) return false;
     return true;
   });
 
   const handleYear = (v) => {
     setYyyy(v);
-    // Reset month/day if they'd be invalid
     let newMm = mm, newDd = dd;
     if (Number(v) === minY && Number(mm) < minM) { newMm = ''; newDd = ''; setMm(''); setDd(''); }
     if (Number(v) === minY && Number(mm) === minM && Number(dd) < minD) { newDd = ''; setDd(''); }
+    if (Number(v) === maxY && Number(mm) > maxM) { newMm = ''; newDd = ''; setMm(''); setDd(''); }
+    if (Number(v) === maxY && Number(mm) === maxM && Number(dd) > maxD) { newDd = ''; setDd(''); }
     emit(v, newMm, newDd);
   };
   const handleMonth = (v) => {
@@ -156,6 +161,7 @@ function DateSelectPicker({ value, onChange, minDate }) {
     const days = v && yyyy ? new Date(Number(yyyy), Number(v), 0).getDate() : 31;
     if (Number(dd) > days) { newDd = ''; setDd(''); }
     if (Number(yyyy) === minY && Number(v) === minM && Number(dd) < minD) { newDd = ''; setDd(''); }
+    if (Number(yyyy) === maxY && Number(v) === maxM && Number(dd) > maxD) { newDd = ''; setDd(''); }
     emit(yyyy, v, newDd);
   };
   const handleDay = (v) => { setDd(v); emit(yyyy, mm, v); };
@@ -396,6 +402,8 @@ function BookingForm({ groups, onReadyForPayment }) {
   const F = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const _td = new Date();
   const today = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
+  const _maxD = new Date(_td); _maxD.setDate(_maxD.getDate() + 30);
+  const maxBookingDate = `${_maxD.getFullYear()}-${String(_maxD.getMonth()+1).padStart(2,'0')}-${String(_maxD.getDate()).padStart(2,'0')}`;
   const hasHome = groups.some((g) => g.items[0]?.lab?.homeCollection || g.items.some((i) => i.homeCollection));
 
   const handleSubmit = async (e) => {
@@ -550,7 +558,9 @@ function BookingForm({ groups, onReadyForPayment }) {
             value={form.slotDate}
             onChange={(v) => setForm((f) => ({ ...f, slotDate: v }))}
             minDate={today}
+            maxDate={maxBookingDate}
           />
+          <p className="text-[10px] text-gray-400 mt-1">Bookings can be scheduled up to 30 days in advance</p>
         </div>
       </div>
 
@@ -878,6 +888,7 @@ function PaymentScreen({ form, groups, total, onSuccess, onBack }) {
 function SuccessScreen({ bookings }) {
   const router = useRouter();
   const first = bookings[0] || {};
+  const warnings = first.warnings || [];
   const slotDate = first.slotDate
     ? new Date(first.slotDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : '';
@@ -892,9 +903,33 @@ function SuccessScreen({ bookings }) {
       <style>{`@keyframes bounceIn{0%{transform:scale(0.5);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}`}</style>
 
       <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Booking Confirmed! 🎉</h1>
-      <p className="text-gray-500 text-sm mb-8 max-w-xs mx-auto">
+      <p className="text-gray-500 text-sm mb-6 max-w-xs mx-auto">
         Your lab test is booked and confirmed. We&apos;ll send you a reminder before your appointment.
       </p>
+
+      {/* Warning banners */}
+      {warnings.includes('lateNight') && (
+        <div className="mb-4 text-left bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex gap-3 items-start">
+          <span className="text-xl shrink-0">🌙</span>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Late-night booking notice</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Your booking was placed after 9 PM. Your sample collection is scheduled for tomorrow. Our team will contact you to confirm the exact timing.
+            </p>
+          </div>
+        </div>
+      )}
+      {warnings.includes('shortNotice') && (
+        <div className="mb-4 text-left bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex gap-3 items-start">
+          <span className="text-xl shrink-0">⏰</span>
+          <div>
+            <p className="text-sm font-semibold text-red-800">Short notice booking</p>
+            <p className="text-xs text-red-700 mt-0.5">
+              Your appointment is within the next 10 hours. Please be ready and keep your phone accessible. If fasting is required, begin fasting now.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Booking cards */}
       <div className="space-y-4 mb-8 text-left">

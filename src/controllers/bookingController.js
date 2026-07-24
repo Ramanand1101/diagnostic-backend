@@ -28,6 +28,36 @@ exports.createBooking = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'All items in a booking must be from the same lab.' });
   }
 
+  // ── 30-day date restriction ──────────────────────────────────────────────────
+  if (payload.slotDate) {
+    const slotDay = new Date(payload.slotDate); slotDay.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const maxDay = new Date(today); maxDay.setDate(maxDay.getDate() + 30);
+    if (slotDay < today) {
+      return res.status(400).json({ message: 'Booking date cannot be in the past.' });
+    }
+    if (slotDay > maxDay) {
+      return res.status(400).json({ message: 'Bookings can only be scheduled up to 30 days in advance.' });
+    }
+  }
+
+  // ── Warning flags (late-night + short notice) ────────────────────────────────
+  const warnings = [];
+  if (payload.slotDate) {
+    const now = new Date();
+    const slotDay = new Date(payload.slotDate); slotDay.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(); tomorrow.setHours(0, 0, 0, 0); tomorrow.setDate(tomorrow.getDate() + 1);
+    if (now.getHours() >= 21 && slotDay.getTime() === tomorrow.getTime()) {
+      warnings.push('lateNight');
+    }
+    if (payload.slotTime) {
+      const [h = 0, m = 0] = payload.slotTime.split(':').map(Number);
+      const apptDateTime = new Date(payload.slotDate); apptDateTime.setHours(h, m, 0, 0);
+      const hoursUntil = (apptDateTime - now) / 3600000;
+      if (hoursUntil > 0 && hoursUntil <= 10) warnings.push('shortNotice');
+    }
+  }
+
   let subtotal = 0;
 
   for (const item of items) {
@@ -129,6 +159,14 @@ exports.createBooking = asyncHandler(async (req, res) => {
               </table>
               ${booking.discount > 0 ? `<p style="text-align:right;margin:8px 0 4px;font-size:13px;color:#16a34a">Discount: –₹${booking.discount}</p>` : ''}
               <p style="text-align:right;margin:8px 0 0;font-weight:700;font-size:16px;color:#0ea5e9">Total: ₹${booking.total}</p>
+              ${warnings.includes('lateNight') ? `
+              <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-top:16px">
+                <p style="margin:0;font-size:13px;color:#92400e">🌙 <strong>Late-night booking notice:</strong> You booked after 9 PM. Your sample collection is scheduled for tomorrow. Our team will reach out to confirm the timing.</p>
+              </div>` : ''}
+              ${warnings.includes('shortNotice') ? `
+              <div style="background:#fef2f2;border:1px solid #f87171;border-radius:8px;padding:12px 16px;margin-top:12px">
+                <p style="margin:0;font-size:13px;color:#991b1b">⏰ <strong>Short notice booking:</strong> Your appointment is within the next 10 hours. Please be ready and keep your phone accessible. Fasting requirements (if any) apply from now.</p>
+              </div>` : ''}
               <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
               <p style="font-size:12px;color:#94a3b8;margin:0">If you have any questions, reply to this email or call the lab directly.</p>
             </div>
@@ -139,7 +177,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
     }
   })();
 
-  res.status(201).json(booking);
+  res.status(201).json({ ...booking.toObject(), warnings });
 });
 
 // GET /api/v1/bookings/stats — superadmin/subadmin only

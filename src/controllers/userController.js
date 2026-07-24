@@ -164,6 +164,67 @@ exports.bulkDeleteUsers = asyncHandler(async (req, res) => {
   res.json({ message: `${result.deletedCount} user(s) deleted` });
 });
 
+exports.resetPassword = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  if (user.role === 'superadmin' && req.user.role !== 'superadmin')
+    return res.status(403).json({ message: 'Only superadmin can reset superadmin passwords' });
+
+  // Generate random readable password: 3 words pattern
+  const chars = 'abcdefghjkmnpqrstuvwxyz';
+  const nums  = '23456789';
+  const rand  = (s) => s[Math.floor(Math.random() * s.length)];
+  const newPassword = [
+    Array.from({ length: 4 }, () => rand(chars)).join(''),
+    Array.from({ length: 2 }, () => rand(nums)).join(''),
+    Array.from({ length: 4 }, () => rand(chars)).join(''),
+  ].join('-');
+
+  user.password = await bcrypt.hash(newPassword, 10);
+  user.passwordChangedAt = new Date();
+  await user.save({ validateBeforeSave: false });
+
+  // Send email notification if requested (default true)
+  const sendEmail = req.body.sendEmail !== false;
+  if (sendEmail && user.email) {
+    try {
+      await sendMail({
+        to: user.email,
+        subject: 'Your HealthOnTime Password Has Been Reset',
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#1a1a1a">
+            <div style="background:#0ea5e9;padding:24px 32px;border-radius:12px 12px 0 0">
+              <h1 style="color:#fff;margin:0;font-size:20px">Password Reset</h1>
+            </div>
+            <div style="background:#fff;padding:24px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
+              <p>Hi <strong>${user.name || 'there'}</strong>,</p>
+              <p>Your HealthOnTime account password has been reset by an administrator.</p>
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;text-align:center">
+                <p style="margin:0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.06em">Your new password</p>
+                <p style="margin:8px 0 0;font-size:22px;font-weight:700;letter-spacing:.08em;font-family:monospace;color:#0ea5e9">${newPassword}</p>
+              </div>
+              <p style="font-size:13px;color:#64748b">Please log in with this password and change it immediately from your profile settings.</p>
+              <a href="${process.env.FRONTEND_URL || 'https://healthontime.in'}/login"
+                style="display:inline-block;margin-top:8px;background:#0ea5e9;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+                Login Now →
+              </a>
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+              <p style="font-size:11px;color:#94a3b8;margin:0">If you did not expect this, please contact support immediately.</p>
+            </div>
+          </div>`,
+      });
+    } catch (e) {
+      console.error('[resetPassword] email failed:', e.message);
+    }
+  }
+
+  res.json({
+    message: 'Password reset successfully',
+    tempPassword: newPassword,
+    emailSent: sendEmail && !!user.email,
+  });
+});
+
 exports.exportCsv = asyncHandler(async (req, res) => {
   const users = await User.find({}).sort({ createdAt: -1 }).select('name email mobile role createdAt').lean();
   const header = 'name,email,mobile,role,createdAt';

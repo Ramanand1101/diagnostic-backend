@@ -4,7 +4,7 @@ import { userApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
-import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX, FiCheck, FiPlus } from 'react-icons/fi';
+import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX, FiCheck, FiPlus, FiKey, FiCopy } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 
@@ -274,6 +274,104 @@ function RoleDropdown({ user, currentUserRole, onChange }) {
   );
 }
 
+// ── Reset Password modal ──────────────────────────────────────────────────────
+function ResetPasswordModal({ user, onClose }) {
+  const [sendEmail, setSendEmail] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState(null); // { tempPassword, emailSent }
+
+  const handleReset = async () => {
+    if (!confirm(`Reset password for "${user.name}"? A new temporary password will be generated.`)) return;
+    setSaving(true);
+    try {
+      const res = await userApi.resetPassword(user._id, sendEmail);
+      setResult(res.data);
+      toast.success('Password reset successfully');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyPwd = () => {
+    if (result?.tempPassword) {
+      navigator.clipboard.writeText(result.tempPassword);
+      toast.success('Copied to clipboard');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Reset Password</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{user.name} — {user.email}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+            <FiX size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {!result ? (
+            <>
+              <p className="text-sm text-gray-600">
+                A new temporary password will be auto-generated and optionally emailed to the user.
+              </p>
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <div
+                  onClick={() => setSendEmail((v) => !v)}
+                  className={`w-10 h-6 rounded-full transition-colors flex items-center ${sendEmail ? 'bg-primary-600' : 'bg-gray-200'}`}
+                >
+                  <span className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-1 ${sendEmail ? 'translate-x-4' : 'translate-x-0'}`} />
+                </div>
+                <span className="text-sm text-gray-700">Send new password to user&apos;s email</span>
+              </label>
+              <div className="flex gap-3 pt-1">
+                <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReset}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-xl disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  <FiKey size={14} /> {saving ? 'Resetting…' : 'Reset Password'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                <p className="text-xs text-green-600 font-medium uppercase tracking-wide mb-1">New Temporary Password</p>
+                <p className="text-2xl font-bold font-mono text-green-800 tracking-widest">{result.tempPassword}</p>
+                <button
+                  onClick={copyPwd}
+                  className="mt-3 flex items-center gap-1.5 text-xs text-green-600 hover:text-green-800 mx-auto border border-green-300 rounded-lg px-3 py-1.5"
+                >
+                  <FiCopy size={12} /> Copy
+                </button>
+              </div>
+              {result.emailSent && (
+                <p className="text-xs text-gray-500 text-center">✓ Email sent to {user.email}</p>
+              )}
+              {!result.emailSent && (
+                <p className="text-xs text-amber-600 text-center">⚠ Email not sent — share this password manually</p>
+              )}
+              <button onClick={onClose} className="w-full py-2.5 text-sm font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800">
+                Done
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
   const { user: currentUser } = useAuth();
@@ -287,6 +385,7 @@ export default function AdminUsersPage() {
   const [selected, setSelected] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [permTarget, setPermTarget] = useState(null);
+  const [resetTarget, setResetTarget] = useState(null);
   const [addModal, setAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ name: '', email: '', mobile: '', role: 'customer' });
   const [addSaving, setAddSaving] = useState(false);
@@ -382,6 +481,14 @@ export default function AdminUsersPage() {
           user={permTarget}
           onClose={() => setPermTarget(null)}
           onSaved={handlePermissionsSaved}
+        />
+      )}
+
+      {/* Reset Password modal */}
+      {resetTarget && (
+        <ResetPasswordModal
+          user={resetTarget}
+          onClose={() => setResetTarget(null)}
         />
       )}
 
@@ -619,6 +726,16 @@ export default function AdminUsersPage() {
                               className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
                             >
                               <FiSliders size={12} /> Permissions
+                            </button>
+                          )}
+                          {/* Reset Password button */}
+                          {!isSuper && isSuperAdmin && (
+                            <button
+                              onClick={() => setResetTarget(u)}
+                              title="Reset password"
+                              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors"
+                            >
+                              <FiKey size={12} /> Reset Pwd
                             </button>
                           )}
                           {!isSuper && (
