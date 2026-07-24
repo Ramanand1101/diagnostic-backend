@@ -6,10 +6,15 @@ const User    = require('../models/User');
 const Counter = require('../models/Counter');
 const { queueEmail } = require('../queues/index');
 
-// Atomic, collision-safe booking number — HOT-000123
+// Atomic, collision-safe booking number — DDMMYYYY-1550 (resets per day, starts at 1550)
 async function nextBookingNo() {
-  const seq = await Counter.nextSeq('booking');
-  return `HOT-${String(seq).padStart(6, '0')}`;
+  const now = new Date();
+  const dd   = String(now.getDate()).padStart(2, '0');
+  const mm   = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  const dateKey = `booking-${dd}${mm}${yyyy}`;          // e.g. booking-24072026
+  const seq = await Counter.nextSeq(dateKey, 1549);      // first call → 1550
+  return `${dd}${mm}${yyyy}-${seq}`;                     // e.g. 24072026-1550
 }
 
 exports.createBooking = asyncHandler(async (req, res) => {
