@@ -26,6 +26,21 @@ async function resolveCorporateScope(req) {
   return null;
 }
 
+// Returns false (and sends a 403) if a 'corporate' role user is trying to touch another
+// corporate's appointment. Admins (superadmin/subadmin) are always allowed. The error
+// middleware here keys off res.statusCode rather than a custom err.status, so this sets
+// the status directly rather than throwing.
+async function assertAppointmentAccess(req, res, appointment) {
+  if (req.user.role !== 'corporate') return true;
+  const myCorporate = await Corporate.findOne({ owners: req.user._id }).select('_id');
+  const appointmentCorporateId = appointment.corporate?._id || appointment.corporate;
+  if (!myCorporate || String(appointmentCorporateId) !== String(myCorporate._id)) {
+    res.status(403).json({ message: 'You do not have access to this appointment.' });
+    return false;
+  }
+  return true;
+}
+
 async function itemsFromPackage(corporate, packageId) {
   const pkg = await CorporatePackage.findById(packageId);
   if (!pkg) throw Object.assign(new Error('Package not found'), { status: 400 });
@@ -39,6 +54,9 @@ async function itemsFromPackage(corporate, packageId) {
 
 exports.createAppointment = asyncHandler(async (req, res) => {
   const myCorporate = await resolveCorporateScope(req);
+  if (req.user.role === 'corporate' && !myCorporate) {
+    return res.status(403).json({ message: 'Your account is not linked to a corporate.' });
+  }
   const corporateId = myCorporate ? myCorporate._id : req.body.corporate;
   if (!corporateId) return res.status(400).json({ message: 'corporate is required.' });
 
@@ -59,7 +77,12 @@ exports.createAppointment = asyncHandler(async (req, res) => {
   let finalItems = items || [];
   let amount = 0;
   if (packageId) {
-    const resolved = await itemsFromPackage(corporate, packageId);
+    let resolved;
+    try {
+      resolved = await itemsFromPackage(corporate, packageId);
+    } catch (err) {
+      return res.status(err.status || 400).json({ message: err.message });
+    }
     finalItems = resolved.items;
     amount = resolved.price;
   } else {
@@ -158,8 +181,12 @@ exports.listAppointments = asyncHandler(async (req, res) => {
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const filter = {};
 
-  if (myCorporate) filter.corporate = myCorporate._id;
-  else if (corporate) filter.corporate = corporate;
+  if (req.user.role === 'corporate') {
+    // Always scope to the caller's own corporate — never trust a client-supplied ?corporate=
+    filter.corporate = myCorporate ? myCorporate._id : null;
+  } else if (corporate) {
+    filter.corporate = corporate;
+  }
 
   if (status) filter.status = status;
   if (lab) filter.lab = lab;
@@ -188,6 +215,7 @@ exports.getAppointment = asyncHandler(async (req, res) => {
     .populate('lab', 'name city phone email address')
     .populate('package', 'name');
   if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+  if (!(await assertAppointmentAccess(req, res, appointment))) return;
   res.json(appointment);
 });
 
@@ -279,6 +307,7 @@ exports.rescheduleAppointment = asyncHandler(async (req, res) => {
   const { slotDate, slotTime, lab: newLabId, reason } = req.body;
   const appointment = await CorporateAppointment.findById(req.params.id).populate('corporate');
   if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+  if (!(await assertAppointmentAccess(req, res, appointment))) return;
 
   let newLab = appointment.lab;
   if (newLabId && String(newLabId) !== String(appointment.lab)) {
@@ -314,12 +343,15 @@ exports.rescheduleAppointment = asyncHandler(async (req, res) => {
 
 // PATCH /:id/cancel
 exports.cancelAppointment = asyncHandler(async (req, res) => {
+  const existing = await CorporateAppointment.findById(req.params.id).select('corporate');
+  if (!existing) return res.status(404).json({ message: 'Appointment not found' });
+  if (!(await assertAppointmentAccess(req, res, existing))) return;
+
   const appointment = await CorporateAppointment.findByIdAndUpdate(
     req.params.id,
     { status: 'cancelled', cancelledBy: req.user._id, cancelledAt: new Date(), cancelReason: req.body.reason || '' },
     { new: true }
   );
-  if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
   res.json(appointment);
 });
 
@@ -337,6 +369,7 @@ exports.notifyEmployee = asyncHandler(async (req, res) => {
     alternate_requested: 'awaiting an alternate date/lab',
     rejected: 'not available at this lab — please contact HR',
     cancelled: 'cancelled',
+    completed: 'complete — your report has been uploaded',
   }[appointment.status] || appointment.status;
 
   const message = `Hi ${emp.name}, your appointment ${appointment.appointmentNo} at ${appointment.lab?.name || 'the lab'} on ${dateStr}${appointment.slotTime ? ` at ${appointment.slotTime}` : ''} is ${statusText}.`;
@@ -369,8 +402,15 @@ exports.notifyEmployee = asyncHandler(async (req, res) => {
 });
 
 // POST /:id/report — upload a test report file (multer-s3 middleware puts the S3 key on req.file.key)
+// Only allowed once the lab has confirmed the appointment; uploading marks it completed.
 exports.uploadReport = asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'File is required.' });
+
+  const existing = await CorporateAppointment.findById(req.params.id).select('status');
+  if (!existing) return res.status(404).json({ message: 'Appointment not found' });
+  if (!['confirmed', 'completed'].includes(existing.status)) {
+    return res.status(400).json({ message: 'Report can only be uploaded after the appointment is confirmed.' });
+  }
 
   const appointment = await CorporateAppointment.findByIdAndUpdate(
     req.params.id,
@@ -379,10 +419,10 @@ exports.uploadReport = asyncHandler(async (req, res) => {
       reportFileName: req.file.originalname,
       reportUploadedAt: new Date(),
       reportUploadedBy: req.user._id,
+      status: 'completed',
     },
     { new: true }
   );
-  if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
   res.json(appointment);
 });
 
@@ -390,6 +430,7 @@ exports.uploadReport = asyncHandler(async (req, res) => {
 exports.getReportUrl = asyncHandler(async (req, res) => {
   const appointment = await CorporateAppointment.findById(req.params.id);
   if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+  if (!(await assertAppointmentAccess(req, res, appointment))) return;
   if (!appointment.reportKey) return res.status(404).json({ message: 'No report uploaded for this appointment yet.' });
 
   const { s3, bucket } = require('../config/s3');

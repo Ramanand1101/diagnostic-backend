@@ -1,14 +1,15 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { corporateAppointmentApi, corporateApi } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { corporateApi, corporateAppointmentApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
-import CsvUploadSection from '@/components/ui/CsvUploadSection';
 import { DateSelectPicker, TimeSlotPicker } from '@/components/booking/DateTimePicker';
 import toast from 'react-hot-toast';
-import { FiPlus, FiSearch, FiUploadCloud, FiMail, FiPhone, FiRefreshCw, FiX, FiFileText, FiDownload } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiFileText, FiDownload, FiRefreshCw, FiX } from 'react-icons/fi';
 
 const STATUS_LABEL = {
   pending: 'Pending',
@@ -29,14 +30,11 @@ const STATUS_COLOR = {
   completed: 'bg-purple-100 text-purple-700',
 };
 
-// ── Manual scheduling form ─────────────────────────────────────────────────────
 const _td0 = new Date();
 const TODAY = `${_td0.getFullYear()}-${String(_td0.getMonth() + 1).padStart(2, '0')}-${String(_td0.getDate()).padStart(2, '0')}`;
 
-function ScheduleForm({ onSave, onClose }) {
-  const [corporates, setCorporates] = useState([]);
-  const [corporateId, setCorporateId] = useState('');
-  const [corpDetail, setCorpDetail] = useState(null);
+// ── Schedule form (no corporate picker — always "my" corporate) ───────────────
+function ScheduleForm({ myCorporate, onSave, onClose }) {
   const [form, setForm] = useState({
     employeeName: '', employeeEmail: '', employeePhone: '', employeeId: '',
     lab: '', package: '', slotDate: TODAY, slotTime: '', notes: '',
@@ -44,30 +42,24 @@ function ScheduleForm({ onSave, onClose }) {
   const [customItems, setCustomItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const today = TODAY;
   const _maxD = new Date(); _maxD.setDate(_maxD.getDate() + 30);
   const maxBookingDate = `${_maxD.getFullYear()}-${String(_maxD.getMonth() + 1).padStart(2, '0')}-${String(_maxD.getDate()).padStart(2, '0')}`;
-
-  useEffect(() => { corporateApi.getAll({ limit: 200, active: 'true' }).then((r) => setCorporates(r.data.items || [])); }, []);
-  useEffect(() => {
-    if (!corporateId) { setCorpDetail(null); return; }
-    corporateApi.getOne(corporateId).then((r) => setCorpDetail(r.data));
-  }, [corporateId]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const addCustomItem = () => setCustomItems([...customItems, { name: '', price: '' }]);
   const updateCustomItem = (i, k, v) => setCustomItems(customItems.map((it, idx) => idx === i ? { ...it, [k]: v } : it));
   const removeCustomItem = (i) => setCustomItems(customItems.filter((_, idx) => idx !== i));
 
+  const assignedLabs = myCorporate?.assignedLabs || [];
+  const assignedPackages = myCorporate?.packages || [];
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!corporateId) return toast.error('Select a corporate');
     if (!form.employeeName.trim()) return toast.error('Employee name is required');
     if (!form.lab) return toast.error('Select a lab');
     setLoading(true);
     try {
       await corporateAppointmentApi.create({
-        corporate: corporateId,
         employee: { name: form.employeeName, email: form.employeeEmail, phone: form.employeePhone, employeeId: form.employeeId },
         lab: form.lab,
         package: form.package || undefined,
@@ -85,25 +77,13 @@ function ScheduleForm({ onSave, onClose }) {
     }
   };
 
-  const assignedLabs = corpDetail?.assignedLabs || [];
-  const assignedPackages = corpDetail?.packages || [];
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Corporate *</label>
-        <select required value={corporateId} onChange={(e) => { setCorporateId(e.target.value); set('lab', ''); set('package', ''); }} className="input">
-          <option value="">Select corporate…</option>
-          {corporates.map((c) => <option key={c._id} value={c._id}>{c.companyName}</option>)}
-        </select>
-      </div>
-
-      {corporateId && assignedLabs.length === 0 && (
+      {assignedLabs.length === 0 && (
         <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          No labs assigned to this corporate yet. Assign a lab from Corporate Accounts first.
+          No labs assigned to your account yet. Contact HealthOnTime support.
         </p>
       )}
-
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Employee Name *</label>
@@ -127,7 +107,7 @@ function ScheduleForm({ onSave, onClose }) {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Lab / Diagnostic Centre *</label>
-        <select required value={form.lab} onChange={(e) => set('lab', e.target.value)} className="input" disabled={!corporateId}>
+        <select required value={form.lab} onChange={(e) => set('lab', e.target.value)} className="input">
           <option value="">Select assigned lab…</option>
           {assignedLabs.map((l) => <option key={l._id} value={l._id}>{l.name} ({l.city})</option>)}
         </select>
@@ -135,9 +115,9 @@ function ScheduleForm({ onSave, onClose }) {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Package (optional)</label>
-        <select value={form.package} onChange={(e) => set('package', e.target.value)} className="input" disabled={!corporateId}>
+        <select value={form.package} onChange={(e) => set('package', e.target.value)} className="input">
           <option value="">— No package, add tests manually —</option>
-          {assignedPackages.map((p) => <option key={p.package._id} value={p.package._id}>{p.package.name} (₹{p.price})</option>)}
+          {assignedPackages.map((p) => <option key={p.package?._id} value={p.package?._id}>{p.package?.name} (₹{p.price})</option>)}
         </select>
       </div>
 
@@ -163,21 +143,11 @@ function ScheduleForm({ onSave, onClose }) {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Date</label>
-        <DateSelectPicker
-          value={form.slotDate}
-          onChange={(v) => set('slotDate', v)}
-          minDate={today}
-          maxDate={maxBookingDate}
-        />
+        <DateSelectPicker value={form.slotDate} onChange={(v) => set('slotDate', v)} minDate={TODAY} maxDate={maxBookingDate} />
         <p className="text-[10px] text-gray-400 mt-1">Appointments can be scheduled up to 30 days in advance</p>
       </div>
       <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-        <TimeSlotPicker
-          value={form.slotTime}
-          onChange={(v) => set('slotTime', v)}
-          slotDate={form.slotDate}
-          onlyMorning
-        />
+        <TimeSlotPicker value={form.slotTime} onChange={(v) => set('slotTime', v)} slotDate={form.slotDate} onlyMorning />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -192,50 +162,12 @@ function ScheduleForm({ onSave, onClose }) {
   );
 }
 
-// ── Bulk excel upload ──────────────────────────────────────────────────────────
-function BulkUploadForm({ onSave, onClose }) {
-  const [corporates, setCorporates] = useState([]);
-  const [corporateId, setCorporateId] = useState('');
-
-  useEffect(() => { corporateApi.getAll({ limit: 200, active: 'true' }).then((r) => setCorporates(r.data.items || [])); }, []);
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Corporate *</label>
-        <select value={corporateId} onChange={(e) => setCorporateId(e.target.value)} className="input">
-          <option value="">Select corporate…</option>
-          {corporates.map((c) => <option key={c._id} value={c._id}>{c.companyName}</option>)}
-        </select>
-      </div>
-      {corporateId ? (
-        <CsvUploadSection
-          title="Upload Appointments"
-          description="Columns: employeeName, employeeEmail, employeePhone, employeeId, lab (must be assigned to this corporate), package (optional), slotDate, slotTime, notes. CSV or XLSX."
-          onUpload={(file) => corporateAppointmentApi.bulkUpload(corporateId, file)}
-          onSuccess={onSave}
-          accept=".csv,.xlsx"
-        />
-      ) : (
-        <p className="text-xs text-gray-400">Select a corporate first to upload their appointments.</p>
-      )}
-      <div className="flex justify-end pt-2">
-        <button onClick={onClose} className="btn-secondary text-sm">Close</button>
-      </div>
-    </div>
-  );
-}
-
-// ── Appointment management modal ───────────────────────────────────────────────
+// ── Appointment detail (self-service actions only: reschedule, cancel, download report) ──
 function AppointmentDetail({ appointment, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
-  const [rescheduleForm, setRescheduleForm] = useState({ slotDate: '', slotTime: '', reason: '' });
   const [showReschedule, setShowReschedule] = useState(false);
-  const [altType, setAltType] = useState('date');
-  const [altNote, setAltNote] = useState('');
-  const [showAlt, setShowAlt] = useState(false);
-  const [uploadingReport, setUploadingReport] = useState(false);
-  const reportFileRef = useRef(null);
+  const [rescheduleForm, setRescheduleForm] = useState({ slotDate: '', slotTime: '', reason: '' });
+  const a = appointment;
 
   const run = async (fn, successMsg) => {
     setBusy(true);
@@ -247,92 +179,46 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
     finally { setBusy(false); }
   };
 
-  const handleReportFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    setUploadingReport(true);
-    try {
-      await corporateAppointmentApi.uploadReport(appointment._id, file);
-      toast.success('Report uploaded!');
-      onChanged();
-    } catch (err) { toast.error(getErrorMessage(err)); }
-    finally { setUploadingReport(false); }
-  };
-
   const handleDownloadReport = async () => {
     try {
-      const res = await corporateAppointmentApi.getReportUrl(appointment._id);
+      const res = await corporateAppointmentApi.getReportUrl(a._id);
       window.open(res.data.url, '_blank');
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
-
-  const a = appointment;
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-lg font-bold text-gray-900">{a.appointmentNo}</h2>
-          <span className={`inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[a.status]}`}>
-            {STATUS_LABEL[a.status]}
-          </span>
+          <span className={`inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[a.status]}`}>{STATUS_LABEL[a.status]}</span>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm bg-gray-50 rounded-xl p-4">
-        <div><p className="text-xs text-gray-400">Corporate</p><p className="font-medium">{a.corporate?.companyName}</p></div>
         <div><p className="text-xs text-gray-400">Lab</p><p className="font-medium">{a.lab?.name} ({a.lab?.city})</p></div>
         <div><p className="text-xs text-gray-400">Employee</p><p className="font-medium">{a.employee?.name}</p></div>
-        <div><p className="text-xs text-gray-400">Contact</p><p className="font-medium">{[a.employee?.email, a.employee?.phone].filter(Boolean).join(' · ') || '—'}</p></div>
         <div><p className="text-xs text-gray-400">Date / Time</p><p className="font-medium">{a.slotDate ? new Date(a.slotDate).toDateString() : 'TBD'} {a.slotTime}</p></div>
         <div><p className="text-xs text-gray-400">Tests</p><p className="font-medium">{(a.items || []).map((i) => i.name).join(', ') || '—'}</p></div>
       </div>
 
       {a.alternateRequest?.type && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-          Alternate {a.alternateRequest.type} requested from corporate. {a.alternateRequest.note}
+          HealthOnTime has requested an alternate {a.alternateRequest.type} for this appointment. {a.alternateRequest.note}
         </div>
       )}
 
-      {/* Status actions */}
       <div className="flex flex-wrap gap-2">
-        {a.status === 'pending' && (
-          <button disabled={busy} onClick={() => run(() => corporateAppointmentApi.sendToLab(a._id), 'Sent to lab')} className="btn-primary text-xs px-3 py-1.5">Send to Lab</button>
-        )}
-        {a.status === 'sent_to_lab' && (
-          <>
-            <button disabled={busy} onClick={() => run(() => corporateAppointmentApi.confirm(a._id), 'Appointment confirmed')} className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700">Confirm</button>
-            <button disabled={busy} onClick={() => run(() => corporateAppointmentApi.reject(a._id), 'Appointment rejected')} className="text-xs px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 hover:bg-red-100">Reject</button>
-            <button onClick={() => setShowAlt((v) => !v)} className="text-xs px-3 py-1.5 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50">Ask Alternate</button>
-          </>
-        )}
-        {['confirmed', 'completed'].includes(a.status) && (
-          <>
-            <button disabled={busy} onClick={() => run(() => corporateAppointmentApi.notifyEmployee(a._id, ['email']), 'Notification emailed')} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-primary-300 flex items-center gap-1"><FiMail size={11} /> Notify (Email)</button>
-            <button disabled={busy} onClick={() => run(() => corporateAppointmentApi.notifyEmployee(a._id, ['whatsapp']), 'Notification sent on WhatsApp')} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-primary-300 flex items-center gap-1"><FiPhone size={11} /> Notify (WhatsApp)</button>
-          </>
-        )}
         {!['cancelled', 'rejected', 'completed'].includes(a.status) && (
           <>
             <button onClick={() => setShowReschedule((v) => !v)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-primary-300 flex items-center gap-1"><FiRefreshCw size={11} /> Reschedule</button>
-            <button disabled={busy} onClick={() => { if (confirm('Cancel this appointment?')) run(() => corporateAppointmentApi.cancel(a._id, 'Cancelled by admin'), 'Appointment cancelled'); }} className="text-xs px-3 py-1.5 rounded-lg text-red-500 hover:bg-red-50">Cancel</button>
+            <button disabled={busy} onClick={() => { if (confirm('Cancel this appointment?')) run(() => corporateAppointmentApi.cancel(a._id, 'Cancelled by corporate'), 'Appointment cancelled'); }} className="text-xs px-3 py-1.5 rounded-lg text-red-500 hover:bg-red-50">Cancel</button>
           </>
         )}
+        {a.reportKey && (
+          <button onClick={handleDownloadReport} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-primary-600 hover:border-primary-300 flex items-center gap-1"><FiDownload size={11} /> Download Report</button>
+        )}
       </div>
-
-      {showAlt && (
-        <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-          <div className="flex gap-2">
-            <select value={altType} onChange={(e) => setAltType(e.target.value)} className="input text-sm">
-              <option value="date">Alternate Date</option>
-              <option value="lab">Alternate Lab</option>
-            </select>
-          </div>
-          <textarea value={altNote} onChange={(e) => setAltNote(e.target.value)} className="input text-sm" rows={2} placeholder="Note for the corporate…" />
-          <button disabled={busy} onClick={() => run(() => corporateAppointmentApi.requestAlternate(a._id, { type: altType, note: altNote }), 'Alternate requested')} className="btn-primary text-xs px-3 py-1.5">Send Request</button>
-        </div>
-      )}
 
       {showReschedule && (
         <div className="bg-gray-50 rounded-lg p-3 space-y-2">
@@ -341,38 +227,9 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
             <input type="time" value={rescheduleForm.slotTime} onChange={(e) => setRescheduleForm((f) => ({ ...f, slotTime: e.target.value }))} className="input text-sm" />
           </div>
           <input value={rescheduleForm.reason} onChange={(e) => setRescheduleForm((f) => ({ ...f, reason: e.target.value }))} className="input text-sm" placeholder="Remark (optional)" />
-          <p className="text-xs text-gray-400">Rescheduling to a different lab/hospital can be done from the Schedule form by cancelling and re-booking, or contact support to change the lab on this record.</p>
           <button disabled={busy} onClick={() => run(() => corporateAppointmentApi.reschedule(a._id, rescheduleForm), 'Appointment rescheduled')} className="btn-primary text-xs px-3 py-1.5">Save Reschedule</button>
         </div>
       )}
-
-      {/* Test Report — only once the lab has confirmed the appointment */}
-      <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Test Report</p>
-        {!['confirmed', 'completed'].includes(a.status) ? (
-          <p className="text-xs text-gray-400">Report can be uploaded once this appointment is confirmed by the lab.</p>
-        ) : (
-          <div className="flex items-center gap-2">
-            {a.reportKey ? (
-              <>
-                <span className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5">
-                  <FiFileText size={12} /> {a.reportFileName || 'report.pdf'}
-                </span>
-                <button onClick={handleDownloadReport} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-primary-600 hover:border-primary-300 flex items-center gap-1">
-                  <FiDownload size={11} /> Download
-                </button>
-              </>
-            ) : (
-              <p className="text-xs text-gray-400">No report uploaded yet.</p>
-            )}
-            <input ref={reportFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleReportFile} />
-            <button onClick={() => reportFileRef.current?.click()} disabled={uploadingReport}
-              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-primary-300 flex items-center gap-1 disabled:opacity-50">
-              <FiUploadCloud size={11} /> {uploadingReport ? 'Uploading...' : a.reportKey ? 'Replace' : 'Upload Report'}
-            </button>
-          </div>
-        )}
-      </div>
 
       {(a.rescheduleHistory || []).length > 0 && (
         <div>
@@ -396,6 +253,9 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
 }
 
 export default function CorporateAppointmentsPage() {
+  const { user, loading: authLoading, isCorporate } = useAuth();
+  const router = useRouter();
+  const [myCorporate, setMyCorporate] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -406,14 +266,24 @@ export default function CorporateAppointmentsPage() {
   const [modal, setModal] = useState(null);
   const searchTimer = useRef(null);
 
+  useEffect(() => {
+    if (!authLoading && user && !isCorporate) router.push('/dashboard');
+  }, [authLoading, user, isCorporate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isCorporate) return;
+    corporateApi.getMine().then((r) => setMyCorporate(r.data));
+  }, [isCorporate]);
+
   const fetchAppointments = useCallback(() => {
+    if (!isCorporate) return;
     setLoading(true);
     const params = { page, limit, q: q || undefined };
     if (status) params.status = status;
     corporateAppointmentApi.getAll(params)
       .then((res) => { setAppointments(res.data.items || []); setTotal(res.data.total || 0); })
       .finally(() => setLoading(false));
-  }, [page, limit, status, q]);
+  }, [isCorporate, page, limit, status, q]);
 
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
@@ -430,18 +300,17 @@ export default function CorporateAppointmentsPage() {
     fetchAppointments();
   };
 
+  if (authLoading) return <PageLoader />;
+  if (!isCorporate) return null;
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Corporate Appointments</h1>
-        <div className="flex gap-2">
-          <button onClick={() => setModal({ type: 'upload' })} className="flex items-center gap-2 text-sm px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">
-            <FiUploadCloud size={14} /> Bulk Upload
-          </button>
-          <button onClick={() => setModal({ type: 'schedule' })} className="btn-primary flex items-center gap-2 text-sm">
-            <FiPlus /> Schedule Appointment
-          </button>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900">My Appointments</h1>
+        <button onClick={() => setModal({ type: 'schedule' })} disabled={!myCorporate?.active}
+          className="btn-primary flex items-center gap-2 text-sm disabled:opacity-40">
+          <FiPlus /> Schedule Appointment
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">
@@ -467,7 +336,6 @@ export default function CorporateAppointmentsPage() {
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="table-header">Appointment #</th>
-                  <th className="table-header">Corporate</th>
                   <th className="table-header">Employee</th>
                   <th className="table-header">Lab</th>
                   <th className="table-header">Date / Time</th>
@@ -479,7 +347,6 @@ export default function CorporateAppointmentsPage() {
                 {appointments.map((a) => (
                   <tr key={a._id} className="hover:bg-gray-50 transition-colors">
                     <td className="table-cell font-medium">{a.appointmentNo}</td>
-                    <td className="table-cell">{a.corporate?.companyName}</td>
                     <td className="table-cell">{a.employee?.name}</td>
                     <td className="table-cell">{a.lab?.name}</td>
                     <td className="table-cell">{a.slotDate ? formatDate(a.slotDate) : '—'} {a.slotTime}</td>
@@ -492,7 +359,7 @@ export default function CorporateAppointmentsPage() {
                   </tr>
                 ))}
                 {appointments.length === 0 && (
-                  <tr><td colSpan={7} className="table-cell text-center text-gray-400 py-10">No appointments found</td></tr>
+                  <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-10">No appointments yet</td></tr>
                 )}
               </tbody>
             </table>
@@ -503,11 +370,7 @@ export default function CorporateAppointmentsPage() {
       <Pagination page={page} total={total} limit={limit} onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />
 
       <Modal open={modal?.type === 'schedule'} onClose={() => setModal(null)} title="Schedule Appointment" size="lg">
-        <ScheduleForm onSave={() => { setModal(null); fetchAppointments(); }} onClose={() => setModal(null)} />
-      </Modal>
-
-      <Modal open={modal?.type === 'upload'} onClose={() => setModal(null)} title="Bulk Upload Appointments" size="md">
-        <BulkUploadForm onSave={() => { setModal(null); fetchAppointments(); }} onClose={() => setModal(null)} />
+        <ScheduleForm myCorporate={myCorporate} onSave={() => { setModal(null); fetchAppointments(); }} onClose={() => setModal(null)} />
       </Modal>
 
       <Modal open={modal?.type === 'view'} onClose={() => setModal(null)} title="Manage Appointment" size="md">

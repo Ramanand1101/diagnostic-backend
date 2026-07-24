@@ -84,7 +84,9 @@ function PhoneModal({ onSave, onSkip }) {
 
 function redirectAfterLogin(role, router, redirectTo) {
   if (redirectTo && redirectTo.startsWith('/')) { router.push(redirectTo); return; }
-  router.push(role === 'superadmin' || role === 'subadmin' ? '/admin' : '/dashboard');
+  if (role === 'superadmin' || role === 'subadmin') { router.push('/admin'); return; }
+  if (role === 'corporate') { router.push('/dashboard/corporate'); return; }
+  router.push('/dashboard');
 }
 
 // ── Channel pill button ───────────────────────────────────────────────────────

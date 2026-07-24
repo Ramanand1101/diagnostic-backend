@@ -27,12 +27,14 @@ function isSlotPast(slot, slotDate) {
   return slotMinutes <= currentMinutes;
 }
 
-export function TimeSlotPicker({ value, onChange, slotDate }) {
+export function TimeSlotPicker({ value, onChange, slotDate, onlyMorning }) {
   useEffect(() => {
     if (value && isSlotPast(value, slotDate)) {
       onChange('');
     }
   }, [slotDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const groups = onlyMorning ? SLOT_GROUPS.filter((g) => g.label.startsWith('Morning')) : SLOT_GROUPS;
 
   return (
     <div className="space-y-4">
@@ -40,7 +42,7 @@ export function TimeSlotPicker({ value, onChange, slotDate }) {
         Preferred Time <span className="text-red-500">*</span>
       </label>
 
-      {SLOT_GROUPS.map(({ label, emoji, color, slots }) => (
+      {groups.map(({ label, emoji, color, slots }) => (
         <div key={label}>
           <p className={`flex items-center gap-1.5 text-xs font-semibold ${color} mb-2`}>
             <span>{emoji}</span> {label}

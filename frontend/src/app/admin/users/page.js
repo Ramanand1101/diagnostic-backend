@@ -8,12 +8,13 @@ import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 
-const ROLES = ['customer', 'lab', 'subadmin', 'superadmin'];
+const ROLES = ['customer', 'lab', 'corporate', 'subadmin', 'superadmin'];
 
 const ROLE_META = {
   superadmin: { label: 'Super Admin', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: '👑' },
   subadmin:   { label: 'Sub Admin',   color: 'bg-blue-100 text-blue-700 border-blue-200',   icon: '🛡️' },
   lab:        { label: 'Lab',         color: 'bg-green-100 text-green-700 border-green-200', icon: '🧪' },
+  corporate:  { label: 'Corporate',   color: 'bg-orange-100 text-orange-700 border-orange-200', icon: '🏢' },
   customer:   { label: 'Customer',    color: 'bg-gray-100 text-gray-600 border-gray-200',    icon: '👤' },
 };
 
@@ -591,7 +592,7 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Role stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {ROLES.map((r) => {
           const meta = ROLE_META[r];
           return (

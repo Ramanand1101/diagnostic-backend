@@ -33,6 +33,12 @@ const labNav = [
   { href: '/dashboard/profile', label: 'Profile', icon: FiUser },
 ];
 
+const corporateNav = [
+  { href: '/dashboard/corporate', label: 'My Company', icon: FiBriefcase },
+  { href: '/dashboard/corporate/appointments', label: 'Appointments', icon: FiCalendar },
+  { href: '/dashboard/profile', label: 'Profile', icon: FiUser },
+];
+
 export default function DashboardLayout({ children }) {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -45,7 +51,14 @@ export default function DashboardLayout({ children }) {
   if (loading) return <PageLoader />;
   if (!user) return null;
 
-  const navItems = user.role === 'lab' ? labNav : customerNav;
+  const navItems = user.role === 'lab' ? labNav : user.role === 'corporate' ? corporateNav : customerNav;
+
+  // Pick the single longest matching href as "active" — prevents a parent route
+  // (e.g. /dashboard/corporate) from also lighting up on its own sub-pages.
+  const allHrefs = navItems.filter((i) => !i.divider).map((i) => i.href);
+  const activeHref = allHrefs
+    .filter((href) => pathname === href || (href !== '/dashboard' && pathname.startsWith(href + '/')))
+    .sort((a, b) => b.length - a.length)[0];
 
   return (
     <>
@@ -70,7 +83,7 @@ export default function DashboardLayout({ children }) {
                     <p key={i} className="text-xs text-gray-400 px-3 pt-3 pb-1 font-medium">{item.label}</p>
                   );
                   const { href, label, icon: Icon } = item;
-                  const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
+                  const active = href === activeHref;
                   return (
                     <Link
                       key={href}
