@@ -4,17 +4,18 @@ import { userApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
-import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX, FiCheck, FiPlus, FiKey, FiCopy } from 'react-icons/fi';
+import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX, FiCheck, FiPlus, FiKey, FiCopy, FiEdit } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 
-const ROLES = ['customer', 'lab', 'corporate', 'subadmin', 'superadmin'];
+const ROLES = ['customer', 'lab', 'corporate', 'employee', 'subadmin', 'superadmin'];
 
 const ROLE_META = {
   superadmin: { label: 'Super Admin', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: '👑' },
   subadmin:   { label: 'Sub Admin',   color: 'bg-blue-100 text-blue-700 border-blue-200',   icon: '🛡️' },
   lab:        { label: 'Lab',         color: 'bg-green-100 text-green-700 border-green-200', icon: '🧪' },
   corporate:  { label: 'Corporate',   color: 'bg-orange-100 text-orange-700 border-orange-200', icon: '🏢' },
+  employee:   { label: 'Employee',    color: 'bg-teal-100 text-teal-700 border-teal-200',    icon: '🧑‍💼' },
   customer:   { label: 'Customer',    color: 'bg-gray-100 text-gray-600 border-gray-200',    icon: '👤' },
 };
 
@@ -276,6 +277,64 @@ function RoleDropdown({ user, currentUserRole, onChange }) {
 }
 
 // ── Reset Password modal ──────────────────────────────────────────────────────
+function EditUserModal({ user, onClose, onSaved }) {
+  const [form, setForm] = useState({ name: user.name || '', email: user.email || '', mobile: user.mobile || '' });
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) return toast.error('Name is required');
+    setSaving(true);
+    try {
+      await userApi.updateDetails(user._id, form);
+      toast.success('User details updated');
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-base font-bold text-gray-900">Edit User</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+            <FiX size={18} />
+          </button>
+        </div>
+        <form onSubmit={handleSave} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+            <input value={form.name} onChange={(e) => set('name', e.target.value)} className="input text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+            <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className="input text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Mobile</label>
+            <input type="tel" value={form.mobile} onChange={(e) => set('mobile', e.target.value)} className="input text-sm" placeholder="9876543210" />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white rounded-xl disabled:opacity-60">
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function ResetPasswordModal({ user, onClose }) {
   const [sendEmail, setSendEmail] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -387,6 +446,7 @@ export default function AdminUsersPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [permTarget, setPermTarget] = useState(null);
   const [resetTarget, setResetTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
   const [addModal, setAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ name: '', email: '', mobile: '', role: 'customer' });
   const [addSaving, setAddSaving] = useState(false);
@@ -493,6 +553,15 @@ export default function AdminUsersPage() {
         />
       )}
 
+      {/* Edit User modal */}
+      {editTarget && (
+        <EditUserModal
+          user={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={fetchUsers}
+        />
+      )}
+
       {/* Add User modal */}
       {addModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -592,7 +661,7 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Role stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {ROLES.map((r) => {
           const meta = ROLE_META[r];
           return (
@@ -727,6 +796,16 @@ export default function AdminUsersPage() {
                               className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
                             >
                               <FiSliders size={12} /> Permissions
+                            </button>
+                          )}
+                          {/* Edit details button */}
+                          {(!isSuper || isSuperAdmin) && (
+                            <button
+                              onClick={() => setEditTarget(u)}
+                              title="Edit name/email/mobile"
+                              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
+                              <FiEdit size={12} /> Edit
                             </button>
                           )}
                           {/* Reset Password button */}

@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Otp = require('../models/Otp');
 const { sendMail } = require('../config/email');
 const { sendSms, sendWhatsapp } = require('../config/sms');
+const { logActivity } = require('../utils/activityLog');
 
 function signToken(user) {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
@@ -86,6 +87,7 @@ exports.login = asyncHandler(async (req, res) => {
 
   // Non-blocking — don't let lastLoginAt update cause a 500
   User.updateOne({ _id: user._id }, { lastLoginAt: new Date() }).catch(() => {});
+  logActivity({ actor: user, action: 'user.login', entity: 'User', entityId: user._id, description: `${user.name} logged in (password)` });
 
   const token = signToken(user);
   res.json({
@@ -195,6 +197,7 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
   }
 
   const token = signToken(user);
+  logActivity({ actor: user, action: 'user.login', entity: 'User', entityId: user._id, description: `${user.name} logged in (OTP)` });
 
   res.json({
     message: 'OTP verified',
@@ -334,6 +337,7 @@ exports.googleAuth = asyncHandler(async (req, res) => {
   await user.save();
 
   const token = signToken(user);
+  logActivity({ actor: user, action: 'user.login', entity: 'User', entityId: user._id, description: `${user.name} logged in (Google)` });
   res.json({
     token,
     user: {

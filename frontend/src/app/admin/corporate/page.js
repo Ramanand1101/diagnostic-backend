@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { corporateApi, labApi, userApi, corporatePackageApi } from '@/lib/api';
+import { corporateApi, labApi, userApi, corporatePackageApi, activityLogApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
@@ -116,9 +116,8 @@ function CorporateForm({ initial, onSave, onClose }) {
     state: initial?.state || '',
     pincode: initial?.pincode || '',
     gstNumber: initial?.gstNumber || '',
+    domains: initial?.domains || [],
     creditLimit: initial?.creditLimit ?? 0,
-    agreementStartDate: initial?.agreementStartDate ? initial.agreementStartDate.slice(0, 10) : '',
-    agreementExpiryDate: initial?.agreementExpiryDate ? initial.agreementExpiryDate.slice(0, 10) : '',
     hr: {
       name: initial?.hr?.name || '',
       department: initial?.hr?.department || '',
@@ -225,16 +224,11 @@ function CorporateForm({ initial, onSave, onClose }) {
             <input type="number" value={form.creditLimit} onChange={(e) => set('creditLimit', e.target.value)} className="input" placeholder="0" />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Agreement Start Date</label>
-            <DateSelectPicker value={form.agreementStartDate} onChange={(v) => set('agreementStartDate', v)} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Agreement Expiry Date</label>
-            <DateSelectPicker value={form.agreementExpiryDate} onChange={(v) => set('agreementExpiryDate', v)} />
-          </div>
+        <div className="mt-3">
+          <MultiField label="Allowed Email Domain(s)" values={form.domains} onChange={(v) => set('domains', v)} placeholder="acme.com" />
+          <p className="text-[11px] text-gray-400 mt-1">If set, company/HR/account-manager emails must use one of these domains.</p>
         </div>
+        <p className="text-[11px] text-gray-400 mt-2">Agreement start/expiry dates are managed from the corporate&apos;s detail view (after saving) under &quot;Agreement History&quot;.</p>
       </div>
 
       <div className="pt-3 border-t border-gray-100">
@@ -310,8 +304,13 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
     reminderDaysBefore: (corporate.settings?.reminderDaysBefore?.length ? corporate.settings.reminderDaysBefore : [60, 30]).join(', '),
     notifyEmail: corporate.settings?.defaultNotifyChannels?.includes('email') ?? true,
     notifyWhatsapp: corporate.settings?.defaultNotifyChannels?.includes('whatsapp') ?? false,
+    employeeCanDownloadReport: corporate.settings?.employeeCanDownloadReport ?? true,
   });
   const [savingSettings, setSavingSettings] = useState(false);
+  const [agreementForm, setAgreementForm] = useState({ startDate: '', expiryDate: '', notes: '' });
+  const [showAddAgreement, setShowAddAgreement] = useState(false);
+  const [savingAgreement, setSavingAgreement] = useState(false);
+  const [activity, setActivity] = useState([]);
 
   useEffect(() => {
     labApi.getAll({ limit: 500 }).then((r) => setLabs(r.data.items || []));
@@ -320,6 +319,7 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
       setStaff(all.filter((u) => u.role === 'superadmin' || u.role === 'subadmin'));
     });
     corporatePackageApi.getAll({ limit: 200, active: 'true' }).then((r) => setCatalogPackages(r.data.items || []));
+    activityLogApi.getAll({ entity: 'Corporate', entityId: corporate._id, limit: 20 }).then((r) => setActivity(r.data.items || []));
   }, []);
 
   const labItems = labs.map((l) => ({ id: l._id, label: `${l.name}${l.city ? ` (${l.city})` : ''}` }));
@@ -372,11 +372,24 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
       if (settingsForm.notifyEmail) channels.push('email');
       if (settingsForm.notifyWhatsapp) channels.push('whatsapp');
       const reminderDaysBefore = settingsForm.reminderDaysBefore.split(',').map((s) => Number(s.trim())).filter((n) => n > 0);
-      await corporateApi.updateSettings(corporate._id, { reminderDaysBefore, defaultNotifyChannels: channels });
+      await corporateApi.updateSettings(corporate._id, { reminderDaysBefore, defaultNotifyChannels: channels, employeeCanDownloadReport: settingsForm.employeeCanDownloadReport });
       toast.success('Settings updated');
       onChanged();
     } catch (err) { toast.error(getErrorMessage(err)); }
     finally { setSavingSettings(false); }
+  };
+
+  const handleAddAgreement = async () => {
+    if (!agreementForm.startDate || !agreementForm.expiryDate) return toast.error('Start and expiry dates are required');
+    setSavingAgreement(true);
+    try {
+      await corporateApi.addAgreement(corporate._id, agreementForm);
+      toast.success('Agreement added');
+      setAgreementForm({ startDate: '', expiryDate: '', notes: '' });
+      setShowAddAgreement(false);
+      onChanged();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setSavingAgreement(false); }
   };
 
   const handleAddAm = async (e) => {
@@ -404,6 +417,14 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
     try {
       await corporateApi.removeAccountManager(corporate._id, userId);
       toast.success('Account manager removed');
+      onChanged();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const handleToggleHR = async (userId, isHR) => {
+    try {
+      await corporateApi.setAccountManagerHR(corporate._id, userId, isHR);
+      toast.success(isHR ? 'Granted HR billing access' : 'Revoked HR billing access');
       onChanged();
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
@@ -508,6 +529,51 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
         </div>
       </div>
 
+      {/* Agreement History */}
+      <div>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Agreement History</p>
+        <div className="space-y-1.5 mb-2">
+          {(corporate.agreements || []).length === 0 && !corporate.agreementStartDate && (
+            <p className="text-xs text-gray-400">No agreements added yet.</p>
+          )}
+          {(corporate.agreements || []).length > 0 ? (
+            [...corporate.agreements].reverse().map((a) => (
+              <div key={a._id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-xs">
+                <span className="text-gray-700">{new Date(a.startDate).toLocaleDateString('en-IN')} – {new Date(a.expiryDate).toLocaleDateString('en-IN')}</span>
+                {a.notes && <span className="text-gray-400">{a.notes}</span>}
+              </div>
+            ))
+          ) : corporate.agreementStartDate && (
+            <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-xs">
+              <span className="text-gray-700">{new Date(corporate.agreementStartDate).toLocaleDateString('en-IN')} – {corporate.agreementExpiryDate ? new Date(corporate.agreementExpiryDate).toLocaleDateString('en-IN') : '—'}</span>
+            </div>
+          )}
+        </div>
+        {!showAddAgreement ? (
+          <button onClick={() => setShowAddAgreement(true)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-primary-600 hover:border-primary-300">
+            + Add New Agreement
+          </button>
+        ) : (
+          <div className="bg-gray-50 rounded-lg p-3 space-y-2.5">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Start Date</label>
+                <DateSelectPicker value={agreementForm.startDate} onChange={(v) => setAgreementForm((f) => ({ ...f, startDate: v }))} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Expiry Date</label>
+                <DateSelectPicker value={agreementForm.expiryDate} onChange={(v) => setAgreementForm((f) => ({ ...f, expiryDate: v }))} />
+              </div>
+            </div>
+            <input value={agreementForm.notes} onChange={(e) => setAgreementForm((f) => ({ ...f, notes: e.target.value }))} className="input text-sm" placeholder="Notes (optional)" />
+            <div className="flex gap-2">
+              <button onClick={handleAddAgreement} disabled={savingAgreement} className="btn-primary text-xs px-3 py-1.5">{savingAgreement ? 'Saving...' : 'Save Agreement'}</button>
+              <button onClick={() => setShowAddAgreement(false)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600">Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Corporate Settings */}
       <div>
         <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Corporate Settings</p>
@@ -531,6 +597,10 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
               </label>
             </div>
           </div>
+          <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+            <input type="checkbox" checked={settingsForm.employeeCanDownloadReport} onChange={(e) => setSettingsForm((f) => ({ ...f, employeeCanDownloadReport: e.target.checked }))} className="w-4 h-4 text-primary-600 rounded" />
+            Allow employees to download their own reports
+          </label>
           <button onClick={saveSettings} disabled={savingSettings} className="btn-primary text-xs px-3 py-1.5">
             {savingSettings ? 'Saving...' : 'Save Settings'}
           </button>
@@ -542,22 +612,32 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
         <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Account Managers (Corporate Login Users)</p>
         <div className="space-y-2 mb-3">
           {(corporate.owners || []).length === 0 && <p className="text-xs text-gray-400">No account managers added yet.</p>}
-          {(corporate.owners || []).map((u) => (
-            <div key={u._id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-              <div>
-                <p className="text-sm font-medium text-gray-800">{u.name}</p>
-                <p className="text-xs text-gray-400">{u.email}{u.mobile ? ` · ${u.mobile}` : ''}</p>
+          {(corporate.owners || []).map((u) => {
+            const isHR = (corporate.hrOwners || []).some((id) => String(id) === String(u._id));
+            return (
+              <div key={u._id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                    {u.name}
+                    {isHR && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">HR</span>}
+                  </p>
+                  <p className="text-xs text-gray-400">{u.email}{u.mobile ? ` · ${u.mobile}` : ''}</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => handleToggleHR(u._id, !isHR)} title={isHR ? 'Revoke HR billing access' : 'Grant HR billing access'}
+                    className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border ${isHR ? 'border-teal-300 text-teal-700 hover:bg-teal-50' : 'border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600'}`}>
+                    {isHR ? 'Unset HR' : 'Make HR'}
+                  </button>
+                  <button onClick={() => handleResetPassword(u._id)} title="Reset password"
+                    className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:border-primary-300 hover:text-primary-600">
+                    <FiKey size={11} /> Reset
+                  </button>
+                  <button onClick={() => handleRemoveAm(u._id)} title="Remove"
+                    className="text-red-400 hover:text-red-600 p-1"><FiX size={14} /></button>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => handleResetPassword(u._id)} title="Reset password"
-                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:border-primary-300 hover:text-primary-600">
-                  <FiKey size={11} /> Reset
-                </button>
-                <button onClick={() => handleRemoveAm(u._id)} title="Remove"
-                  className="text-red-400 hover:text-red-600 p-1"><FiX size={14} /></button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <form onSubmit={handleAddAm} className="flex gap-2 items-end flex-wrap bg-gray-50 rounded-lg p-3">
           <div className="flex-1 min-w-[120px]">
@@ -576,6 +656,20 @@ function CorporateDetail({ corporate, onClose, onEdit, onChanged }) {
             <FiUserPlus size={12} /> {addingAm ? 'Adding...' : 'Add'}
           </button>
         </form>
+      </div>
+
+      {/* Activity Log */}
+      <div>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Recent Activity</p>
+        <div className="max-h-56 overflow-y-auto space-y-1.5">
+          {activity.length === 0 && <p className="text-xs text-gray-400">No activity recorded yet.</p>}
+          {activity.map((a) => (
+            <div key={a._id} className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+              <p className="text-gray-700">{a.description}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{new Date(a.createdAt).toLocaleString('en-IN')}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="flex justify-end pt-2 border-t border-gray-100">

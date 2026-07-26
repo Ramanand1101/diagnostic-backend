@@ -2,6 +2,8 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { sendMail } = require('../config/email');
+const { isValidEmail, isValidPhone } = require('../utils/validators');
+const { logActivity } = require('../utils/activityLog');
 
 // POST /api/v1/users — admin creates a user and emails them a temp password
 exports.createUser = asyncHandler(async (req, res) => {
@@ -108,7 +110,7 @@ exports.listUsers = asyncHandler(async (req, res) => {
 });
 
 exports.updateRole = asyncHandler(async (req, res) => {
-  const VALID_ROLES = ['superadmin', 'subadmin', 'lab', 'corporate', 'customer'];
+  const VALID_ROLES = ['superadmin', 'subadmin', 'lab', 'corporate', 'employee', 'customer'];
   const { role } = req.body;
   if (!VALID_ROLES.includes(role))
     return res.status(400).json({ message: `Invalid role. Allowed: ${VALID_ROLES.join(', ')}` });
@@ -124,9 +126,50 @@ exports.updateRole = asyncHandler(async (req, res) => {
   if (user.role === 'superadmin' && req.user.role !== 'superadmin')
     return res.status(403).json({ message: 'Cannot change a superadmin\'s role' });
 
+  const oldRole = user.role;
   user.role = role;
   await user.save();
+  logActivity({ actor: req.user, action: 'user.role_changed', entity: 'User', entityId: user._id, description: `${user.name}'s role changed from ${oldRole} to ${role}` });
   res.json({ message: `Role updated to ${role}`, user: { _id: user._id, name: user.name, role: user.role } });
+});
+
+// PATCH /api/v1/users/:id — admin edits a user's name/email/mobile
+exports.updateUserDetails = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  if (user.role === 'superadmin' && req.user.role !== 'superadmin')
+    return res.status(403).json({ message: 'Only superadmin can edit a superadmin\'s details' });
+
+  const { name, email, mobile } = req.body;
+  const changes = [];
+
+  if (name !== undefined) {
+    if (!name.trim()) return res.status(400).json({ message: 'Name cannot be empty.' });
+    if (name !== user.name) changes.push(`name: "${user.name}" → "${name}"`);
+    user.name = name;
+  }
+  if (email !== undefined && email !== user.email) {
+    if (!isValidEmail(email)) return res.status(400).json({ message: 'Enter a valid email address.' });
+    const exists = await User.findOne({ email: new RegExp(`^${email}$`, 'i'), _id: { $ne: user._id } });
+    if (exists) return res.status(409).json({ message: 'This email is already used by another account.' });
+    changes.push(`email: "${user.email || ''}" → "${email}"`);
+    user.email = email;
+  }
+  if (mobile !== undefined && mobile !== user.mobile) {
+    if (mobile && !isValidPhone(mobile)) return res.status(400).json({ message: 'Enter a valid mobile number.' });
+    if (mobile) {
+      const exists = await User.findOne({ mobile, _id: { $ne: user._id } });
+      if (exists) return res.status(409).json({ message: 'This mobile number is already used by another account.' });
+    }
+    changes.push(`mobile: "${user.mobile || ''}" → "${mobile || ''}"`);
+    user.mobile = mobile || undefined;
+  }
+
+  await user.save();
+  if (changes.length) {
+    logActivity({ actor: req.user, action: 'user.updated', entity: 'User', entityId: user._id, description: `${req.user.name} updated ${user.name}'s details: ${changes.join(', ')}` });
+  }
+  res.json({ _id: user._id, name: user.name, email: user.email, mobile: user.mobile, role: user.role });
 });
 
 const VALID_PERMISSIONS = [

@@ -7,5 +7,6 @@ const PINCODE_REGEX = /^\d{6}$/;
 const isValidEmail = (v) => EMAIL_REGEX.test(String(v || '').trim());
 const isValidPhone = (v) => PHONE_REGEX.test(String(v || '').trim());
 const isValidPincode = (v) => PINCODE_REGEX.test(String(v || '').trim());
+const emailDomain = (v) => (String(v || '').split('@')[1] || '').toLowerCase().trim();
 
-module.exports = { EMAIL_REGEX, PHONE_REGEX, PINCODE_REGEX, isValidEmail, isValidPhone, isValidPincode };
+module.exports = { EMAIL_REGEX, PHONE_REGEX, PINCODE_REGEX, isValidEmail, isValidPhone, isValidPincode, emailDomain };

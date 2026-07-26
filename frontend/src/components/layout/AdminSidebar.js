@@ -7,7 +7,7 @@ import {
   FiFileText, FiPercent, FiStar, FiBook, FiFile, FiMail,
   FiSettings, FiHelpCircle, FiImage, FiUploadCloud, FiLayers,
   FiBriefcase, FiUserCheck, FiPhoneCall, FiActivity, FiList, FiLayout, FiFilePlus,
-  FiDollarSign, FiChevronsLeft, FiChevronsRight,
+  FiDollarSign, FiChevronsLeft, FiChevronsRight, FiLink,
 } from 'react-icons/fi';
 import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -77,6 +77,8 @@ const navSections = [
       { href: '/admin/pages',              label: 'Pages',             icon: FiFile,     permission: 'pages' },
       { href: '/admin/settings',           label: 'Settings',          icon: FiSettings, permission: 'settings' },
       { href: '/admin/settings/animation', label: 'Booking Animation', icon: FiActivity, permission: 'settings' },
+      { href: '/admin/activity-log',       label: 'Activity Log',      icon: FiList,     permission: 'settings' },
+      { href: '/admin/integrations',       label: 'Integrations',      icon: FiLink,     permission: null, superAdminOnly: true },
     ],
   },
 ];
@@ -89,9 +91,10 @@ export default function AdminSidebar() {
   const visibleSections = navSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) =>
-        item.permission === null ? true : hasPermission(item.permission)
-      ),
+      items: section.items.filter((item) => {
+        if (item.superAdminOnly) return isSuperAdmin;
+        return item.permission === null ? true : hasPermission(item.permission);
+      }),
     }))
     .filter((section) => section.items.length > 0);
 

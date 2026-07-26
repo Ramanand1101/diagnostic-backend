@@ -2,7 +2,8 @@ const asyncHandler = require('express-async-handler');
 const Corporate = require('../models/Corporate');
 const User = require('../models/User');
 const { sendMail } = require('../config/email');
-const { isValidEmail, isValidPhone, isValidPincode } = require('../utils/validators');
+const { isValidEmail, isValidPhone, isValidPincode, emailDomain } = require('../utils/validators');
+const { logActivity } = require('../utils/activityLog');
 
 // Validates company + HR contact fields (required ones + any optional ones that were provided).
 // Returns an error message string, or null if everything looks valid.
@@ -28,6 +29,17 @@ function validateCorporatePayload(payload) {
     }
     for (const p of hr.phones || []) {
       if (p && !isValidPhone(p)) return `Extra HR phone "${p}" is not valid.`;
+    }
+  }
+
+  // Company + HR emails must belong to one of the corporate's allowed domains, when set.
+  if (Array.isArray(payload.domains) && payload.domains.filter(Boolean).length) {
+    const domains = payload.domains.filter(Boolean).map((d) => d.toLowerCase().trim());
+    if (payload.email && !domains.includes(emailDomain(payload.email))) {
+      return `Company email must use one of the allowed domains: ${domains.join(', ')}`;
+    }
+    if (hr?.email && !domains.includes(emailDomain(hr.email))) {
+      return `HR email must use one of the allowed domains: ${domains.join(', ')}`;
     }
   }
 
@@ -84,6 +96,7 @@ exports.createCorporate = asyncHandler(async (req, res) => {
   if (validationError) return res.status(400).json({ message: validationError });
 
   const corporate = await Corporate.create(req.body);
+  logActivity({ actor: req.user, action: 'corporate.created', entity: 'Corporate', entityId: corporate._id, description: `${req.user.name} created corporate "${corporate.companyName}"` });
   res.status(201).json(corporate);
 });
 
@@ -94,18 +107,21 @@ exports.updateCorporate = asyncHandler(async (req, res) => {
   delete payload.relationshipManager; // managed via /relationship-manager endpoint
   delete payload.packages;          // managed via /packages endpoint
   delete payload.settings;          // managed via /settings endpoint
+  delete payload.agreements;        // managed via /agreements endpoint
 
   const validationError = validateCorporatePayload(payload);
   if (validationError) return res.status(400).json({ message: validationError });
 
   const corporate = await Corporate.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
+  logActivity({ actor: req.user, action: 'corporate.updated', entity: 'Corporate', entityId: corporate._id, description: `${req.user.name} updated corporate "${corporate.companyName}"` });
   res.json(corporate);
 });
 
 exports.deleteCorporate = asyncHandler(async (req, res) => {
   const corporate = await Corporate.findByIdAndDelete(req.params.id);
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
+  logActivity({ actor: req.user, action: 'corporate.deleted', entity: 'Corporate', entityId: corporate._id, description: `${req.user.name} deleted corporate "${corporate.companyName}"` });
   res.json({ message: 'Corporate deleted' });
 });
 
@@ -115,7 +131,29 @@ exports.setStatus = asyncHandler(async (req, res) => {
   if (typeof active !== 'boolean') return res.status(400).json({ message: 'active (boolean) is required.' });
   const corporate = await Corporate.findByIdAndUpdate(req.params.id, { active }, { new: true });
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
+  logActivity({ actor: req.user, action: active ? 'corporate.activated' : 'corporate.suspended', entity: 'Corporate', entityId: corporate._id, description: `${req.user.name} ${active ? 'activated' : 'suspended'} "${corporate.companyName}"` });
   res.json(corporate);
+});
+
+// POST /:id/agreements — add a new agreement (also becomes the "current" one)
+exports.addAgreement = asyncHandler(async (req, res) => {
+  const { startDate, expiryDate, notes } = req.body;
+  if (!startDate || !expiryDate) return res.status(400).json({ message: 'startDate and expiryDate are required.' });
+
+  const corporate = await Corporate.findById(req.params.id);
+  if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
+
+  corporate.agreements.push({ startDate, expiryDate, notes });
+  // Keep the top-level fields pointed at the newest agreement — the reminder cron
+  // and existing UI read these directly.
+  corporate.agreementStartDate = startDate;
+  corporate.agreementExpiryDate = expiryDate;
+  corporate.agreementReminder60SentAt = undefined;
+  corporate.agreementReminder30SentAt = undefined;
+  await corporate.save();
+
+  logActivity({ actor: req.user, action: 'corporate.agreement_added', entity: 'Corporate', entityId: corporate._id, description: `${req.user.name} added a new agreement for "${corporate.companyName}" (${new Date(startDate).toDateString()} – ${new Date(expiryDate).toDateString()})` });
+  res.status(201).json(corporate);
 });
 
 // PATCH /:id/labs — replace the assigned labs list
@@ -171,6 +209,11 @@ exports.addAccountManager = asyncHandler(async (req, res) => {
   const corporate = await Corporate.findById(req.params.id);
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
 
+  const domains = (corporate.domains || []).filter(Boolean).map((d) => d.toLowerCase().trim());
+  if (domains.length && !domains.includes(emailDomain(email))) {
+    return res.status(400).json({ message: `Account manager email must use one of this corporate's domains: ${domains.join(', ')}` });
+  }
+
   const exists = await User.findOne({ email: new RegExp(`^${email}$`, 'i') });
   if (exists) return res.status(409).json({ message: 'A user with this email already exists.' });
 
@@ -204,6 +247,7 @@ exports.addAccountManager = asyncHandler(async (req, res) => {
     console.error('[Corporate] account manager welcome email failed:', e.message);
   }
 
+  logActivity({ actor: req.user, action: 'corporate.account_manager_added', entity: 'Corporate', entityId: corporate._id, description: `${req.user.name} added account manager ${name} (${email}) to "${corporate.companyName}"` });
   res.status(201).json({ user: { _id: user._id, name: user.name, email: user.email, mobile: user.mobile, role: user.role }, tempPassword });
 });
 
@@ -215,15 +259,36 @@ exports.removeAccountManager = asyncHandler(async (req, res) => {
     { new: true }
   ).populate('owners', 'name email mobile isActive');
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
+  logActivity({ actor: req.user, action: 'corporate.account_manager_removed', entity: 'Corporate', entityId: corporate._id, description: `${req.user.name} removed an account manager from "${corporate.companyName}"` });
   res.json(corporate);
+});
+
+// PATCH /:id/account-managers/:userId/hr — flag/unflag an account manager as HR (billing access)
+exports.setAccountManagerHR = asyncHandler(async (req, res) => {
+  const { isHR } = req.body;
+  if (typeof isHR !== 'boolean') return res.status(400).json({ message: 'isHR (boolean) is required.' });
+
+  const corporate = await Corporate.findById(req.params.id);
+  if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
+  if (!corporate.owners.some((o) => String(o) === String(req.params.userId))) {
+    return res.status(400).json({ message: 'This user is not an account manager on this corporate.' });
+  }
+
+  corporate.hrOwners = corporate.hrOwners.filter((o) => String(o) !== String(req.params.userId));
+  if (isHR) corporate.hrOwners.push(req.params.userId);
+  await corporate.save();
+
+  logActivity({ actor: req.user, action: 'corporate.hr_flag_changed', entity: 'Corporate', entityId: corporate._id, description: `${req.user.name} ${isHR ? 'granted' : 'revoked'} HR billing access for an account manager on "${corporate.companyName}"` });
+  res.json({ hrOwners: corporate.hrOwners });
 });
 
 // PATCH /:id/settings — reminder-days config + default employee notification channels
 exports.updateSettings = asyncHandler(async (req, res) => {
-  const { reminderDaysBefore, defaultNotifyChannels } = req.body;
+  const { reminderDaysBefore, defaultNotifyChannels, employeeCanDownloadReport } = req.body;
   const update = {};
   if (Array.isArray(reminderDaysBefore)) update['settings.reminderDaysBefore'] = reminderDaysBefore.map(Number).filter((n) => n > 0);
   if (Array.isArray(defaultNotifyChannels)) update['settings.defaultNotifyChannels'] = defaultNotifyChannels.filter((c) => ['email', 'whatsapp'].includes(c));
+  if (typeof employeeCanDownloadReport === 'boolean') update['settings.employeeCanDownloadReport'] = employeeCanDownloadReport;
 
   const corporate = await Corporate.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
@@ -232,9 +297,18 @@ exports.updateSettings = asyncHandler(async (req, res) => {
 
 // GET /:id/billing — day/month/year-wise billing view. Only appointments whose report is
 // FULLY uploaded (status: 'completed') are billable — a partial report does not count.
+// Admins can view any corporate; a 'corporate' role user only if they're flagged as HR on this account.
 exports.getBilling = asyncHandler(async (req, res) => {
   const corporate = await Corporate.findById(req.params.id);
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });
+
+  if (req.user.role === 'corporate') {
+    const isOwner = corporate.owners.some((o) => String(o) === String(req.user._id));
+    const isHR = corporate.hrOwners.some((o) => String(o) === String(req.user._id));
+    if (!isOwner || !isHR) {
+      return res.status(403).json({ message: 'Only HR-flagged account managers can view billing.' });
+    }
+  }
 
   const { from, to, groupBy = 'day' } = req.query;
   const CorporateAppointment = require('../models/CorporateAppointment');

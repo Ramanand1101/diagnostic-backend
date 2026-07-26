@@ -36,6 +36,12 @@ const labNav = [
 const corporateNav = [
   { href: '/dashboard/corporate', label: 'My Company', icon: FiBriefcase },
   { href: '/dashboard/corporate/appointments', label: 'Appointments', icon: FiCalendar },
+  { href: '/dashboard/corporate/billing', label: 'Billing', icon: FiDollarSign },
+  { href: '/dashboard/profile', label: 'Profile', icon: FiUser },
+];
+
+const employeeNav = [
+  { href: '/dashboard/employee', label: 'My Appointments', icon: FiCalendar },
   { href: '/dashboard/profile', label: 'Profile', icon: FiUser },
 ];
 
@@ -51,7 +57,10 @@ export default function DashboardLayout({ children }) {
   if (loading) return <PageLoader />;
   if (!user) return null;
 
-  const navItems = user.role === 'lab' ? labNav : user.role === 'corporate' ? corporateNav : customerNav;
+  const navItems = user.role === 'lab' ? labNav
+    : user.role === 'corporate' ? corporateNav
+    : user.role === 'employee' ? employeeNav
+    : customerNav;
 
   // Pick the single longest matching href as "active" — prevents a parent route
   // (e.g. /dashboard/corporate) from also lighting up on its own sub-pages.

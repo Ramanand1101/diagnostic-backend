@@ -23,6 +23,8 @@ const corporateAppointmentSchema = new mongoose.Schema({
   appointmentNo: { type: String, unique: true, index: true },
   corporate: { type: mongoose.Schema.Types.ObjectId, ref: 'Corporate', required: true, index: true },
   employee: employeeSchema,
+  // Auto-linked self-service login (role: 'employee') for this appointment's employee, when their email was provided
+  employeeUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   lab: { type: mongoose.Schema.Types.ObjectId, ref: 'Lab', required: true },
   package: { type: mongoose.Schema.Types.ObjectId, ref: 'CorporatePackage', default: null },
   items: [{ name: String, price: Number }],

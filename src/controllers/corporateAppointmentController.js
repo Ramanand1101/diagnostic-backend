@@ -3,10 +3,12 @@ const CorporateAppointment = require('../models/CorporateAppointment');
 const CorporatePackage = require('../models/CorporatePackage');
 const Corporate = require('../models/Corporate');
 const Lab = require('../models/Lab');
+const User = require('../models/User');
 const Counter = require('../models/Counter');
 const { queueEmail } = require('../queues/index');
 const { sendWhatsapp } = require('../config/sms');
 const { parseSpreadsheet } = require('../utils/csvParser');
+const { logActivity } = require('../utils/activityLog');
 
 async function nextAppointmentNo() {
   const now = new Date();
@@ -26,11 +28,19 @@ async function resolveCorporateScope(req) {
   return null;
 }
 
-// Returns false (and sends a 403) if a 'corporate' role user is trying to touch another
-// corporate's appointment. Admins (superadmin/subadmin) are always allowed. The error
+// Returns false (and sends a 403) if a 'corporate'/'employee' role user is trying to touch
+// an appointment that isn't theirs. Admins (superadmin/subadmin) are always allowed. The error
 // middleware here keys off res.statusCode rather than a custom err.status, so this sets
 // the status directly rather than throwing.
 async function assertAppointmentAccess(req, res, appointment) {
+  if (req.user.role === 'employee') {
+    const appointmentEmployeeUserId = appointment.employeeUser?._id || appointment.employeeUser;
+    if (!appointmentEmployeeUserId || String(appointmentEmployeeUserId) !== String(req.user._id)) {
+      res.status(403).json({ message: 'You do not have access to this appointment.' });
+      return false;
+    }
+    return true;
+  }
   if (req.user.role !== 'corporate') return true;
   const myCorporate = await Corporate.findOne({ owners: req.user._id }).select('_id');
   const appointmentCorporateId = appointment.corporate?._id || appointment.corporate;
@@ -39,6 +49,44 @@ async function assertAppointmentAccess(req, res, appointment) {
     return false;
   }
   return true;
+}
+
+// Finds or creates a self-service ('employee' role) login for an appointment's employee,
+// so they can log in to view/reschedule this appointment and download their report.
+// Never hijacks an existing account that belongs to a different role (customer/lab/admin/etc).
+async function getOrCreateEmployeeUser({ name, email, phone }) {
+  if (!email) return null;
+  const existing = await User.findOne({ email: new RegExp(`^${email}$`, 'i') });
+  if (existing) return existing.role === 'employee' ? existing : null;
+
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  const tempPassword = `Emp@${rand}`;
+  const user = await User.create({ name: name || 'Employee', email, mobile: phone || undefined, role: 'employee', password: tempPassword });
+
+  try {
+    await queueEmail({
+      to: email,
+      subject: 'Your HealthOnTime account — view your appointment & report',
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+          <h2 style="color:#1d4ed8">Welcome, ${user.name}!</h2>
+          <p>A diagnostic appointment has been scheduled for you through your employer. You can log in to view its status, reschedule, and download your report once ready.</p>
+          <p><strong>Login Email:</strong> ${email}</p>
+          <p><strong>Temporary Password:</strong>
+            <span style="font-size:1.3rem;font-weight:700;letter-spacing:2px;color:#111">${tempPassword}</span>
+          </p>
+          <p style="color:#dc2626;font-size:0.9rem">⚠ Please change your password after logging in.</p>
+          <a href="${process.env.FRONTEND_URL || 'https://healthontime.in'}/login"
+            style="display:inline-block;margin-top:1rem;background:#1d4ed8;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+            Login Now →
+          </a>
+        </div>`,
+    });
+  } catch (e) {
+    console.error('[CorporateAppointment] employee welcome email failed:', e.message);
+  }
+
+  return user;
 }
 
 async function itemsFromPackage(corporate, packageId) {
@@ -89,10 +137,16 @@ exports.createAppointment = asyncHandler(async (req, res) => {
     amount = finalItems.reduce((sum, i) => sum + (Number(i.price) || 0), 0);
   }
 
+  const employeeUser = await getOrCreateEmployeeUser(employee).catch((e) => {
+    console.error('[CorporateAppointment] employee account link failed:', e.message);
+    return null;
+  });
+
   const appointment = await CorporateAppointment.create({
     appointmentNo: await nextAppointmentNo(),
     corporate: corporate._id,
     employee,
+    employeeUser: employeeUser?._id || null,
     lab: lab._id,
     package: packageId || null,
     items: finalItems,
@@ -106,6 +160,7 @@ exports.createAppointment = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
   });
 
+  logActivity({ actor: req.user, action: 'appointment.created', entity: 'CorporateAppointment', entityId: appointment._id, description: `${req.user.name} scheduled appointment ${appointment.appointmentNo} for ${employee?.name} at ${lab.name}`, payload: { corporate: corporate._id } });
   res.status(201).json(appointment);
 });
 
@@ -145,15 +200,22 @@ exports.bulkUploadAppointments = asyncHandler(async (req, res) => {
         amount = match.price;
       }
 
+      const employeeInfo = {
+        name: row.employeename,
+        email: row.employeeemail || '',
+        phone: row.employeephone || '',
+        employeeId: row.employeeid || '',
+      };
+      const employeeUser = await getOrCreateEmployeeUser(employeeInfo).catch((e) => {
+        console.error('[CorporateAppointment] employee account link failed:', e.message);
+        return null;
+      });
+
       const appointment = await CorporateAppointment.create({
         appointmentNo: await nextAppointmentNo(),
         corporate: corporate._id,
-        employee: {
-          name: row.employeename,
-          email: row.employeeemail || '',
-          phone: row.employeephone || '',
-          employeeId: row.employeeid || '',
-        },
+        employee: employeeInfo,
+        employeeUser: employeeUser?._id || null,
         lab: lab._id,
         package: packageId,
         items: finalItems,
@@ -181,7 +243,10 @@ exports.listAppointments = asyncHandler(async (req, res) => {
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const filter = {};
 
-  if (req.user.role === 'corporate') {
+  if (req.user.role === 'employee') {
+    // Employees only ever see appointments explicitly linked to their own login
+    filter.employeeUser = req.user._id;
+  } else if (req.user.role === 'corporate') {
     // Always scope to the caller's own corporate — never trust a client-supplied ?corporate=
     filter.corporate = myCorporate ? myCorporate._id : null;
   } else if (corporate) {
@@ -207,6 +272,53 @@ exports.listAppointments = asyncHandler(async (req, res) => {
     CorporateAppointment.countDocuments(filter),
   ]);
   res.json({ items, page: Number(page), limit: safeLimit, total });
+});
+
+// GET /corporate-appointments/export-csv — admin: bulk download filtered appointments
+exports.exportCsv = asyncHandler(async (req, res) => {
+  const { status, lab, corporate, dateFrom, dateTo, q } = req.query;
+  const filter = {};
+  if (corporate) filter.corporate = corporate;
+  if (status) filter.status = status;
+  if (lab) filter.lab = lab;
+  if (dateFrom || dateTo) {
+    filter.slotDate = {};
+    if (dateFrom) filter.slotDate.$gte = new Date(dateFrom);
+    if (dateTo) filter.slotDate.$lte = new Date(dateTo);
+  }
+  if (q) filter.$or = [{ appointmentNo: new RegExp(q, 'i') }, { 'employee.name': new RegExp(q, 'i') }];
+
+  const items = await CorporateAppointment.find(filter)
+    .populate('corporate', 'companyName')
+    .populate('lab', 'name city')
+    .sort('-createdAt')
+    .limit(10000)
+    .lean();
+
+  const escape = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const headers = [
+    'appointmentNo', 'corporate', 'employeeName', 'employeeEmail', 'employeePhone', 'employeeId',
+    'lab', 'city', 'tests', 'amount', 'slotDate', 'slotTime', 'status', 'reportStatus',
+    'missingTests', 'invoiced', 'createdAt',
+  ];
+
+  const rows = items.map((a) => [
+    a.appointmentNo, a.corporate?.companyName || '', a.employee?.name || '', a.employee?.email || '', a.employee?.phone || '', a.employee?.employeeId || '',
+    a.lab?.name || '', a.city || '', (a.items || []).map((i) => i.name).join('|'), a.amount || 0,
+    a.slotDate ? new Date(a.slotDate).toISOString().slice(0, 10) : '', a.slotTime || '', a.status, a.reportStatus || 'none',
+    (a.missingTests || []).join('|'), a.invoiced ? 'Yes' : 'No',
+    a.createdAt ? new Date(a.createdAt).toISOString().slice(0, 10) : '',
+  ].map(escape).join(','));
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="corporate-appointments-export.csv"');
+  res.send(csv);
 });
 
 exports.getAppointment = asyncHandler(async (req, res) => {
@@ -259,6 +371,7 @@ exports.confirmAppointment = asyncHandler(async (req, res) => {
     { new: true }
   ).populate('lab corporate package');
   if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+  logActivity({ actor: req.user, action: 'appointment.confirmed', entity: 'CorporateAppointment', entityId: appointment._id, description: `${req.user.name} confirmed appointment ${appointment.appointmentNo}` });
   res.json(appointment);
 });
 
@@ -270,6 +383,7 @@ exports.rejectAppointment = asyncHandler(async (req, res) => {
     { new: true }
   );
   if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+  logActivity({ actor: req.user, action: 'appointment.rejected', entity: 'CorporateAppointment', entityId: appointment._id, description: `${req.user.name} rejected appointment ${appointment.appointmentNo}` });
   res.json(appointment);
 });
 
@@ -311,6 +425,9 @@ exports.rescheduleAppointment = asyncHandler(async (req, res) => {
 
   let newLab = appointment.lab;
   if (newLabId && String(newLabId) !== String(appointment.lab)) {
+    if (req.user.role === 'employee') {
+      return res.status(403).json({ message: 'Employees cannot change the lab. Please contact your account manager.' });
+    }
     const corporate = appointment.corporate;
     const isAssigned = (corporate.assignedLabs || []).some((l) => String(l) === String(newLabId));
     if (!isAssigned) return res.status(403).json({ message: 'This lab is not assigned to the corporate.' });
@@ -338,6 +455,7 @@ exports.rescheduleAppointment = asyncHandler(async (req, res) => {
   appointment.status = 'pending'; // needs re-confirmation from the lab
   await appointment.save();
 
+  logActivity({ actor: req.user, action: 'appointment.rescheduled', entity: 'CorporateAppointment', entityId: appointment._id, description: `${req.user.name} rescheduled appointment ${appointment.appointmentNo}${reason ? ` — ${reason}` : ''}` });
   res.json(appointment);
 });
 
@@ -352,6 +470,7 @@ exports.cancelAppointment = asyncHandler(async (req, res) => {
     { status: 'cancelled', cancelledBy: req.user._id, cancelledAt: new Date(), cancelReason: req.body.reason || '' },
     { new: true }
   );
+  logActivity({ actor: req.user, action: 'appointment.cancelled', entity: 'CorporateAppointment', entityId: appointment._id, description: `${req.user.name} cancelled appointment ${appointment.appointmentNo}${req.body.reason ? ` — ${req.body.reason}` : ''}` });
   res.json(appointment);
 });
 
@@ -453,6 +572,7 @@ exports.uploadReport = asyncHandler(async (req, res) => {
     }
   }
 
+  logActivity({ actor: req.user, action: type === 'partial' ? 'report.uploaded_partial' : 'report.uploaded_complete', entity: 'CorporateAppointment', entityId: existing._id, description: `${req.user.name} uploaded a ${type} report for ${existing.appointmentNo}${type === 'partial' ? ` (missing: ${missingTests.join(', ')})` : ''}` });
   res.json(existing);
 });
 
@@ -468,6 +588,7 @@ exports.markReportDone = asyncHandler(async (req, res) => {
   appointment.missingTests = [];
   appointment.status = 'completed';
   await appointment.save();
+  logActivity({ actor: req.user, action: 'report.marked_done', entity: 'CorporateAppointment', entityId: appointment._id, description: `${req.user.name} marked the report for ${appointment.appointmentNo} as complete` });
   res.json(appointment);
 });
 
@@ -477,6 +598,13 @@ exports.getReportUrl = asyncHandler(async (req, res) => {
   if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
   if (!(await assertAppointmentAccess(req, res, appointment))) return;
   if (!appointment.reportKey) return res.status(404).json({ message: 'No report uploaded for this appointment yet.' });
+
+  if (req.user.role === 'employee') {
+    const corp = await Corporate.findById(appointment.corporate).select('settings.employeeCanDownloadReport');
+    if (corp?.settings?.employeeCanDownloadReport === false) {
+      return res.status(403).json({ message: 'Report downloads are disabled for employees on this account. Please contact your HR/account manager.' });
+    }
+  }
 
   const { s3, bucket } = require('../config/s3');
   const { GetObjectCommand } = require('@aws-sdk/client-s3');

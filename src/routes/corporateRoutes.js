@@ -20,7 +20,9 @@ router.patch('/:id/settings', protect, adminOnly, corporate.updateSettings);
 
 router.post('/:id/account-managers', protect, adminOnly, corporate.addAccountManager);
 router.delete('/:id/account-managers/:userId', protect, adminOnly, corporate.removeAccountManager);
+router.patch('/:id/account-managers/:userId/hr', protect, adminOnly, corporate.setAccountManagerHR);
 
-router.get('/:id/billing', protect, adminOnly, corporate.getBilling);
+router.get('/:id/billing', protect, allowRoles('superadmin', 'subadmin', 'corporate'), corporate.getBilling);
+router.post('/:id/agreements', protect, adminOnly, corporate.addAgreement);
 
 module.exports = router;

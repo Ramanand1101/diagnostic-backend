@@ -5,7 +5,7 @@ import { getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import toast from 'react-hot-toast';
 import {
-  FiDollarSign, FiClock, FiCalendar, FiFileText, FiPrinter, FiX,
+  FiDollarSign, FiClock, FiCalendar, FiFileText, FiPrinter, FiX, FiDownload,
 } from 'react-icons/fi';
 
 const PRESETS = [
@@ -221,9 +221,24 @@ export default function CorporateBillingPage() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
+  const handleDownloadCsv = async () => {
+    try {
+      const params = corporateId ? { corporate: corporateId } : {};
+      const res = await corporateInvoiceApi.exportCsv(params);
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'corporate-invoices-export.csv'; a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error('Export failed'); }
+  };
+
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-gray-900">Corporate Billing</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Corporate Billing</h1>
+        <button onClick={handleDownloadCsv} className="flex items-center gap-2 text-sm px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">
+          <FiDownload size={14} /> Download Invoices CSV
+        </button>
+      </div>
 
       <div className="flex flex-wrap gap-3 items-center">
         <select value={corporateId} onChange={(e) => setCorporateId(e.target.value)} className="input max-w-xs">

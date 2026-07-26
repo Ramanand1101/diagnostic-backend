@@ -86,6 +86,7 @@ function redirectAfterLogin(role, router, redirectTo) {
   if (redirectTo && redirectTo.startsWith('/')) { router.push(redirectTo); return; }
   if (role === 'superadmin' || role === 'subadmin') { router.push('/admin'); return; }
   if (role === 'corporate') { router.push('/dashboard/corporate'); return; }
+  if (role === 'employee') { router.push('/dashboard/employee'); return; }
   router.push('/dashboard');
 }
 

@@ -49,6 +49,7 @@ export const userApi = {
   create: (data) => api.post('/users', data),
   getAll: (params) => api.get('/users', { params }),
   updateRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
+  updateDetails: (id, data) => api.patch(`/users/${id}`, data),
   bulkDelete: (ids) => api.delete('/users/bulk-delete', { data: { ids } }),
   deleteUser: (id) => api.delete(`/users/${id}`),
   exportCsv: () => api.get('/users/export-csv', { responseType: 'blob' }),
@@ -88,9 +89,23 @@ export const corporateApi = {
   assignRelationshipManager: (id, userId) => api.patch(`/corporates/${id}/relationship-manager`, { userId }),
   addAccountManager: (id, data) => api.post(`/corporates/${id}/account-managers`, data),
   removeAccountManager: (id, userId) => api.delete(`/corporates/${id}/account-managers/${userId}`),
+  setAccountManagerHR: (id, userId, isHR) => api.patch(`/corporates/${id}/account-managers/${userId}/hr`, { isHR }),
   assignPackages: (id, packages) => api.patch(`/corporates/${id}/packages`, { packages }),
   updateSettings: (id, data) => api.patch(`/corporates/${id}/settings`, data),
+  addAgreement: (id, data) => api.post(`/corporates/${id}/agreements`, data),
   getBilling: (id, params) => api.get(`/corporates/${id}/billing`, { params }),
+};
+
+// Activity Log
+export const activityLogApi = {
+  getAll: (params) => api.get('/activity-log', { params }),
+};
+
+// Integration Settings
+export const integrationApi = {
+  getAll: () => api.get('/integrations'),
+  upsert: (key, data) => api.put(`/integrations/${key}`, data),
+  delete: (key) => api.delete(`/integrations/${key}`),
 };
 
 // Corporate Invoices
@@ -99,6 +114,7 @@ export const corporateInvoiceApi = {
   getOne: (id) => api.get(`/corporate-invoices/${id}`),
   generate: (corporateId, data) => api.post(`/corporate-invoices/${corporateId}/generate`, data),
   updateStatus: (id, status) => api.patch(`/corporate-invoices/${id}/status`, { status }),
+  exportCsv: (params) => api.get('/corporate-invoices/export-csv', { params, responseType: 'blob' }),
 };
 
 // Corporate Packages
@@ -113,6 +129,7 @@ export const corporatePackageApi = {
 // Corporate Appointments
 export const corporateAppointmentApi = {
   getAll: (params) => api.get('/corporate-appointments', { params }),
+  exportCsv: (params) => api.get('/corporate-appointments/export-csv', { params, responseType: 'blob' }),
   getOne: (id) => api.get(`/corporate-appointments/${id}`),
   create: (data) => api.post('/corporate-appointments', data),
   bulkUpload: (corporateId, file) => {

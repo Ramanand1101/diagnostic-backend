@@ -506,11 +506,25 @@ export default function CorporateAppointmentsPage() {
     fetchAppointments();
   };
 
+  const handleDownloadCsv = async () => {
+    try {
+      const params = { q: q || undefined };
+      if (status) params.status = status;
+      const res = await corporateAppointmentApi.exportCsv(params);
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'corporate-appointments-export.csv'; a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error('Export failed'); }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Corporate Appointments</h1>
         <div className="flex gap-2">
+          <button onClick={handleDownloadCsv} className="flex items-center gap-2 text-sm px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">
+            <FiDownload size={14} /> Download CSV
+          </button>
           <button onClick={() => setModal({ type: 'upload' })} className="flex items-center gap-2 text-sm px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">
             <FiUploadCloud size={14} /> Bulk Upload
           </button>

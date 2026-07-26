@@ -42,6 +42,7 @@ export function AuthProvider({ children }) {
   const isSuperAdmin = user?.role === 'superadmin';
   const isLab = user?.role === 'lab';
   const isCorporate = user?.role === 'corporate';
+  const isEmployee = user?.role === 'employee';
   const isCustomer = user?.role === 'customer';
 
   const hasPermission = (key) => {
@@ -52,7 +53,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, isAdmin, isSuperAdmin, isLab, isCorporate, isCustomer, hasPermission }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, isAdmin, isSuperAdmin, isLab, isCorporate, isEmployee, isCustomer, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

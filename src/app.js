@@ -42,6 +42,8 @@ const corporateRoutes      = require('./routes/corporateRoutes');
 const corporatePackageRoutes = require('./routes/corporatePackageRoutes');
 const corporateAppointmentRoutes = require('./routes/corporateAppointmentRoutes');
 const corporateInvoiceRoutes = require('./routes/corporateInvoiceRoutes');
+const activityLogRoutes = require('./routes/activityLogRoutes');
+const integrationSettingRoutes = require('./routes/integrationSettingRoutes');
 
 const app = express();
 
@@ -153,6 +155,8 @@ app.use('/api/v1/corporates',         corporateRoutes);
 app.use('/api/v1/corporate-packages', corporatePackageRoutes);
 app.use('/api/v1/corporate-appointments', corporateAppointmentRoutes);
 app.use('/api/v1/corporate-invoices', corporateInvoiceRoutes);
+app.use('/api/v1/activity-log', activityLogRoutes);
+app.use('/api/v1/integrations', integrationSettingRoutes);
 
 // ── Error handlers ────────────────────────────────────────────────────────────
 app.use(notFound);
