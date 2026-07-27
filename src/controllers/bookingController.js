@@ -230,14 +230,17 @@ exports.listBookings = asyncHandler(async (req, res) => {
   if (status) filter.status = status;
   if (q) filter.bookingNo = new RegExp(q, 'i');
 
-  if (req.user.role === 'customer') {
-    filter.user = req.user._id;
-  } else if (req.user.role === 'lab') {
+  if (req.user.role === 'lab') {
     const Lab = require('../models/Lab');
     const myLab = await Lab.findOne({ owners: req.user._id });
     filter.lab = myLab?._id || null;
-  } else {
+  } else if (req.user.role === 'superadmin' || req.user.role === 'subadmin') {
     if (lab) filter.lab = lab;
+  } else {
+    // customer, hot_employee, corporate, employee, or any other non-admin role —
+    // this same endpoint backs the personal "My Bookings" dashboard, so it must
+    // never return other people's bookings.
+    filter.user = req.user._id;
   }
 
   const skip = (Number(page) - 1) * safeLimit;
@@ -249,6 +252,20 @@ exports.listBookings = asyncHandler(async (req, res) => {
 exports.getBooking = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id).populate('user lab items.product');
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+  if (req.user.role === 'lab') {
+    const Lab = require('../models/Lab');
+    const myLab = await Lab.findOne({ owners: req.user._id }).select('_id');
+    if (!myLab || String(booking.lab?._id || booking.lab) !== String(myLab._id)) {
+      return res.status(403).json({ message: 'You do not have access to this booking.' });
+    }
+  } else if (req.user.role !== 'superadmin' && req.user.role !== 'subadmin') {
+    const ownerId = booking.user?._id || booking.user;
+    if (!ownerId || String(ownerId) !== String(req.user._id)) {
+      return res.status(403).json({ message: 'You do not have access to this booking.' });
+    }
+  }
+
   res.json(booking);
 });
 
