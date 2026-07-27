@@ -34,6 +34,11 @@ export default function LabCard({ lab, compareIds, onToggleCompare }) {
             <span className="line-clamp-1">{lab.city}{lab.state ? `, ${lab.state}` : ''}</span>
           </div>
         </div>
+        {typeof lab.distanceKm === 'number' && (
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white text-primary-700 border border-primary-200 shrink-0 shadow-sm">
+            {lab.distanceKm < 1 ? `${Math.round(lab.distanceKm * 1000)} m` : `${lab.distanceKm} km`}
+          </span>
+        )}
         {lab.verificationStatus === 'verified' && (
           <FiCheckCircle className="text-secondary-500 text-xl flex-shrink-0 mt-0.5" title="Verified" />
         )}

@@ -2,7 +2,7 @@
 // Kept in one place so email / SMS / WhatsApp / screen all show identical wording.
 // TODO (future): move these into an admin-configurable settings collection.
 const WARNING_MESSAGES = {
-  lateNight: 'Note: If the diagnostic center is closed or opens late, please cooperate. Please inform us, Our team will coordinate with the diagnostic center and update you if any schedule changes are required.',
+  lateNight: 'Note: If the diagnostic center is closed or opens late, please cooperate. Our team will coordinate with the diagnostic center and inform you of any schedule changes if required.',
   shortNotice: 'Please check with the diagnostic center/lab regarding appointment availability before visiting.',
 };
 

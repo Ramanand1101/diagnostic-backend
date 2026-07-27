@@ -4,6 +4,46 @@ const { syncObjects, deleteObject, deleteObjects } = require('../services/algoli
 const makeSlug = require('../utils/slug');
 const { parseCSV } = require('../utils/csvParser');
 
+const RADIUS_OPTIONS_KM = [5, 10, 25, 50];
+const DEFAULT_RADIUS_KM = 10;
+
+// Validates lat/lng (when both are supplied together) and, if valid, mutates `target`
+// (a plain object destined for Lab.create/findOneAndUpdate) to set lat/lng plus the
+// derived GeoJSON `location` field the 2dsphere index queries against. Passing both as
+// null/'' clears coordinates and sets `target.unsetLocation = true` — since MongoDB won't
+// remove a field from a `$set` update via an `undefined` value, the caller must turn that
+// flag into a proper `$unset`. Passing neither key leaves `target` untouched (partial
+// updates). Returns an error message string, or null if everything applied cleanly.
+function applyLabGeoFields(target) {
+  const hasLat = Object.prototype.hasOwnProperty.call(target, 'lat');
+  const hasLng = Object.prototype.hasOwnProperty.call(target, 'lng');
+  if (!hasLat && !hasLng) return null;
+  if (hasLat !== hasLng) return 'Latitude and longitude must be provided together.';
+
+  const isEmpty = (v) => v === null || v === undefined || v === '';
+  const latEmpty = isEmpty(target.lat);
+  const lngEmpty = isEmpty(target.lng);
+  if (latEmpty !== lngEmpty) return 'Latitude and longitude must be provided together.';
+  if (latEmpty && lngEmpty) {
+    target.lat = null;
+    target.lng = null;
+    delete target.location;
+    target.unsetLocation = true;
+    return null;
+  }
+
+  const lat = Number(target.lat);
+  const lng = Number(target.lng);
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return 'Latitude/longitude must be valid numbers.';
+  if (lat < -90 || lat > 90) return 'Latitude must be between -90 and 90.';
+  if (lng < -180 || lng > 180) return 'Longitude must be between -180 and 180.';
+
+  target.lat = lat;
+  target.lng = lng;
+  target.location = { type: 'Point', coordinates: [lng, lat] };
+  return null;
+}
+
 function labRecord(lab) {
   return {
     objectID: String(lab._id),
@@ -77,6 +117,8 @@ exports.getMyLab = asyncHandler(async (req, res) => {
 exports.createLab = asyncHandler(async (req, res) => {
   if (!req.body.slug && req.body.name) req.body.slug = makeSlug(req.body.name);
   if (req.user.role === 'lab') req.body.owners = [req.user._id];
+  const geoError = applyLabGeoFields(req.body);
+  if (geoError) return res.status(400).json({ message: geoError });
   const lab = await Lab.create(req.body);
   console.log('Created Lab:', lab);
   await syncObjects('labs', [labRecord(lab)]);
@@ -86,13 +128,18 @@ exports.createLab = asyncHandler(async (req, res) => {
 exports.updateLab = asyncHandler(async (req, res) => {
   const payload = { ...req.body };
   if (payload.name && !payload.slug) payload.slug = makeSlug(payload.name);
+  const geoError = applyLabGeoFields(payload);
+  if (geoError) return res.status(400).json({ message: geoError });
+  const clearLocation = payload.unsetLocation;
+  delete payload.unsetLocation;
 
   // Lab role users can only update their own lab
   const filter = req.user.role === 'lab'
     ? { _id: req.params.id, owners: req.user._id }
     : { _id: req.params.id };
 
-  const lab = await Lab.findOneAndUpdate(filter, payload, { new: true, runValidators: true });
+  const update = clearLocation ? { $set: payload, $unset: { location: '' } } : payload;
+  const lab = await Lab.findOneAndUpdate(filter, update, { new: true, runValidators: true });
   if (!lab) return res.status(req.user.role === 'lab' ? 403 : 404).json({ message: req.user.role === 'lab' ? 'Not your lab' : 'Lab not found' });
   await syncObjects('labs', [labRecord(lab)]);
   res.json(lab);
@@ -118,12 +165,41 @@ exports.rejectLab = asyncHandler(async (req, res) => {
   res.json(lab);
 });
 
+// GET /api/v1/labs/nearby — with lat/lng: geospatial $geoNear, sorted nearest-first,
+// scoped to a configurable radius (defaults to 10km; frontend offers 5/10/25/50km).
+// Without lat/lng (permission denied / unsupported): falls back to the existing
+// city-substring search, unchanged, sorted by rating.
 exports.nearbyLabs = asyncHandler(async (req, res) => {
-  const { city } = req.query;
+  const { city, lat, lng, limit = 50 } = req.query;
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  let { radiusKm } = req.query;
+  radiusKm = RADIUS_OPTIONS_KM.includes(Number(radiusKm)) ? Number(radiusKm) : DEFAULT_RADIUS_KM;
+
+  const latNum = Number(lat);
+  const lngNum = Number(lng);
+  const hasCoords = lat !== undefined && lng !== undefined && !Number.isNaN(latNum) && !Number.isNaN(lngNum);
+
+  if (hasCoords) {
+    const labs = await Lab.aggregate([
+      {
+        $geoNear: {
+          near: { type: 'Point', coordinates: [lngNum, latNum] },
+          distanceField: 'distanceMeters',
+          maxDistance: radiusKm * 1000,
+          spherical: true,
+          query: { approved: true },
+        },
+      },
+      { $addFields: { distanceKm: { $round: [{ $divide: ['$distanceMeters', 1000] }, 2] } } },
+      { $limit: safeLimit },
+    ]);
+    return res.json({ items: labs, radiusKm, sortedBy: 'distance' });
+  }
+
   const labs = await Lab.find(city ? { city: new RegExp(city, 'i'), approved: true } : { approved: true })
     .sort('-ratingAvg')
-    .limit(20);
-  res.json(labs);
+    .limit(safeLimit);
+  res.json({ items: labs, radiusKm: null, sortedBy: 'rating' });
 });
 
 exports.compareLabs = asyncHandler(async (req, res) => {
@@ -145,10 +221,10 @@ exports.bulkDeleteLabs = asyncHandler(async (req, res) => {
 // GET /api/v1/labs/demo-csv — public, returns a downloadable template
 exports.labDemoCsv = (req, res) => {
   const rows = [
-    'name,address,area,city,state,pincode,phone,email,homeCollection,featured,description',
-    'Vijay Diagnostics,Shop 12 Hazratganj Market,Hazratganj,Lucknow,Uttar Pradesh,226001,9876543210,vijay@example.com,true,false,NABL certified diagnostic centre',
-    'Apollo Diagnostics,Plot 5 Sector A,Gomti Nagar,Lucknow,Uttar Pradesh,226010,9876543211,apollo@example.com,true,true,Premium diagnostics with home collection',
-    'SRL Diagnostics,Civil Lines Road,Civil Lines,Lucknow,Uttar Pradesh,226001,9876543212,srl@example.com,true,false,Trusted pathology services',
+    'name,address,area,city,state,pincode,phone,email,homeCollection,featured,description,lat,lng',
+    'Vijay Diagnostics,Shop 12 Hazratganj Market,Hazratganj,Lucknow,Uttar Pradesh,226001,9876543210,vijay@example.com,true,false,NABL certified diagnostic centre,26.8467,80.9462',
+    'Apollo Diagnostics,Plot 5 Sector A,Gomti Nagar,Lucknow,Uttar Pradesh,226010,9876543211,apollo@example.com,true,true,Premium diagnostics with home collection,26.8500,80.9950',
+    'SRL Diagnostics,Civil Lines Road,Civil Lines,Lucknow,Uttar Pradesh,226001,9876543212,srl@example.com,true,false,Trusted pathology services,26.8600,80.9200',
   ].join('\n');
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="labs-template.csv"');
@@ -182,8 +258,7 @@ exports.bulkUploadLabsCsv = asyncHandler(async (req, res) => {
         // else: skip silently — brand not found, lab created without brand
       }
 
-      const slug = makeSlug(`${row.name}-${row.city || ''}-${Date.now()}`);
-      const lab = await Lab.create({
+      const labData = {
         name: row.name,
         brand: brandId,
         address: row.address || '',
@@ -196,6 +271,15 @@ exports.bulkUploadLabsCsv = asyncHandler(async (req, res) => {
         homeCollection: row.homecollection === 'true' || row.homecollection === '1',
         featured: row.featured === 'true' || row.featured === '1',
         description: row.description || '',
+      };
+      if (row.lat !== undefined && row.lat !== '') labData.lat = row.lat;
+      if (row.lng !== undefined && row.lng !== '') labData.lng = row.lng;
+      const geoError = applyLabGeoFields(labData);
+      if (geoError) { errors.push({ row: i + 2, error: geoError }); continue; }
+
+      const slug = makeSlug(`${row.name}-${row.city || ''}-${Date.now()}`);
+      const lab = await Lab.create({
+        ...labData,
         slug,
         approved: true,
         verificationStatus: 'verified',
@@ -234,7 +318,7 @@ exports.exportLabsCsv = asyncHandler(async (req, res) => {
 
   const headers = [
     'name','brand','city','state','address','area','pincode',
-    'phone','email','phones','emails',
+    'phone','email','phones','emails','lat','lng',
     'homeCollection','featured','accreditation',
     'verificationStatus','approved','ratingAvg','reviewCount',
     'sampleCollectionTime','reportDeliveryTime','description',
@@ -247,6 +331,7 @@ exports.exportLabsCsv = asyncHandler(async (req, res) => {
     l.address || '', l.area || '', l.pincode || '',
     l.phone || '', l.email || '',
     (l.phones || []).join('|'), (l.emails || []).join('|'),
+    l.lat ?? '', l.lng ?? '',
     l.homeCollection ? 'Yes' : 'No',
     l.featured ? 'Yes' : 'No',
     (l.accreditation || []).join('|'),

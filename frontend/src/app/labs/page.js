@@ -8,8 +8,10 @@ import Pagination from '@/components/ui/Pagination';
 import { PageLoader } from '@/components/ui/Spinner';
 import { labApi } from '@/lib/api';
 import { getErrorMessage } from '@/utils/helpers';
-import { FiFilter, FiX, FiGitMerge } from 'react-icons/fi';
+import { FiFilter, FiX, FiGitMerge, FiCrosshair, FiSearch, FiMapPin } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+
+const RADIUS_OPTIONS_KM = [5, 10, 25, 50];
 
 export default function LabsPage() {
   const router = useRouter();
@@ -22,15 +24,31 @@ export default function LabsPage() {
   const [compareIds, setCompareIds] = useState([]);
   const limit = 12;
 
+  // ── Nearest-labs state ──────────────────────────────────────────────────────
+  const [mode, setMode] = useState('browse'); // 'browse' (city/filters) | 'nearby' (geo)
+  const [coords, setCoords] = useState(null); // { lat, lng }
+  const [radiusKm, setRadiusKm] = useState(10);
+  const [locating, setLocating] = useState(false);
+  const [locationDenied, setLocationDenied] = useState(false);
+  const [manualQuery, setManualQuery] = useState(''); // PIN code / city / address fallback
+  const [geocoding, setGeocoding] = useState(false);
+
   const fetchLabs = async () => {
     setLoading(true);
     try {
-      const params = { page, limit, approved: true };
-      if (filters.city) params.city = filters.city;
-      if (filters.homeCollection) params.homeCollection = filters.homeCollection;
-      const res = await labApi.getAll(params);
-      setLabs(res.data.items || res.data.labs || []);
-      setTotal(res.data.total || 0);
+      if (mode === 'nearby' && coords) {
+        const res = await labApi.getNearby({ lat: coords.lat, lng: coords.lng, radiusKm, limit: 100 });
+        const items = res.data.items || [];
+        setLabs(items);
+        setTotal(items.length);
+      } else {
+        const params = { page, limit, approved: true };
+        if (filters.city) params.city = filters.city;
+        if (filters.homeCollection) params.homeCollection = filters.homeCollection;
+        const res = await labApi.getAll(params);
+        setLabs(res.data.items || res.data.labs || []);
+        setTotal(res.data.total || 0);
+      }
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -38,7 +56,56 @@ export default function LabsPage() {
     }
   };
 
-  useEffect(() => { fetchLabs(); }, [page, filters]);
+  useEffect(() => { fetchLabs(); }, [page, filters, mode, coords, radiusKm]);
+
+  // Auto-prompt for location on load — browser shows its native permission dialog;
+  // if the user denies or it's unavailable, we silently fall back to manual search.
+  useEffect(() => { detectLocation(); }, []);
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) { setLocationDenied(true); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setMode('nearby');
+        setLocationDenied(false);
+        setLocating(false);
+      },
+      () => { setLocationDenied(true); setLocating(false); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // Fallback for denied/unavailable geolocation — geocode a PIN code / city / address
+  // via Nominatim, then run the same nearby-radius search around that point.
+  const searchManualLocation = async (e) => {
+    e.preventDefault();
+    if (!manualQuery.trim()) return;
+    setGeocoding(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=in&q=${encodeURIComponent(manualQuery)}`
+      );
+      const data = await res.json();
+      if (!data.length) {
+        toast.error('Could not find that location — try a different PIN code, city, or address');
+        return;
+      }
+      setCoords({ lat: Number(data[0].lat), lng: Number(data[0].lon) });
+      setMode('nearby');
+    } catch {
+      toast.error('Location lookup failed. Please try again.');
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  const backToBrowse = () => {
+    setMode('browse');
+    setCoords(null);
+    setPage(1);
+  };
 
   const handleFilter = (key, value) => {
     setFilters((f) => ({ ...f, [key]: value }));
@@ -65,7 +132,9 @@ export default function LabsPage() {
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Diagnostic Labs</h1>
-            <p className="text-gray-500 text-sm mt-1">{total} labs available</p>
+            <p className="text-gray-500 text-sm mt-1">
+              {mode === 'nearby' ? `${total} labs within ${radiusKm} km of you` : `${total} labs available`}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             {compareIds.length > 0 && (
@@ -79,16 +148,78 @@ export default function LabsPage() {
                 </button>
               </div>
             )}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 btn-secondary text-sm"
-            >
-              <FiFilter /> Filters
-            </button>
+            {mode === 'browse' && (
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 btn-secondary text-sm"
+              >
+                <FiFilter /> Filters
+              </button>
+            )}
           </div>
         </div>
 
-        {showFilters && (
+        {/* Nearest-labs panel */}
+        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+          {mode === 'nearby' ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="flex items-center gap-1.5 text-sm font-semibold text-primary-700">
+                <FiCrosshair /> Showing nearest labs first
+              </span>
+              <div className="flex items-center gap-1.5 ml-1">
+                {RADIUS_OPTIONS_KM.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setRadiusKm(r)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                      radiusKm === r ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {r} km
+                  </button>
+                ))}
+              </div>
+              <button onClick={backToBrowse} className="text-sm text-gray-400 hover:text-gray-600 underline ml-auto">
+                Search by city / PIN code instead
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div className="flex flex-wrap items-center gap-3 mb-1">
+                <button
+                  onClick={detectLocation}
+                  disabled={locating}
+                  className="flex items-center gap-2 btn-primary text-sm disabled:opacity-60"
+                >
+                  <FiCrosshair /> {locating ? 'Detecting your location…' : 'Use my current location'}
+                </button>
+                <span className="text-xs text-gray-400">or search manually below</span>
+              </div>
+              {locationDenied && (
+                <p className="text-xs text-amber-600 mb-3">
+                  Location access denied or unavailable — search by PIN code, city, or address instead.
+                </p>
+              )}
+              <form onSubmit={searchManualLocation} className="flex gap-2 max-w-md mt-2">
+                <div className="relative flex-1">
+                  <FiMapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+                  <input
+                    type="text"
+                    value={manualQuery}
+                    onChange={(e) => setManualQuery(e.target.value)}
+                    placeholder="Enter PIN code, city, or address"
+                    className="input pl-9 text-sm w-full"
+                  />
+                </div>
+                <button type="submit" disabled={geocoding} className="btn-secondary text-sm flex items-center gap-2 disabled:opacity-60">
+                  <FiSearch /> {geocoding ? 'Searching…' : 'Search'}
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+
+        {showFilters && mode === 'browse' && (
           <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
@@ -133,7 +264,11 @@ export default function LabsPage() {
         {loading ? (
           <PageLoader />
         ) : labs.length === 0 ? (
-          <div className="text-center py-20 text-gray-500">No labs found. Try different filters.</div>
+          <div className="text-center py-20 text-gray-500">
+            {mode === 'nearby'
+              ? `No labs found within ${radiusKm} km. Try a larger radius.`
+              : 'No labs found. Try different filters.'}
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -146,7 +281,9 @@ export default function LabsPage() {
                 />
               ))}
             </div>
-            <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
+            {mode === 'browse' && (
+              <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
+            )}
           </>
         )}
       </main>

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { labApi, brandApi, userApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
@@ -13,6 +14,12 @@ import {
   FiPlus, FiCheckCircle, FiXCircle, FiEdit, FiStar,
   FiSearch, FiUploadCloud, FiDownload, FiEye, FiMail, FiPhone, FiMapPin, FiLayers, FiChevronDown, FiX, FiFilePlus,
 } from 'react-icons/fi';
+
+// Leaflet touches `window` on import, so it must never be part of the SSR render pass.
+const LabLocationPicker = dynamic(() => import('@/components/admin/LabLocationPicker'), {
+  ssr: false,
+  loading: () => <div className="h-[260px] rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-400">Loading map…</div>,
+});
 
 // ── Searchable multi-select for Lab Assistants ────────────────────────────────
 function AssistantSelect({ users, selected, onChange }) {
@@ -152,6 +159,8 @@ function LabForm({ initial, onSave, onClose }) {
     city: initial?.city || '',
     state: initial?.state || '',
     pincode: initial?.pincode || '',
+    lat: initial?.lat ?? null,
+    lng: initial?.lng ?? null,
     phone: initial?.phone || '',
     email: initial?.email || '',
     homeCollection: initial?.homeCollection || false,
@@ -307,6 +316,13 @@ function LabForm({ initial, onSave, onClose }) {
           />
         </div>
       </div>
+
+      <LabLocationPicker
+        lat={form.lat}
+        lng={form.lng}
+        onChange={({ lat, lng }) => setForm((f) => ({ ...f, lat, lng }))}
+      />
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
