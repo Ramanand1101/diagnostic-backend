@@ -28,6 +28,7 @@ router.post('/:id/notify-employee', protect, allowModule('corporate', 'edit'), a
 
 router.post('/:id/report', protect, allowModule('corporate', 'edit'), reportUpload.single('file'), appt.uploadReport);
 router.patch('/:id/report/mark-done', protect, allowModule('corporate', 'edit'), appt.markReportDone);
+router.post('/:id/report/remind', protect, allowModule('corporate', 'edit'), appt.sendReportReminder);
 router.get('/:id/report-url', protect, allowModule('corporate', 'view', ...viewOwn), appt.getReportUrl);
 
 module.exports = router;

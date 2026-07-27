@@ -70,6 +70,8 @@ const corporateAppointmentSchema = new mongoose.Schema({
   // 'complete' = every test is in the report — this is what unlocks billing.
   reportStatus: { type: String, enum: ['none', 'partial', 'complete'], default: 'none' },
   missingTests: [String],
+  // Last time an admin manually re-nudged the lab about missing tests via "Send Reminder"
+  reportReminderSentAt: Date,
 
   // Set once billed on a CorporateInvoice, so it isn't double-billed
   invoiced: { type: Boolean, default: false, index: true },

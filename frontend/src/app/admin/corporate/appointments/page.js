@@ -279,6 +279,17 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
     finally { setUploadingReport(false); }
   };
 
+  const [reminding, setReminding] = useState(false);
+  const handleSendReminder = async () => {
+    setReminding(true);
+    try {
+      await corporateAppointmentApi.sendReportReminder(appointment._id);
+      toast.success(`Reminder sent to ${a.lab?.name || 'the lab'}`);
+      onChanged();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setReminding(false); }
+  };
+
   const handleDownloadReport = async () => {
     try {
       const res = await corporateAppointmentApi.getReportUrl(appointment._id);
@@ -397,15 +408,23 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
                   <FiDownload size={11} /> Download
                 </button>
                 {a.reportStatus === 'partial' && (
-                  <button onClick={handleMarkDone} disabled={uploadingReport} className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
-                    ✓ Mark as Done
-                  </button>
+                  <>
+                    <button onClick={handleSendReminder} disabled={reminding} className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50 flex items-center gap-1">
+                      <FiMail size={11} /> {reminding ? 'Sending…' : 'Send Reminder'}
+                    </button>
+                    <button onClick={handleMarkDone} disabled={uploadingReport} className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                      ✓ Mark as Done
+                    </button>
+                  </>
                 )}
               </div>
             )}
             {a.reportStatus === 'partial' && (a.missingTests || []).length > 0 && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 Still missing: <span className="font-semibold">{a.missingTests.join(', ')}</span> — lab has been notified. Billing is on hold until the report is marked complete.
+                {a.reportReminderSentAt && (
+                  <span className="block mt-1 text-amber-600">Last reminded {formatDate(a.reportReminderSentAt)}</span>
+                )}
               </p>
             )}
 

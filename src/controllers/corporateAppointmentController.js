@@ -610,6 +610,40 @@ exports.markReportDone = asyncHandler(async (req, res) => {
   res.json(appointment);
 });
 
+// POST /:id/report/remind — admin manually re-nudges the lab about tests still missing
+// from a partial report (the automatic email only fires once, at upload time)
+exports.sendReportReminder = asyncHandler(async (req, res) => {
+  const appointment = await CorporateAppointment.findById(req.params.id).populate('lab', 'name email');
+  if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+  if (appointment.reportStatus !== 'partial') {
+    return res.status(400).json({ message: 'This appointment does not have a partial report awaiting completion.' });
+  }
+  if (!appointment.missingTests?.length) {
+    return res.status(400).json({ message: 'No missing tests are recorded for this appointment.' });
+  }
+  if (!appointment.lab?.email) {
+    return res.status(400).json({ message: 'This lab has no email address on file to send a reminder to.' });
+  }
+
+  await queueEmail({
+    to: appointment.lab.email,
+    subject: `Reminder: Report still pending — ${appointment.appointmentNo}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+        <h2 style="color:#b45309">Reminder — Report Still Pending</h2>
+        <p>This is a follow-up reminder for appointment <strong>${appointment.appointmentNo}</strong> (${appointment.employee?.name || ''}).</p>
+        <p>The following test(s) are still pending — please send the remaining report at the earliest:</p>
+        <ul>${appointment.missingTests.map((t) => `<li>${t}</li>`).join('')}</ul>
+      </div>`,
+  });
+
+  appointment.reportReminderSentAt = new Date();
+  await appointment.save();
+
+  logActivity({ actor: req.user, action: 'report.reminder_sent', entity: 'CorporateAppointment', entityId: appointment._id, description: `${req.user.name} sent a manual reminder to ${appointment.lab.name} about missing tests (${appointment.missingTests.join(', ')}) for ${appointment.appointmentNo}` });
+  res.json(appointment);
+});
+
 // GET /:id/report-url — short-lived signed download URL for the uploaded report
 exports.getReportUrl = asyncHandler(async (req, res) => {
   const appointment = await CorporateAppointment.findById(req.params.id);

@@ -152,6 +152,7 @@ export const corporateAppointmentApi = {
     return api.post(`/corporate-appointments/${id}/report`, fd);
   },
   markReportDone: (id) => api.patch(`/corporate-appointments/${id}/report/mark-done`),
+  sendReportReminder: (id) => api.post(`/corporate-appointments/${id}/report/remind`),
   getReportUrl: (id) => api.get(`/corporate-appointments/${id}/report-url`),
 };
 
