@@ -12,6 +12,8 @@ router.get('/:id', protect, allowModule('bookings', 'view', 'customer', 'lab', '
 router.patch('/:id/status', protect, allowModule('bookings', 'edit', 'lab'), controller.updateBookingStatus);
 router.patch('/:id/paid', protect, allowModule('bookings', 'edit', 'lab'), controller.markPaid);
 router.patch('/:id/edit', protect, allowModule('bookings', 'edit'), controller.updateBooking);
+router.patch('/:id/report/mark-done', protect, allowModule('bookings', 'edit', 'lab'), controller.markReportDone);
+router.post('/:id/report/remind', protect, allowModule('bookings', 'edit', 'lab'), controller.sendReportReminder);
 router.patch('/:id/restore', protect, allowModule('bookings', 'edit'), controller.restoreBooking);
 router.delete('/:id', protect, allowModule('bookings', 'delete'), controller.deleteBooking);
 

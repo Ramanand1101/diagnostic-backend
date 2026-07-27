@@ -7,6 +7,7 @@ const Counter = require('../models/Counter');
 const { queueEmail } = require('../queues/index');
 const { sendSms, sendWhatsapp } = require('../config/sms');
 const { WARNING_MESSAGES, computeBookingWarnings } = require('../utils/bookingWarnings');
+const { logActivity } = require('../utils/activityLog');
 
 // Atomic, collision-safe booking number — DDMMYYYY-1550 (resets per day, starts at 1550)
 async function nextBookingNo() {
@@ -302,6 +303,56 @@ exports.updateBooking = asyncHandler(async (req, res) => {
   const booking = await Booking.findByIdAndUpdate(req.params.id, update, { new: true })
     .populate('user lab items.product');
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  res.json(booking);
+});
+
+// PATCH /api/v1/bookings/:id/report/mark-done — admin/lab confirms a previously-partial
+// report is now complete (e.g. the missing test result arrived separately).
+exports.markReportDone = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  if (booking.reportStatus !== 'partial') {
+    return res.status(400).json({ message: 'This booking does not have a partial report awaiting completion.' });
+  }
+
+  booking.reportStatus = 'complete';
+  booking.missingTests = [];
+  if (!['cancelled', 'refunded'].includes(booking.status)) booking.status = 'completed';
+  await booking.save();
+  logActivity({ actor: req.user, action: 'report.marked_done', entity: 'Booking', entityId: booking._id, description: `${req.user.name} marked the report for booking ${booking.bookingNo} as complete` });
+  res.json(booking);
+});
+
+// POST /api/v1/bookings/:id/report/remind — admin/lab manually re-nudges about tests
+// still missing from a partial report (the automatic email only fires once, at upload time)
+exports.sendReportReminder = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id).populate('lab', 'name email');
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  if (booking.reportStatus !== 'partial') {
+    return res.status(400).json({ message: 'This booking does not have a partial report awaiting completion.' });
+  }
+  if (!booking.missingTests?.length) {
+    return res.status(400).json({ message: 'No missing tests are recorded for this booking.' });
+  }
+  if (!booking.lab?.email) {
+    return res.status(400).json({ message: 'This lab has no email address on file to send a reminder to.' });
+  }
+
+  await queueEmail({
+    to: booking.lab.email,
+    subject: `Reminder: Report still pending — ${booking.bookingNo}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+        <h2 style="color:#b45309">Reminder — Report Still Pending</h2>
+        <p>This is a follow-up reminder for booking <strong>${booking.bookingNo}</strong>.</p>
+        <p>The following test(s) are still pending — please send the remaining report at the earliest:</p>
+        <ul>${booking.missingTests.map((t) => `<li>${t}</li>`).join('')}</ul>
+      </div>`,
+  });
+
+  booking.reportReminderSentAt = new Date();
+  await booking.save();
+  logActivity({ actor: req.user, action: 'report.reminder_sent', entity: 'Booking', entityId: booking._id, description: `${req.user.name} sent a manual reminder to ${booking.lab.name} about missing tests (${booking.missingTests.join(', ')}) for booking ${booking.bookingNo}` });
   res.json(booking);
 });
 

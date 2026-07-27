@@ -1,13 +1,13 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { bookingApi } from '@/lib/api';
+import { bookingApi, reportApi } from '@/lib/api';
 import { formatDate, formatCurrency, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
-import { FiEye, FiSearch, FiEdit, FiTrash2, FiRotateCcw, FiMapPin, FiCalendar, FiClock } from 'react-icons/fi';
+import { FiEye, FiSearch, FiEdit, FiTrash2, FiRotateCcw, FiMapPin, FiCalendar, FiClock, FiFileText, FiDownload, FiUploadCloud, FiMail } from 'react-icons/fi';
 
 // Standard slot groups (same as cart page)
 const SLOT_GROUPS = [
@@ -155,6 +155,201 @@ function EditBookingModal({ booking, onSave, onClose }) {
   );
 }
 
+// ── View/status/report modal ──────────────────────────────────────────────────
+function BookingDetailModal({ booking, statuses, onClose, onChanged }) {
+  const [newStatus, setNewStatus] = useState(booking.status);
+  const [reports, setReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(true);
+  const [reportFile, setReportFile] = useState(null);
+  const [reportType, setReportType] = useState('complete');
+  const [missingSelected, setMissingSelected] = useState([]);
+  const [uploadingReport, setUploadingReport] = useState(false);
+  const [reminding, setReminding] = useState(false);
+  const reportFileRef = useRef(null);
+
+  const fetchReports = useCallback(() => {
+    setLoadingReports(true);
+    reportApi.getAll({ booking: booking._id })
+      .then((res) => setReports(res.data.items || []))
+      .finally(() => setLoadingReports(false));
+  }, [booking._id]);
+
+  useEffect(() => { fetchReports(); }, [fetchReports]);
+
+  const toggleMissing = (name) => {
+    setMissingSelected((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!newStatus) return;
+    try {
+      await bookingApi.updateStatus(booking._id, { status: newStatus });
+      toast.success('Status updated!');
+      onChanged();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const handleUploadReport = async () => {
+    if (!reportFile) return toast.error('Choose a file first');
+    if (reportType === 'partial' && missingSelected.length === 0) return toast.error('Select which test(s) are still missing');
+    setUploadingReport(true);
+    try {
+      await reportApi.uploadForBooking(booking._id, reportFile, { type: reportType, missingTests: missingSelected });
+      toast.success(reportType === 'partial' ? 'Partial report uploaded — lab notified of missing tests' : 'Report uploaded');
+      setReportFile(null);
+      setMissingSelected([]);
+      if (reportFileRef.current) reportFileRef.current.value = '';
+      fetchReports();
+      onChanged();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setUploadingReport(false); }
+  };
+
+  const handleMarkDone = async () => {
+    setUploadingReport(true);
+    try {
+      await bookingApi.markReportDone(booking._id);
+      toast.success('Report marked complete');
+      onChanged();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setUploadingReport(false); }
+  };
+
+  const handleSendReminder = async () => {
+    setReminding(true);
+    try {
+      await bookingApi.sendReportReminder(booking._id);
+      toast.success(`Reminder sent to ${booking.lab?.name || 'the lab'}`);
+      onChanged();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setReminding(false); }
+  };
+
+  const handleDownload = async (reportId) => {
+    try {
+      const res = await reportApi.getDownloadUrl(reportId);
+      window.open(res.data.url, '_blank');
+    } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const b = booking;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <div><p className="text-gray-400">Customer</p><p className="font-medium">{b.user?.name || b.guest?.name}</p>{b.user?.mobile && <p className="text-xs text-gray-400">{b.user.mobile}</p>}</div>
+        <div><p className="text-gray-400">Lab</p><p className="font-medium">{b.lab?.name || '—'}</p>{b.lab?.city && <p className="text-xs text-gray-400">{b.lab.city}</p>}</div>
+        <div><p className="text-gray-400">Total</p><p className="font-medium">{formatCurrency(b.total)}</p></div>
+        <div><p className="text-gray-400">Date</p><p className="font-medium">{formatDate(b.slotDate)}</p></div>
+        <div><p className="text-gray-400">Visit</p><p className="font-medium capitalize">{b.visitType}</p></div>
+        {b.cancelledByName && (
+          <div><p className="text-gray-400">Cancelled By</p><p className="font-medium text-red-600">{b.cancelledByName}</p></div>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Update Status</label>
+        <div className="flex gap-2">
+          <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="input flex-1">
+            {statuses.map((s) => <option key={s} value={s} className="capitalize">{s}</option>)}
+          </select>
+          <button onClick={handleStatusUpdate} className="btn-primary text-sm px-4">Update</button>
+        </div>
+      </div>
+
+      {/* Test Report */}
+      <div>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">Test Report</p>
+        <div className="space-y-3">
+          {!loadingReports && reports.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {reports.map((r) => (
+                <div key={r._id} className="flex items-center gap-2 flex-wrap">
+                  <span className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5">
+                    <FiFileText size={12} /> {r.fileName || 'report.pdf'}
+                  </span>
+                  <button onClick={() => handleDownload(r._id)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-primary-600 hover:border-primary-300 flex items-center gap-1">
+                    <FiDownload size={11} /> Download
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {b.reportStatus && b.reportStatus !== 'none' && (
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${b.reportStatus === 'complete' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                {b.reportStatus === 'complete' ? 'Complete' : 'Partial'}
+              </span>
+            )}
+            {b.reportStatus === 'partial' && (
+              <>
+                <button onClick={handleSendReminder} disabled={reminding} className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50 flex items-center gap-1">
+                  <FiMail size={11} /> {reminding ? 'Sending…' : 'Send Reminder'}
+                </button>
+                <button onClick={handleMarkDone} disabled={uploadingReport} className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                  ✓ Mark as Done
+                </button>
+              </>
+            )}
+          </div>
+
+          {b.reportStatus === 'partial' && (b.missingTests || []).length > 0 && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Still missing: <span className="font-semibold">{b.missingTests.join(', ')}</span> — lab has been notified.
+              {b.reportReminderSentAt && (
+                <span className="block mt-1 text-amber-600">Last reminded {formatDate(b.reportReminderSentAt)}</span>
+              )}
+            </p>
+          )}
+
+          <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+            <div className="flex gap-4">
+              <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                <input type="radio" checked={reportType === 'complete'} onChange={() => { setReportType('complete'); setMissingSelected([]); }} className="text-primary-600" />
+                Complete Report
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                <input type="radio" checked={reportType === 'partial'} onChange={() => setReportType('partial')} className="text-primary-600" />
+                Partial Report
+              </label>
+            </div>
+
+            {reportType === 'partial' && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Tick the test(s) still missing from this upload:</p>
+                <div className="flex flex-wrap gap-2">
+                  {(b.items || []).map((item) => (
+                    <label key={item.name} className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-full px-2.5 py-1 cursor-pointer">
+                      <input type="checkbox" checked={missingSelected.includes(item.name)} onChange={() => toggleMissing(item.name)} className="text-amber-600" />
+                      {item.name}
+                    </label>
+                  ))}
+                  {(b.items || []).length === 0 && <p className="text-xs text-gray-400">No tests listed on this booking.</p>}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <input ref={reportFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                onChange={(e) => setReportFile(e.target.files?.[0] || null)}
+                className="text-xs flex-1" />
+              <button onClick={handleUploadReport} disabled={uploadingReport || !reportFile}
+                className="text-xs px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 flex items-center gap-1 whitespace-nowrap">
+                <FiUploadCloud size={11} /> {uploadingReport ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-3 justify-end pt-1">
+        <button onClick={onClose} className="btn-secondary">Close</button>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -165,7 +360,6 @@ export default function AdminBookingsPage() {
   const [q, setQ] = useState('');
   const [viewBooking, setViewBooking] = useState(null);
   const [editBooking, setEditBooking] = useState(null);
-  const [newStatus, setNewStatus] = useState('');
   const [limit, setLimit] = useState(20);
   const searchTimer = useRef(null);
 
@@ -187,16 +381,6 @@ export default function AdminBookingsPage() {
     clearTimeout(searchTimer.current);
     const val = e.target.value;
     searchTimer.current = setTimeout(() => { setQ(val); setPage(1); }, 400);
-  };
-
-  const handleStatusUpdate = async () => {
-    if (!newStatus) return;
-    try {
-      await bookingApi.updateStatus(viewBooking._id, { status: newStatus });
-      toast.success('Status updated!');
-      setViewBooking(null);
-      fetchBookings();
-    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const handleMarkPaid = async (id) => {
@@ -310,7 +494,7 @@ export default function AdminBookingsPage() {
                       <div className="flex gap-2 items-center">
                         {!showDeleted && (
                           <>
-                            <button onClick={() => { setViewBooking(b); setNewStatus(b.status); }} title="View" className="text-gray-400 hover:text-primary-600"><FiEye /></button>
+                            <button onClick={() => setViewBooking(b)} title="View" className="text-gray-400 hover:text-primary-600"><FiEye /></button>
                             <button onClick={() => setEditBooking(b)} title="Reschedule" className="text-gray-400 hover:text-primary-600"><FiEdit /></button>
                             <button onClick={() => handleDelete(b._id)} title="Delete" className="text-gray-400 hover:text-red-600"><FiTrash2 /></button>
                             {b.paymentStatus === 'unpaid' && (
@@ -338,30 +522,18 @@ export default function AdminBookingsPage() {
       <Pagination page={page} total={total} limit={limit} onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />
 
       {/* View/Status Modal */}
-      <Modal open={!!viewBooking} onClose={() => setViewBooking(null)} title={`Booking #${viewBooking?.bookingNo}`}>
+      <Modal open={!!viewBooking} onClose={() => setViewBooking(null)} title={`Booking #${viewBooking?.bookingNo}`} size="lg">
         {viewBooking && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><p className="text-gray-400">Customer</p><p className="font-medium">{viewBooking.user?.name || viewBooking.guest?.name}</p>{viewBooking.user?.mobile && <p className="text-xs text-gray-400">{viewBooking.user.mobile}</p>}</div>
-              <div><p className="text-gray-400">Lab</p><p className="font-medium">{viewBooking.lab?.name || '—'}</p>{viewBooking.lab?.city && <p className="text-xs text-gray-400">{viewBooking.lab.city}</p>}</div>
-              <div><p className="text-gray-400">Total</p><p className="font-medium">{formatCurrency(viewBooking.total)}</p></div>
-              <div><p className="text-gray-400">Date</p><p className="font-medium">{formatDate(viewBooking.slotDate)}</p></div>
-              <div><p className="text-gray-400">Visit</p><p className="font-medium capitalize">{viewBooking.visitType}</p></div>
-              {viewBooking.cancelledByName && (
-                <div><p className="text-gray-400">Cancelled By</p><p className="font-medium text-red-600">{viewBooking.cancelledByName}</p></div>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Update Status</label>
-              <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="input">
-                {statuses.map((s) => <option key={s} value={s} className="capitalize">{s}</option>)}
-              </select>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setViewBooking(null)} className="btn-secondary">Close</button>
-              <button onClick={handleStatusUpdate} className="btn-primary">Update Status</button>
-            </div>
-          </div>
+          <BookingDetailModal
+            booking={viewBooking}
+            statuses={statuses}
+            onClose={() => setViewBooking(null)}
+            onChanged={async () => {
+              const res = await bookingApi.getById(viewBooking._id);
+              setViewBooking(res.data);
+              fetchBookings();
+            }}
+          />
         )}
       </Modal>
 

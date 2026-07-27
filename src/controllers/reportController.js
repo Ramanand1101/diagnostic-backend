@@ -1,12 +1,15 @@
 const asyncHandler = require('express-async-handler');
 const crypto = require('crypto');
 const { PDFDocument } = require('pdf-lib');
+const { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const Report = require('../models/Report');
 const Booking = require('../models/Booking');
 const User = require('../models/User');
 const Lab = require('../models/Lab');
 const { s3, bucket } = require('../config/s3');
 const { sendMail } = require('../config/email');
+const { queueEmail } = require('../queues/index');
 
 async function compressPdf(buffer) {
   try {
@@ -28,6 +31,19 @@ exports.uploadReport = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(bookingId).populate('user lab');
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
+  // 'partial' = some test(s) still pending (see missingTests) — mirrors the same
+  // partial/complete pattern used for Corporate Appointment reports.
+  const type = req.body.type === 'partial' ? 'partial' : 'complete';
+  let missingTests = [];
+  if (type === 'partial') {
+    try {
+      missingTests = JSON.parse(req.body.missingTests || '[]');
+    } catch {
+      missingTests = String(req.body.missingTests || '').split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    if (!missingTests.length) return res.status(400).json({ message: 'List which tests are still missing for a partial report.' });
+  }
+
   const prefix = process.env.AWS_S3_REPORTS_PREFIX || 'reports';
   const labId = booking.lab?._id || booking.lab;
   const fileStats = [];
@@ -41,7 +57,7 @@ exports.uploadReport = asyncHandler(async (req, res) => {
     const safeName = file.originalname.replace(/\s+/g, '_');
     const storageKey = `${prefix}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeName}`;
 
-    await s3.putObject({
+    await s3.send(new PutObjectCommand({
       Bucket: bucket,
       Key: storageKey,
       Body: compressedBuffer,
@@ -51,7 +67,7 @@ exports.uploadReport = asyncHandler(async (req, res) => {
         bookingId: bookingId.toString(),
         uploadedBy: req.user._id.toString()
       }
-    }).promise();
+    }));
 
     const report = await Report.create({
       booking: bookingId,
@@ -68,6 +84,29 @@ exports.uploadReport = asyncHandler(async (req, res) => {
 
     reports.push(report);
     fileStats.push({ name: file.originalname, originalSize, fileSize });
+  }
+
+  booking.reportStatus = type;
+  booking.missingTests = type === 'partial' ? missingTests : [];
+  if (type === 'complete' && !['cancelled', 'refunded'].includes(booking.status)) booking.status = 'completed';
+  await booking.save();
+
+  if (type === 'partial' && booking.lab?.email) {
+    try {
+      await queueEmail({
+        to: booking.lab.email,
+        subject: `Partial Report Received — ${booking.bookingNo} — tests still pending`,
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+            <h2 style="color:#b45309">Partial Report Received</h2>
+            <p>We received a partial report for booking <strong>${booking.bookingNo}</strong> (${booking.user?.name || booking.guest?.name || ''}).</p>
+            <p>The following test(s) are still pending — please send the remaining report at the earliest:</p>
+            <ul>${missingTests.map((t) => `<li>${t}</li>`).join('')}</ul>
+          </div>`,
+      });
+    } catch (e) {
+      console.error('[Report] partial-report lab email failed:', e.message);
+    }
   }
 
   try {
@@ -135,8 +174,9 @@ exports.listReports = asyncHandler(async (req, res) => {
   } else if (req.user.role === 'lab') {
     const myLab = await Lab.findOne({ owners: req.user._id });
     filter.lab = myLab?._id || null;
-  } else if (req.query.lab) {
-    filter.lab = req.query.lab;
+  } else {
+    if (req.query.lab) filter.lab = req.query.lab;
+    if (req.query.booking) filter.booking = req.query.booking;
   }
 
   const reports = await Report.find(filter)
@@ -162,12 +202,11 @@ exports.getDownloadUrl = asyncHandler(async (req, res) => {
     }
   }
 
-  const url = s3.getSignedUrl('getObject', {
+  const url = await getSignedUrl(s3, new GetObjectCommand({
     Bucket: bucket,
     Key: report.storageKey,
-    Expires: 300,
     ResponseContentDisposition: `attachment; filename="${report.fileName || 'report.pdf'}"`
-  });
+  }), { expiresIn: 300 });
 
   res.json({ url });
 });
@@ -185,7 +224,7 @@ exports.deleteReport = asyncHandler(async (req, res) => {
 
   if (report.storageKey) {
     try {
-      await s3.deleteObject({ Bucket: bucket, Key: report.storageKey }).promise();
+      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: report.storageKey }));
     } catch { /* S3 delete failure should not block DB deletion */ }
   }
 
@@ -203,7 +242,7 @@ exports.replaceReport = asyncHandler(async (req, res) => {
 
   // Delete old S3 file
   if (report.storageKey) {
-    try { await s3.deleteObject({ Bucket: bucket, Key: report.storageKey }).promise(); } catch { /* ignore */ }
+    try { await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: report.storageKey })); } catch { /* ignore */ }
   }
 
   const originalSize = file.buffer.length;
@@ -213,13 +252,13 @@ exports.replaceReport = asyncHandler(async (req, res) => {
   const safeName = file.originalname.replace(/\s+/g, '_');
   const storageKey = `${prefix}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeName}`;
 
-  await s3.putObject({
+  await s3.send(new PutObjectCommand({
     Bucket: bucket,
     Key: storageKey,
     Body: compressedBuffer,
     ContentType: 'application/pdf',
     ACL: 'private',
-  }).promise();
+  }));
 
   const updated = await Report.findByIdAndUpdate(
     req.params.id,

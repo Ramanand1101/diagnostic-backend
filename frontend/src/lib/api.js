@@ -217,12 +217,22 @@ export const bookingApi = {
   editBooking: (id, data) => api.patch(`/bookings/${id}/edit`, data),
   deleteBooking: (id) => api.delete(`/bookings/${id}`),
   restoreBooking: (id) => api.patch(`/bookings/${id}/restore`),
+  markReportDone: (id) => api.patch(`/bookings/${id}/report/mark-done`),
+  sendReportReminder: (id) => api.post(`/bookings/${id}/report/remind`),
 };
 
 // Reports
 export const reportApi = {
   getAll: (params) => api.get('/reports', { params }),
   upload: (data) => api.post('/reports', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  uploadForBooking: (bookingId, file, { type = 'complete', missingTests = [] } = {}) => {
+    const fd = new FormData();
+    fd.append('files', file);
+    fd.append('booking', bookingId);
+    fd.append('type', type);
+    if (type === 'partial') fd.append('missingTests', JSON.stringify(missingTests));
+    return api.post('/reports', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
   getShared: (token) => api.get(`/reports/share/${token}`),
   getDownloadUrl: (id) => api.get(`/reports/${id}/download`),
   deleteReport: (id) => api.delete(`/reports/${id}`),

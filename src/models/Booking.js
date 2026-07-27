@@ -50,6 +50,11 @@ const bookingSchema = new mongoose.Schema({
   cancelledByName: String,
   cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reminderSent: { type: Boolean, default: false },
+  // 'partial' = some tests still pending (see missingTests). 'complete' = every test is in.
+  // Mirrors the same reportStatus/missingTests pattern used on CorporateAppointment.
+  reportStatus: { type: String, enum: ['none', 'partial', 'complete'], default: 'none' },
+  missingTests: [String],
+  reportReminderSentAt: Date,
   isDeleted: { type: Boolean, default: false },
   deletedAt: Date
 }, { timestamps: true });

@@ -33,7 +33,7 @@ export default function AdminReportsPage() {
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append('report', file);
+      formData.append('files', file);
       formData.append('booking', bookingId);
       await reportApi.upload(formData);
       toast.success('Report uploaded!');
