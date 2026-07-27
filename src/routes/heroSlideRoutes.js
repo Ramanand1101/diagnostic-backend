@@ -2,18 +2,18 @@ const router = require('express').Router();
 const asyncHandler = require('express-async-handler');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { protect, allowRoles } = require('../middleware/authMiddleware');
+const { protect, allowModule } = require('../middleware/authMiddleware');
 const { makePublicUpload } = require('../middleware/uploadMiddleware');
 const { s3, bucket } = require('../config/s3');
 const controller = require('../controllers/heroSlideController');
 
 const imageUpload = makePublicUpload(process.env.AWS_S3_HERO_SLIDES_PREFIX || 'hero-slides');
-const adminOnly = [protect, allowRoles('superadmin', 'subadmin')];
+const uploadGate = [protect, allowModule('hero-slides', ['create', 'edit'])];
 
 // Upload image → S3, returns canonical URL (for DB) + presigned URL (for immediate preview)
 router.post(
   '/upload',
-  ...adminOnly,
+  ...uploadGate,
   imageUpload.single('image'),
   asyncHandler(async (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'No image uploaded' });
@@ -33,8 +33,8 @@ router.post(
 );
 
 router.get('/', controller.list);
-router.post('/', ...adminOnly, controller.create);
-router.put('/:id', ...adminOnly, controller.update);
-router.delete('/:id', ...adminOnly, controller.remove);
+router.post('/', protect, allowModule('hero-slides', 'create'), controller.create);
+router.put('/:id', protect, allowModule('hero-slides', 'edit'), controller.update);
+router.delete('/:id', protect, allowModule('hero-slides', 'delete'), controller.remove);
 
 module.exports = router;

@@ -1,11 +1,11 @@
 const router = require('express').Router();
-const { protect, allowRoles } = require('../middleware/authMiddleware');
+const { protect, allowModule } = require('../middleware/authMiddleware');
 const controller = require('../controllers/blogController');
 
 router.get('/', controller.list);
 router.get('/:slug', controller.getBySlug);
-router.post('/', protect, allowRoles('superadmin', 'subadmin'), controller.create);
-router.put('/:id', protect, allowRoles('superadmin', 'subadmin'), controller.update);
-router.delete('/:id', protect, allowRoles('superadmin', 'subadmin'), controller.remove);
+router.post('/', protect, allowModule('blogs', 'create'), controller.create);
+router.put('/:id', protect, allowModule('blogs', 'edit'), controller.update);
+router.delete('/:id', protect, allowModule('blogs', 'delete'), controller.remove);
 
 module.exports = router;

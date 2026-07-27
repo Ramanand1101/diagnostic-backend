@@ -2,13 +2,24 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { sendMail } = require('../config/email');
-const { isValidEmail, isValidPhone } = require('../utils/validators');
+const { isValidEmail, isValidPhone, emailDomain } = require('../utils/validators');
 const { logActivity } = require('../utils/activityLog');
+const { invalidateUserCache } = require('../middleware/authMiddleware');
+
+const HOT_EMPLOYEE_DOMAIN = 'healthontime.in';
 
 // POST /api/v1/users — admin creates a user and emails them a temp password
 exports.createUser = asyncHandler(async (req, res) => {
   const { name, email, mobile, role = 'customer' } = req.body;
   if (!name || !email) return res.status(400).json({ message: 'Name and email are required.' });
+
+  if (role === 'hot_employee' && emailDomain(email) !== HOT_EMPLOYEE_DOMAIN) {
+    return res.status(400).json({ message: `HOT Employee accounts must use an @${HOT_EMPLOYEE_DOMAIN} email address.` });
+  }
+  // Sub Admin is a promotion, not a starting role — create as HOT Employee first, then promote.
+  if (role === 'subadmin') {
+    return res.status(400).json({ message: 'Sub Admin cannot be assigned directly. Create the user as a HOT Employee first, then promote them to Sub Admin.' });
+  }
 
   const exists = await User.findOne({ email: new RegExp(`^${email}$`, 'i') });
   if (exists) return res.status(409).json({ message: 'A user with this email already exists.' });
@@ -110,7 +121,7 @@ exports.listUsers = asyncHandler(async (req, res) => {
 });
 
 exports.updateRole = asyncHandler(async (req, res) => {
-  const VALID_ROLES = ['superadmin', 'subadmin', 'lab', 'corporate', 'employee', 'customer'];
+  const VALID_ROLES = ['superadmin', 'subadmin', 'hot_employee', 'lab', 'corporate', 'employee', 'customer'];
   const { role } = req.body;
   if (!VALID_ROLES.includes(role))
     return res.status(400).json({ message: `Invalid role. Allowed: ${VALID_ROLES.join(', ')}` });
@@ -126,9 +137,25 @@ exports.updateRole = asyncHandler(async (req, res) => {
   if (user.role === 'superadmin' && req.user.role !== 'superadmin')
     return res.status(403).json({ message: 'Cannot change a superadmin\'s role' });
 
+  // Sub Admin is only reachable by promoting an existing HOT Employee
+  if (role === 'subadmin' && user.role !== 'hot_employee') {
+    return res.status(400).json({ message: 'Only HOT Employee accounts can be promoted to Sub Admin. Set the user\'s role to HOT Employee first.' });
+  }
+
+  // HOT Employee accounts must be on the company domain
+  if (role === 'hot_employee' && emailDomain(user.email) !== HOT_EMPLOYEE_DOMAIN) {
+    return res.status(400).json({ message: `HOT Employee accounts must use an @${HOT_EMPLOYEE_DOMAIN} email address.` });
+  }
+
+  // Demoting out of subadmin clears any granted permissions — they'll start fresh if re-promoted
+  if (user.role === 'subadmin' && role !== 'subadmin') {
+    user.permissions = [];
+  }
+
   const oldRole = user.role;
   user.role = role;
   await user.save();
+  await invalidateUserCache(user._id);
   logActivity({ actor: req.user, action: 'user.role_changed', entity: 'User', entityId: user._id, description: `${user.name}'s role changed from ${oldRole} to ${role}` });
   res.json({ message: `Role updated to ${role}`, user: { _id: user._id, name: user.name, role: user.role } });
 });
@@ -150,6 +177,9 @@ exports.updateUserDetails = asyncHandler(async (req, res) => {
   }
   if (email !== undefined && email !== user.email) {
     if (!isValidEmail(email)) return res.status(400).json({ message: 'Enter a valid email address.' });
+    if (user.role === 'hot_employee' && emailDomain(email) !== HOT_EMPLOYEE_DOMAIN) {
+      return res.status(400).json({ message: `HOT Employee accounts must use an @${HOT_EMPLOYEE_DOMAIN} email address.` });
+    }
     const exists = await User.findOne({ email: new RegExp(`^${email}$`, 'i'), _id: { $ne: user._id } });
     if (exists) return res.status(409).json({ message: 'This email is already used by another account.' });
     changes.push(`email: "${user.email || ''}" → "${email}"`);
@@ -166,28 +196,63 @@ exports.updateUserDetails = asyncHandler(async (req, res) => {
   }
 
   await user.save();
+  await invalidateUserCache(user._id);
   if (changes.length) {
     logActivity({ actor: req.user, action: 'user.updated', entity: 'User', entityId: user._id, description: `${req.user.name} updated ${user.name}'s details: ${changes.join(', ')}` });
   }
   res.json({ _id: user._id, name: user.name, email: user.email, mobile: user.mobile, role: user.role });
 });
 
-const VALID_PERMISSIONS = [
-  'labs','brands','products','categories','test-master','bulk-upload',
-  'crm','bookings','reports','lab-changes','users','reviews','tickets',
-  'hero-slides','home-settings','coupons','blogs','newsletter','pages','settings',
-  'corporate',
+const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete'];
+const PERMISSION_MODULES = [
+  { key: 'dashboard',     label: 'Dashboard' },
+  { key: 'labs',          label: 'Labs' },
+  { key: 'brands',        label: 'Brands / Chains' },
+  { key: 'products',      label: 'Products' },
+  { key: 'categories',    label: 'Categories' },
+  { key: 'test-master',   label: 'Test Master List' },
+  { key: 'bulk-upload',   label: 'Bulk Upload' },
+  { key: 'crm',           label: 'CRM' },
+  { key: 'bookings',      label: 'Bookings' },
+  { key: 'reports',       label: 'Reports' },
+  { key: 'lab-changes',   label: 'Lab Profile Changes' },
+  { key: 'users',         label: 'Users' },
+  { key: 'reviews',       label: 'Reviews' },
+  { key: 'tickets',       label: 'Tickets' },
+  { key: 'hero-slides',   label: 'Hero Slides' },
+  { key: 'home-settings', label: 'Home Page CMS' },
+  { key: 'coupons',       label: 'Coupons' },
+  { key: 'blogs',         label: 'Blogs' },
+  { key: 'newsletter',    label: 'Newsletter' },
+  { key: 'pages',         label: 'Pages' },
+  { key: 'settings',      label: 'Settings' },
+  { key: 'corporate',     label: 'Corporate' },
+  { key: 'activity-log',  label: 'Activity Log' },
 ];
+const VALID_MODULE_KEYS = PERMISSION_MODULES.map((m) => m.key);
+
+// GET /api/v1/users/permission-modules — the catalog the frontend renders checkboxes from
+exports.listPermissionModules = asyncHandler(async (req, res) => {
+  res.json({ modules: PERMISSION_MODULES, actions: PERMISSION_ACTIONS });
+});
 
 exports.updatePermissions = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ message: 'User not found' });
   if (user.role !== 'subadmin') return res.status(400).json({ message: 'Permissions can only be set for subadmins' });
+
   const { permissions } = req.body;
-  if (!Array.isArray(permissions)) return res.status(400).json({ message: 'permissions must be an array' });
-  const filtered = permissions.filter((p) => VALID_PERMISSIONS.includes(p));
-  user.permissions = filtered;
+  if (!Array.isArray(permissions)) return res.status(400).json({ message: 'permissions must be an array of { module, actions }.' });
+
+  const cleaned = permissions
+    .filter((p) => p && VALID_MODULE_KEYS.includes(p.module) && Array.isArray(p.actions))
+    .map((p) => ({ module: p.module, actions: p.actions.filter((a) => PERMISSION_ACTIONS.includes(a)) }))
+    .filter((p) => p.actions.length > 0);
+
+  user.permissions = cleaned;
   await user.save();
+  await invalidateUserCache(user._id);
+  logActivity({ actor: req.user, action: 'user.permissions_changed', entity: 'User', entityId: user._id, description: `${req.user.name} updated permissions for ${user.name} (${cleaned.length} module${cleaned.length === 1 ? '' : 's'} granted)` });
   res.json({ message: 'Permissions updated', permissions: user.permissions });
 });
 
@@ -228,6 +293,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   user.password = newPassword;
   user.passwordChangedAt = new Date();
   await user.save({ validateBeforeSave: false });
+  await invalidateUserCache(user._id);
 
   // Send email notification if requested (default true)
   const sendEmail = req.body.sendEmail !== false;

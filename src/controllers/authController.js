@@ -80,10 +80,12 @@ exports.login = asyncHandler(async (req, res) => {
     $or: [{ email: emailOrMobile }, { mobile: emailOrMobile }]
   }).select('+password');
 
-  if (!user || !user.password) return res.status(401).json({ message: 'Invalid credentials' });
+  // Never distinguish "no such user" from "wrong password" — both cases return the exact
+  // same generic message, to prevent an attacker from enumerating valid accounts.
+  if (!user || !user.password) return res.status(401).json({ message: 'Invalid email or password' });
 
   const ok = await user.matchPassword(password);
-  if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
+  if (!ok) return res.status(401).json({ message: 'Invalid email or password' });
 
   // Non-blocking — don't let lastLoginAt update cause a 500
   User.updateOne({ _id: user._id }, { lastLoginAt: new Date() }).catch(() => {});

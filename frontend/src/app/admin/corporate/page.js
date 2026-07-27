@@ -116,7 +116,7 @@ function CorporateForm({ initial, onSave, onClose }) {
     state: initial?.state || '',
     pincode: initial?.pincode || '',
     gstNumber: initial?.gstNumber || '',
-    domains: initial?.domains || [],
+    domains: initial?.domains?.length ? initial.domains : [''],
     creditLimit: initial?.creditLimit ?? 0,
     hr: {
       name: initial?.hr?.name || '',
@@ -146,6 +146,7 @@ function CorporateForm({ initial, onSave, onClose }) {
     if (!form.phone.trim()) return toast.error('Company phone is required');
     if (!PHONE_RE.test(form.phone.trim())) return toast.error('Enter a valid company phone number');
     if (form.pincode && !/^\d{6}$/.test(form.pincode)) return toast.error('Company pincode must be exactly 6 digits');
+    if (!form.domains.filter((d) => d.trim()).length) return toast.error('At least one Allowed Email Domain is required');
     for (const e of form.emails) { if (e && !EMAIL_RE.test(e.trim())) return toast.error(`Extra company email "${e}" is not valid`); }
     for (const p of form.phones) { if (p && !PHONE_RE.test(p.trim())) return toast.error(`Extra company phone "${p}" is not valid`); }
 
@@ -225,8 +226,8 @@ function CorporateForm({ initial, onSave, onClose }) {
           </div>
         </div>
         <div className="mt-3">
-          <MultiField label="Allowed Email Domain(s)" values={form.domains} onChange={(v) => set('domains', v)} placeholder="acme.com" />
-          <p className="text-[11px] text-gray-400 mt-1">If set, company/HR/account-manager emails must use one of these domains.</p>
+          <MultiField label="Allowed Email Domain(s) *" values={form.domains} onChange={(v) => set('domains', v)} placeholder="acme.com" />
+          <p className="text-[11px] text-gray-400 mt-1">Required. Company/HR/account-manager/employee emails must use one of these domains.</p>
         </div>
         <p className="text-[11px] text-gray-400 mt-2">Agreement start/expiry dates are managed from the corporate&apos;s detail view (after saving) under &quot;Agreement History&quot;.</p>
       </div>

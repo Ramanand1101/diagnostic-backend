@@ -1,13 +1,11 @@
 const router = require('express').Router();
-const { protect, allowRoles } = require('../middleware/authMiddleware');
+const { protect, allowModule } = require('../middleware/authMiddleware');
 const pkg = require('../controllers/corporatePackageController');
 
-const adminOnly = allowRoles('superadmin', 'subadmin');
-
-router.get('/', protect, adminOnly, pkg.listPackages);
-router.post('/', protect, adminOnly, pkg.createPackage);
-router.get('/:id', protect, adminOnly, pkg.getPackage);
-router.put('/:id', protect, adminOnly, pkg.updatePackage);
-router.delete('/:id', protect, adminOnly, pkg.deletePackage);
+router.get('/', protect, allowModule('corporate', 'view'), pkg.listPackages);
+router.post('/', protect, allowModule('corporate', 'create'), pkg.createPackage);
+router.get('/:id', protect, allowModule('corporate', 'view'), pkg.getPackage);
+router.put('/:id', protect, allowModule('corporate', 'edit'), pkg.updatePackage);
+router.delete('/:id', protect, allowModule('corporate', 'delete'), pkg.deletePackage);
 
 module.exports = router;

@@ -9,6 +9,18 @@ const { queueEmail } = require('../queues/index');
 const { sendWhatsapp } = require('../config/sms');
 const { parseSpreadsheet } = require('../utils/csvParser');
 const { logActivity } = require('../utils/activityLog');
+const { emailDomain } = require('../utils/validators');
+
+// Employee emails must match one of the corporate's configured Allowed Email Domain(s).
+// Returns an error message string, or null if the email is missing/valid.
+function checkEmployeeDomain(corporate, email) {
+  if (!email) return null;
+  const domains = (corporate.domains || []).filter(Boolean).map((d) => d.toLowerCase().trim());
+  if (domains.length && !domains.includes(emailDomain(email))) {
+    return `Employee email must use one of this corporate's allowed domains: ${domains.join(', ')}`;
+  }
+  return null;
+}
 
 async function nextAppointmentNo() {
   const now = new Date();
@@ -116,6 +128,9 @@ exports.createAppointment = asyncHandler(async (req, res) => {
   if (!employee?.name) return res.status(400).json({ message: 'Employee name is required.' });
   if (!labId) return res.status(400).json({ message: 'Lab is required.' });
 
+  const domainError = checkEmployeeDomain(corporate, employee.email);
+  if (domainError) return res.status(400).json({ message: domainError });
+
   const isAssigned = (corporate.assignedLabs || []).some((l) => String(l) === String(labId));
   if (!isAssigned) return res.status(403).json({ message: 'This lab is not assigned to the corporate. Ask admin to assign it first.' });
 
@@ -206,6 +221,9 @@ exports.bulkUploadAppointments = asyncHandler(async (req, res) => {
         phone: row.employeephone || '',
         employeeId: row.employeeid || '',
       };
+      const domainError = checkEmployeeDomain(corporate, employeeInfo.email);
+      if (domainError) { errors.push({ row: i + 2, error: domainError }); continue; }
+
       const employeeUser = await getOrCreateEmployeeUser(employeeInfo).catch((e) => {
         console.error('[CorporateAppointment] employee account link failed:', e.message);
         return null;

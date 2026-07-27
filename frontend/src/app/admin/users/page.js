@@ -8,97 +8,76 @@ import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 
-const ROLES = ['customer', 'lab', 'corporate', 'employee', 'subadmin', 'superadmin'];
+const ROLES = ['customer', 'lab', 'corporate', 'employee', 'hot_employee', 'subadmin', 'superadmin'];
 
 const ROLE_META = {
-  superadmin: { label: 'Super Admin', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: '👑' },
-  subadmin:   { label: 'Sub Admin',   color: 'bg-blue-100 text-blue-700 border-blue-200',   icon: '🛡️' },
-  lab:        { label: 'Lab',         color: 'bg-green-100 text-green-700 border-green-200', icon: '🧪' },
-  corporate:  { label: 'Corporate',   color: 'bg-orange-100 text-orange-700 border-orange-200', icon: '🏢' },
-  employee:   { label: 'Employee',    color: 'bg-teal-100 text-teal-700 border-teal-200',    icon: '🧑‍💼' },
-  customer:   { label: 'Customer',    color: 'bg-gray-100 text-gray-600 border-gray-200',    icon: '👤' },
+  superadmin:   { label: 'Super Admin', color: 'bg-purple-100 text-purple-700 border-purple-200', icon: '👑' },
+  subadmin:     { label: 'Sub Admin',   color: 'bg-blue-100 text-blue-700 border-blue-200',   icon: '🛡️' },
+  hot_employee: { label: 'HOT Employee', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', icon: '🔥' },
+  lab:          { label: 'Lab',         color: 'bg-green-100 text-green-700 border-green-200', icon: '🧪' },
+  corporate:    { label: 'Corporate',   color: 'bg-orange-100 text-orange-700 border-orange-200', icon: '🏢' },
+  employee:     { label: 'Employee',    color: 'bg-teal-100 text-teal-700 border-teal-200',    icon: '🧑‍💼' },
+  customer:     { label: 'Customer',    color: 'bg-gray-100 text-gray-600 border-gray-200',    icon: '👤' },
 };
 
-// All assignable permission keys, grouped by section
-const PERMISSION_SECTIONS = [
-  {
-    label: 'Lab Management',
-    items: [
-      { key: 'labs',         label: 'Labs' },
-      { key: 'brands',       label: 'Brands / Chains' },
-      { key: 'products',     label: 'Products' },
-      { key: 'categories',   label: 'Categories' },
-      { key: 'test-master',  label: 'Test Master List' },
-      { key: 'bulk-upload',  label: 'Bulk Upload' },
-    ],
-  },
-  {
-    label: 'CRM',
-    items: [
-      { key: 'crm', label: 'CRM (Dashboard, Patients, Leads, Follow-ups, Doctors)' },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      { key: 'bookings',    label: 'Bookings' },
-      { key: 'reports',     label: 'Reports' },
-      { key: 'lab-changes', label: 'Lab Profile Changes' },
-      { key: 'users',       label: 'Users' },
-      { key: 'reviews',     label: 'Reviews' },
-      { key: 'tickets',     label: 'Tickets' },
-    ],
-  },
-  {
-    label: 'Marketing',
-    items: [
-      { key: 'hero-slides',   label: 'Hero Slides' },
-      { key: 'home-settings', label: 'Home Page CMS' },
-      { key: 'coupons',       label: 'Coupons' },
-      { key: 'blogs',         label: 'Blogs' },
-      { key: 'newsletter',    label: 'Newsletter' },
-    ],
-  },
-  {
-    label: 'Content & Config',
-    items: [
-      { key: 'pages',    label: 'Pages' },
-      { key: 'settings', label: 'Settings' },
-    ],
-  },
-];
+const HOT_EMPLOYEE_DOMAIN = 'healthontime.in';
+const ACTION_LABELS = { view: 'View', create: 'Create', edit: 'Edit', delete: 'Delete' };
+const ACTIONS = ['view', 'create', 'edit', 'delete'];
 
-const ALL_KEYS = PERMISSION_SECTIONS.flatMap((s) => s.items.map((i) => i.key));
+const permsToMap = (permissions) => {
+  const map = {};
+  (permissions || []).forEach((p) => { map[p.module] = new Set(p.actions || []); });
+  return map;
+};
 
 // ── Permissions modal ─────────────────────────────────────────────────────────
 function PermissionsModal({ user, onClose, onSaved }) {
-  const [selected, setSelected] = useState(new Set(user.permissions || []));
+  const [modules, setModules] = useState([]);
+  const [loadingModules, setLoadingModules] = useState(true);
+  const [perms, setPerms] = useState(() => permsToMap(user.permissions));
   const [saving, setSaving] = useState(false);
 
-  const toggle = (key) => setSelected((prev) => {
-    const next = new Set(prev);
-    next.has(key) ? next.delete(key) : next.add(key);
+  useEffect(() => {
+    userApi.getPermissionModules()
+      .then((res) => setModules(res.data.modules || []))
+      .catch(() => toast.error('Failed to load permission modules'))
+      .finally(() => setLoadingModules(false));
+  }, []);
+
+  const toggleAction = (moduleKey, action) => setPerms((prev) => {
+    const next = { ...prev };
+    const set = new Set(next[moduleKey] || []);
+    set.has(action) ? set.delete(action) : set.add(action);
+    next[moduleKey] = set;
     return next;
   });
 
-  const toggleSection = (keys) => {
-    const allOn = keys.every((k) => selected.has(k));
-    setSelected((prev) => {
-      const next = new Set(prev);
-      keys.forEach((k) => allOn ? next.delete(k) : next.add(k));
-      return next;
-    });
-  };
+  const toggleModuleRow = (moduleKey) => setPerms((prev) => {
+    const next = { ...prev };
+    const current = next[moduleKey] || new Set();
+    const allOn = ACTIONS.every((a) => current.has(a));
+    next[moduleKey] = allOn ? new Set() : new Set(ACTIONS);
+    return next;
+  });
 
-  const selectAll   = () => setSelected(new Set(ALL_KEYS));
-  const deselectAll = () => setSelected(new Set());
+  const selectAll = () => {
+    const next = {};
+    modules.forEach((m) => { next[m.key] = new Set(ACTIONS); });
+    setPerms(next);
+  };
+  const deselectAll = () => setPerms({});
+
+  const grantedCount = Object.values(perms).filter((s) => s.size > 0).length;
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await userApi.updatePermissions(user._id, [...selected]);
+      const payload = Object.entries(perms)
+        .map(([module, set]) => ({ module, actions: [...set] }))
+        .filter((p) => p.actions.length > 0);
+      await userApi.updatePermissions(user._id, payload);
       toast.success(`Permissions updated for ${user.name}`);
-      onSaved(user._id, [...selected]);
+      onSaved(user._id, payload);
       onClose();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -110,7 +89,7 @@ function PermissionsModal({ user, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
@@ -126,61 +105,65 @@ function PermissionsModal({ user, onClose, onSaved }) {
 
         {/* Quick actions */}
         <div className="flex items-center gap-2 px-6 py-3 bg-gray-50 border-b border-gray-100">
-          <span className="text-xs text-gray-500 font-medium">{selected.size} of {ALL_KEYS.length} selected</span>
+          <span className="text-xs text-gray-500 font-medium">{grantedCount} of {modules.length} modules granted</span>
           <div className="ml-auto flex gap-2">
             <button onClick={selectAll} className="text-xs px-3 py-1 border border-gray-200 rounded-lg hover:bg-white transition-colors text-gray-600">
-              Select All
+              Grant Full Access
             </button>
             <button onClick={deselectAll} className="text-xs px-3 py-1 border border-gray-200 rounded-lg hover:bg-white transition-colors text-gray-600">
-              Deselect All
+              Revoke All
             </button>
           </div>
         </div>
 
-        {/* Permission list */}
-        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
-          {PERMISSION_SECTIONS.map((section) => {
-            const sectionKeys = section.items.map((i) => i.key);
-            const allOn = sectionKeys.every((k) => selected.has(k));
-            const someOn = sectionKeys.some((k) => selected.has(k));
-            return (
-              <div key={section.label}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{section.label}</p>
-                  <button
-                    onClick={() => toggleSection(sectionKeys)}
-                    className={`text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors ${
-                      allOn
-                        ? 'bg-primary-100 text-primary-700 border-primary-200'
-                        : someOn
-                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                        : 'bg-gray-50 text-gray-500 border-gray-200'
-                    }`}
-                  >
-                    {allOn ? 'All On' : someOn ? 'Partial' : 'All Off'} — toggle
-                  </button>
-                </div>
-                <div className="space-y-1.5">
-                  {section.items.map(({ key, label }) => {
-                    const on = selected.has(key);
-                    return (
-                      <label key={key} className={`flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer border transition-all ${
-                        on ? 'bg-primary-50 border-primary-200' : 'bg-white border-gray-100 hover:border-gray-200'
-                      }`}>
-                        <span className={`w-4 h-4 rounded flex items-center justify-center border transition-colors flex-shrink-0 ${
-                          on ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
-                        }`}>
-                          {on && <FiCheck size={10} className="text-white" strokeWidth={3} />}
-                        </span>
-                        <input type="checkbox" checked={on} onChange={() => toggle(key)} className="sr-only" />
-                        <span className="text-sm text-gray-700">{label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+        {/* Permission table */}
+        <div className="overflow-y-auto flex-1 px-6 py-4">
+          {loadingModules ? (
+            <p className="text-sm text-gray-400 text-center py-8">Loading modules…</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="pb-2 pr-2">Module</th>
+                  {ACTIONS.map((a) => <th key={a} className="pb-2 px-1 text-center w-16">{ACTION_LABELS[a]}</th>)}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {modules.map((m) => {
+                  const set = perms[m.key] || new Set();
+                  const anyOn = set.size > 0;
+                  return (
+                    <tr key={m.key} className={anyOn ? 'bg-primary-50/40' : ''}>
+                      <td className="py-2 pr-2">
+                        <button
+                          onClick={() => toggleModuleRow(m.key)}
+                          className="text-sm text-gray-700 hover:text-primary-700 font-medium text-left"
+                          title="Toggle full access for this module"
+                        >
+                          {m.label}
+                        </button>
+                      </td>
+                      {ACTIONS.map((a) => {
+                        const on = set.has(a);
+                        return (
+                          <td key={a} className="text-center px-1">
+                            <label className="inline-flex items-center justify-center cursor-pointer">
+                              <span className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${
+                                on ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
+                              }`}>
+                                {on && <FiCheck size={11} className="text-white" strokeWidth={3} />}
+                              </span>
+                              <input type="checkbox" checked={on} onChange={() => toggleAction(m.key, a)} className="sr-only" />
+                            </label>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Footer */}
@@ -518,6 +501,10 @@ export default function AdminUsersPage() {
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (!addForm.name.trim() || !addForm.email.trim()) { toast.error('Name and email are required'); return; }
+    if (addForm.role === 'hot_employee' && !addForm.email.trim().toLowerCase().endsWith(`@${HOT_EMPLOYEE_DOMAIN}`)) {
+      toast.error(`HOT Employee accounts require an @${HOT_EMPLOYEE_DOMAIN} email address`);
+      return;
+    }
     setAddSaving(true);
     try {
       const res = await userApi.create(addForm);
@@ -611,13 +598,21 @@ export default function AdminUsersPage() {
                 >
                   <option value="customer">Customer</option>
                   <option value="lab">Lab</option>
-                  <option value="subadmin">Sub Admin</option>
+                  <option value="hot_employee">HOT Employee</option>
                   {currentUser?.role === 'superadmin' && <option value="superadmin">Super Admin</option>}
                 </select>
               </div>
+              {addForm.role === 'hot_employee' && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2.5 text-xs text-indigo-800">
+                  🔥 HOT Employee accounts require an <strong>@{HOT_EMPLOYEE_DOMAIN}</strong> email address. Only HOT Employees can later be promoted to Sub Admin.
+                </div>
+              )}
               <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
                 🔑 A random password will be auto-generated and sent to the user&apos;s email. They can change it after logging in.
               </div>
+              <p className="text-xs text-gray-400">
+                Sub Admin access can&apos;t be granted directly — create the user as a HOT Employee first, then promote them to Sub Admin from the table below.
+              </p>
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setAddModal(false)} className="flex-1 btn-secondary">Cancel</button>
                 <button type="submit" disabled={addSaving} className="flex-1 btn-primary disabled:opacity-60">

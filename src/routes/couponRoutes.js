@@ -1,11 +1,11 @@
 const router = require('express').Router();
-const { protect, allowRoles } = require('../middleware/authMiddleware');
+const { protect, allowModule } = require('../middleware/authMiddleware');
 const controller = require('../controllers/couponController');
 
-router.get('/', protect, allowRoles('superadmin', 'subadmin'), controller.list);
-router.get('/:id', protect, allowRoles('superadmin', 'subadmin'), controller.getById);
-router.post('/', protect, allowRoles('superadmin', 'subadmin'), controller.create);
-router.put('/:id', protect, allowRoles('superadmin', 'subadmin'), controller.update);
-router.delete('/:id', protect, allowRoles('superadmin', 'subadmin'), controller.remove);
+router.get('/', protect, allowModule('coupons', 'view'), controller.list);
+router.get('/:id', protect, allowModule('coupons', 'view'), controller.getById);
+router.post('/', protect, allowModule('coupons', 'create'), controller.create);
+router.put('/:id', protect, allowModule('coupons', 'edit'), controller.update);
+router.delete('/:id', protect, allowModule('coupons', 'delete'), controller.remove);
 
 module.exports = router;

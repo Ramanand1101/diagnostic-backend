@@ -1,7 +1,7 @@
 const router = require('express').Router();
-const { protect, allowRoles } = require('../middleware/authMiddleware');
+const { protect, allowModule } = require('../middleware/authMiddleware');
 const { listActivity } = require('../controllers/activityLogController');
 
-router.get('/', protect, allowRoles('superadmin', 'subadmin'), listActivity);
+router.get('/', protect, allowModule('activity-log', 'view'), listActivity);
 
 module.exports = router;

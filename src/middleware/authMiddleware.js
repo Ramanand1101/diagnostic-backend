@@ -47,11 +47,30 @@ function allowRoles(...roles) {
   };
 }
 
-function allowPermission(permission) {
+// Returns true if the user is allowed `action` (view/create/edit/delete) on `module`.
+// `action` may also be an array of actions, in which case any one of them being granted
+// is sufficient (e.g. an "upload logo" endpoint used by both the create and edit flows).
+// Superadmin: always. Subadmin: only if explicitly granted that action on that module.
+// Any other role: false (callers combine this with allowRoles/extraRoles for non-admin roles).
+function hasModulePermission(user, module, action) {
+  if (!user) return false;
+  if (user.role === 'superadmin') return true;
+  if (user.role !== 'subadmin') return false;
+  const entry = (user.permissions || []).find((p) => p.module === module);
+  if (!entry || !Array.isArray(entry.actions)) return false;
+  const actions = Array.isArray(action) ? action : [action];
+  return actions.some((a) => entry.actions.includes(a));
+}
+
+// Granular, per-action permission gate. Superadmin always passes; subadmin only if the
+// specific action (or, if `action` is an array, any one of them) on that module was
+// explicitly granted; any `extraRoles` (e.g. 'lab' for CRM routes that labs also use)
+// pass unconditionally regardless of the permissions system.
+function allowModule(module, action, ...extraRoles) {
   return (req, res, next) => {
     if (!req.user) return res.status(403).json({ message: 'Forbidden' });
-    if (req.user.role === 'superadmin') return next();
-    if (req.user.role === 'subadmin' && req.user.permissions?.includes(permission)) return next();
+    if (extraRoles.includes(req.user.role)) return next();
+    if (hasModulePermission(req.user, module, action)) return next();
     return res.status(403).json({ message: 'Insufficient permissions' });
   };
 }
@@ -61,4 +80,4 @@ async function invalidateUserCache(userId) {
   await cacheDel(userKey(String(userId)));
 }
 
-module.exports = { protect, allowRoles, allowPermission, invalidateUserCache };
+module.exports = { protect, allowRoles, allowModule, hasModulePermission, invalidateUserCache };

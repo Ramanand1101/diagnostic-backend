@@ -53,6 +53,7 @@ export const userApi = {
   bulkDelete: (ids) => api.delete('/users/bulk-delete', { data: { ids } }),
   deleteUser: (id) => api.delete(`/users/${id}`),
   exportCsv: () => api.get('/users/export-csv', { responseType: 'blob' }),
+  getPermissionModules: () => api.get('/users/permission-modules'),
   updatePermissions: (id, permissions) => api.patch(`/users/${id}/permissions`, { permissions }),
   resetPassword: (id, sendEmail = true) => api.post(`/users/${id}/reset-password`, { sendEmail }),
 };

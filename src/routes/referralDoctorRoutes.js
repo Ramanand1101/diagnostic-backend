@@ -1,13 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { protect, allowRoles } = require('../middleware/authMiddleware');
+const { protect, allowModule } = require('../middleware/authMiddleware');
 const c = require('../controllers/referralDoctorController');
 
-const admin = [protect, allowRoles('superadmin', 'subadmin', 'lab')];
-
-router.get('/', ...admin, c.list);
-router.post('/', ...admin, c.create);
-router.put('/:id', ...admin, c.update);
-router.delete('/:id', ...admin, c.remove);
+router.get('/', protect, allowModule('crm', 'view', 'lab'), c.list);
+router.post('/', protect, allowModule('crm', 'create', 'lab'), c.create);
+router.put('/:id', protect, allowModule('crm', 'edit', 'lab'), c.update);
+router.delete('/:id', protect, allowModule('crm', 'delete', 'lab'), c.remove);
 
 module.exports = router;

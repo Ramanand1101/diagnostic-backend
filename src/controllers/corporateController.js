@@ -6,8 +6,12 @@ const { isValidEmail, isValidPhone, isValidPincode, emailDomain } = require('../
 const { logActivity } = require('../utils/activityLog');
 
 // Validates company + HR contact fields (required ones + any optional ones that were provided).
-// Returns an error message string, or null if everything looks valid.
-function validateCorporatePayload(payload) {
+// `options.existingDomains` lets updateCorporate fall back to the corporate's already-saved
+// domains when the payload itself doesn't touch that field. Returns an error message string,
+// or null if everything looks valid.
+function validateCorporatePayload(payload, options = {}) {
+  const { existingDomains = null } = options;
+
   if (payload.email !== undefined && !isValidEmail(payload.email)) return 'Enter a valid company email address.';
   if (payload.phone !== undefined && !isValidPhone(payload.phone)) return 'Enter a valid company phone number.';
   if (payload.pincode && !isValidPincode(payload.pincode)) return 'Company pincode must be exactly 6 digits.';
@@ -32,15 +36,20 @@ function validateCorporatePayload(payload) {
     }
   }
 
-  // Company + HR emails must belong to one of the corporate's allowed domains, when set.
-  if (Array.isArray(payload.domains) && payload.domains.filter(Boolean).length) {
-    const domains = payload.domains.filter(Boolean).map((d) => d.toLowerCase().trim());
-    if (payload.email && !domains.includes(emailDomain(payload.email))) {
-      return `Company email must use one of the allowed domains: ${domains.join(', ')}`;
-    }
-    if (hr?.email && !domains.includes(emailDomain(hr.email))) {
-      return `HR email must use one of the allowed domains: ${domains.join(', ')}`;
-    }
+  // Allowed Email Domain(s) is mandatory — falls back to the corporate's existing domains
+  // when this update doesn't touch the field (it can never be cleared out to empty).
+  const rawDomains = payload.domains !== undefined ? payload.domains : existingDomains;
+  const domains = Array.isArray(rawDomains) ? rawDomains.filter(Boolean).map((d) => d.toLowerCase().trim()) : [];
+  if (!domains.length) {
+    return 'Allowed Email Domain(s) is required — add at least one domain that company/HR/account-manager emails must match.';
+  }
+
+  // Company + HR emails must belong to one of the corporate's allowed domains.
+  if (payload.email && !domains.includes(emailDomain(payload.email))) {
+    return `Company email must use one of the allowed domains: ${domains.join(', ')}`;
+  }
+  if (hr?.email && !domains.includes(emailDomain(hr.email))) {
+    return `HR email must use one of the allowed domains: ${domains.join(', ')}`;
   }
 
   return null;
@@ -94,6 +103,7 @@ exports.createCorporate = asyncHandler(async (req, res) => {
   }
   const validationError = validateCorporatePayload(req.body);
   if (validationError) return res.status(400).json({ message: validationError });
+  req.body.domains = req.body.domains.filter(Boolean).map((d) => d.toLowerCase().trim());
 
   const corporate = await Corporate.create(req.body);
   logActivity({ actor: req.user, action: 'corporate.created', entity: 'Corporate', entityId: corporate._id, description: `${req.user.name} created corporate "${corporate.companyName}"` });
@@ -109,8 +119,12 @@ exports.updateCorporate = asyncHandler(async (req, res) => {
   delete payload.settings;          // managed via /settings endpoint
   delete payload.agreements;        // managed via /agreements endpoint
 
-  const validationError = validateCorporatePayload(payload);
+  const existing = await Corporate.findById(req.params.id).select('domains');
+  if (!existing) return res.status(404).json({ message: 'Corporate not found' });
+
+  const validationError = validateCorporatePayload(payload, { existingDomains: existing.domains });
   if (validationError) return res.status(400).json({ message: validationError });
+  if (payload.domains !== undefined) payload.domains = payload.domains.filter(Boolean).map((d) => d.toLowerCase().trim());
 
   const corporate = await Corporate.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
   if (!corporate) return res.status(404).json({ message: 'Corporate not found' });

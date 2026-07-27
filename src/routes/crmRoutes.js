@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { protect, allowRoles } = require('../middleware/authMiddleware');
+const { protect, allowModule } = require('../middleware/authMiddleware');
 const c = require('../controllers/crmController');
 
-const admin = [protect, allowRoles('superadmin', 'subadmin')];
+const admin = [protect, allowModule('crm', 'view')];
 
 router.get('/stats', ...admin, c.stats);
 router.get('/patients', ...admin, c.patientList);

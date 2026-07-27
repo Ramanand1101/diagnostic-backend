@@ -45,10 +45,15 @@ export function AuthProvider({ children }) {
   const isEmployee = user?.role === 'employee';
   const isCustomer = user?.role === 'customer';
 
-  const hasPermission = (key) => {
+  // `action` defaults to 'view' — enough for nav-visibility checks; pages that gate
+  // create/edit/delete UI (buttons, forms) should pass the specific action explicitly.
+  const hasPermission = (module, action = 'view') => {
     if (!user) return false;
     if (user.role === 'superadmin') return true;
-    if (user.role === 'subadmin') return Array.isArray(user.permissions) && user.permissions.includes(key);
+    if (user.role === 'subadmin') {
+      const entry = Array.isArray(user.permissions) ? user.permissions.find((p) => p.module === module) : null;
+      return !!entry && Array.isArray(entry.actions) && entry.actions.includes(action);
+    }
     return false;
   };
 
