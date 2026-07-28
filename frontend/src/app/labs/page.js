@@ -1,25 +1,30 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import LabCard from '@/components/lab/LabCard';
 import Pagination from '@/components/ui/Pagination';
 import { PageLoader } from '@/components/ui/Spinner';
 import { labApi } from '@/lib/api';
+import { useCity } from '@/context/CityContext';
 import { getErrorMessage } from '@/utils/helpers';
 import { FiFilter, FiX, FiGitMerge, FiCrosshair, FiSearch, FiMapPin } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
 const RADIUS_OPTIONS_KM = [5, 10, 25, 50];
 
-export default function LabsPage() {
+function LabsPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { city: selectedCity } = useCity();
   const [labs, setLabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [filters, setFilters] = useState({ city: '', homeCollection: '' });
+  // A shared "/labs?city=X" link (from the homepage, or bookmarked/shared) always
+  // wins over the app-wide selected city so the link behaves the way it reads.
+  const [filters, setFilters] = useState({ city: searchParams.get('city') || selectedCity || '', homeCollection: '' });
   const [showFilters, setShowFilters] = useState(false);
   const [compareIds, setCompareIds] = useState([]);
   const limit = 12;
@@ -271,7 +276,7 @@ export default function LabsPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
               {labs.map((lab) => (
                 <LabCard
                   key={lab._id}
@@ -289,5 +294,13 @@ export default function LabsPage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+export default function LabsPage() {
+  return (
+    <Suspense>
+      <LabsPageContent />
+    </Suspense>
   );
 }

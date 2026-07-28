@@ -92,11 +92,11 @@ export default function FeaturedLabsSection() {
 
         {/* Grid */}
         {loading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 items-start">
             {[...Array(4)].map((_, i) => <LabSkeleton key={i} />)}
           </div>
         ) : labs.length > 0 ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 items-start">
             {labs.map((lab) => <LabCard key={lab._id} lab={lab} />)}
           </div>
         ) : (
