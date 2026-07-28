@@ -87,18 +87,6 @@ async function getHomeContent() {
   }
 }
 
-async function getCategories() {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/categories?limit=10`, {
-      next: { revalidate: 600 },
-    });
-    const data = await res.json();
-    return data.items || data.categories || [];
-  } catch {
-    return [];
-  }
-}
-
 function SectionHeader({ title, subtitle, href, linkLabel = 'View all' }) {
   return (
     <div className="flex items-end justify-between mb-7">
@@ -120,10 +108,7 @@ function SectionHeader({ title, subtitle, href, linkLabel = 'View all' }) {
 }
 
 export default async function HomePage() {
-  const [content, categories] = await Promise.all([
-    getHomeContent(),
-    getCategories(),
-  ]);
+  const content = await getHomeContent();
 
   const hero = content.hero || DEFAULT_CONTENT.hero;
   const stats = content.stats || DEFAULT_CONTENT.stats;
@@ -245,31 +230,6 @@ export default async function HomePage() {
             </div>
           </div>
         </section>
-
-        {/* Browse by category (from DB) */}
-        {categories.length > 0 && (
-          <section className="py-14 bg-[#F8FAFC]">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <SectionHeader
-                title="Browse by Category"
-                subtitle="Explore tests and packages by health category"
-                href="/products"
-              />
-              <div className="flex flex-wrap gap-3">
-                {categories.map((cat) => (
-                  <Link
-                    key={cat._id}
-                    href={`/products?category=${cat._id}`}
-                    className="bg-white border border-gray-200 hover:border-primary-400 hover:bg-primary-50 hover:text-primary-700 px-5 py-2.5 rounded-full text-sm font-medium text-gray-700 shadow-sm transition-all"
-                  >
-                    {cat.name}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
 
         {/* Trust banner */}
         <section className="bg-gradient-to-br from-primary-700 to-primary-900 py-14">
