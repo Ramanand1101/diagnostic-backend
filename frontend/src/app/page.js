@@ -4,7 +4,6 @@ import Footer from '@/components/layout/Footer';
 import Hero from '@/components/home/Hero';
 import NewsletterSection from '@/components/home/NewsletterSection';
 import FeaturedLabsSection from '@/components/home/FeaturedLabsSection';
-import FeaturedProductsSection from '@/components/home/FeaturedProductsSection';
 import RecommendedTestsCarousel from '@/components/home/RecommendedTestsCarousel';
 import {
   FiActivity, FiShield, FiClock, FiAward,
@@ -271,8 +270,6 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* Featured Products (city-aware client component) */}
-        <FeaturedProductsSection />
 
         {/* Trust banner */}
         <section className="bg-gradient-to-br from-primary-700 to-primary-900 py-14">

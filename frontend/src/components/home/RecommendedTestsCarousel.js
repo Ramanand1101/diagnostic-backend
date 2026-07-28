@@ -47,11 +47,11 @@ const CARDS_PER_VIEW = 5;
 
 function TestCardSkeleton() {
   return (
-    <div className="flex-none snap-start w-[45%] sm:w-[31%] lg:w-[calc(20%-1rem)] bg-white rounded-2xl border border-gray-100 p-5 animate-pulse space-y-3">
-      <div className="w-14 h-14 rounded-full bg-gray-100 mx-auto" />
+    <div className="flex-none snap-start w-[45%] sm:w-[31%] lg:w-[calc(20%-1rem)] bg-white rounded-2xl border border-gray-100 p-7 animate-pulse space-y-4">
+      <div className="w-28 h-28 rounded-full bg-gray-100 mx-auto" />
       <div className="h-4 bg-gray-100 rounded w-3/4 mx-auto" />
       <div className="h-4 bg-gray-100 rounded w-1/2 mx-auto" />
-      <div className="h-9 bg-gray-100 rounded-lg w-full mt-2" />
+      <div className="h-11 bg-gray-100 rounded-lg w-full mt-2" />
     </div>
   );
 }
@@ -73,19 +73,19 @@ function TestCard({ product }) {
   };
 
   return (
-    <div className="flex-none snap-start w-[45%] sm:w-[31%] lg:w-[calc(20%-1rem)] bg-white rounded-2xl border border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all p-5 flex flex-col text-center">
+    <div className="flex-none snap-start w-[45%] sm:w-[31%] lg:w-[calc(20%-1rem)] bg-white rounded-2xl border border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all p-7 flex flex-col text-center">
       <Link href={`/products/${product.slug}`} className="flex flex-col items-center flex-1">
-        <div className={`w-14 h-14 ${bg} rounded-full flex items-center justify-center mb-3`}>
-          <Icon className={`text-2xl ${color}`} />
+        <div className={`w-28 h-28 ${bg} rounded-full flex items-center justify-center mb-4`}>
+          <Icon className={`text-5xl ${color}`} />
         </div>
-        <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mb-2 min-h-[2.5rem]">
+        <h3 className="font-semibold text-gray-900 text-base leading-snug line-clamp-2 mb-3 min-h-[2.75rem]">
           {product.name}
         </h3>
-        <div className="flex items-baseline justify-center gap-1.5 flex-wrap mb-1">
-          {hasDiscount && <span className="text-xs line-through text-gray-400">₹{mrp.toLocaleString('en-IN')}</span>}
-          <span className="text-lg font-extrabold text-primary-700">₹{sale.toLocaleString('en-IN')}</span>
+        <div className="flex items-baseline justify-center gap-2 flex-wrap mb-1">
+          {hasDiscount && <span className="text-sm line-through text-gray-400">₹{mrp.toLocaleString('en-IN')}</span>}
+          <span className="text-xl font-extrabold text-primary-700">₹{sale.toLocaleString('en-IN')}</span>
           {discountPercent > 0 && (
-            <span className="text-[11px] font-bold bg-secondary-100 text-secondary-700 px-1.5 py-0.5 rounded-full">
+            <span className="text-xs font-bold bg-secondary-100 text-secondary-700 px-2 py-0.5 rounded-full">
               {discountPercent}% off
             </span>
           )}
@@ -93,7 +93,7 @@ function TestCard({ product }) {
       </Link>
       <button
         onClick={handleBookNow}
-        className="mt-3 w-full py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-bold text-sm transition-colors shadow-sm"
+        className="mt-4 w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-bold text-sm transition-colors shadow-sm"
       >
         Book Now
       </button>
@@ -111,6 +111,10 @@ export default function RecommendedTestsCarousel() {
   const [activeDot, setActiveDot] = useState(0);
 
   useEffect(() => {
+    // Guards against the city changing again (e.g. '' -> detected city) before this
+    // request resolves — without it, a slower unfiltered request can land after a
+    // faster city-filtered one and overwrite it with a mixed-city result set.
+    let cancelled = false;
     setLoading(true);
     const base = { isActive: 'true', limit: 15 };
     if (city) base.city = city;
@@ -118,11 +122,13 @@ export default function RecommendedTestsCarousel() {
     productApi.getAll({ ...base, featured: 'true' })
       .then((res) => {
         const items = res.data.items || [];
-        if (items.length > 0) { setProducts(items); return; }
-        return productApi.getAll(base).then((r2) => setProducts(r2.data.items || []));
+        if (items.length > 0) { if (!cancelled) setProducts(items); return; }
+        return productApi.getAll(base).then((r2) => { if (!cancelled) setProducts(r2.data.items || []); });
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
   }, [city]);
 
   const dotCount = Math.max(1, Math.ceil(products.length / CARDS_PER_VIEW));
