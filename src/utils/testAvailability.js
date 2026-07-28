@@ -31,22 +31,28 @@ function evaluateRule(rule, date) {
       return withinBounds(d, rule.effectiveFrom, rule.effectiveTo) ? true : null;
     case 'everyday':
       return withinBounds(d, rule.effectiveFrom, rule.effectiveTo) ? true : null;
+    // These three are "only available on the matching days" patterns — within the
+    // rule's effective window, a non-matching day is an explicit unavailability, not
+    // silence (otherwise "Selected Days" and "Alternate Days" would never actually
+    // restrict anything: the default-available fallback would win on every off day).
     case 'selectedDays':
       if (!withinBounds(d, rule.effectiveFrom, rule.effectiveTo)) return null;
-      return (rule.daysOfWeek || []).includes(d.getDay()) ? true : null;
+      return (rule.daysOfWeek || []).includes(d.getDay());
     case 'alternateDays': {
       if (!rule.alternateAnchorDate) return null;
       if (!withinBounds(d, rule.effectiveFrom, rule.effectiveTo)) return null;
       const anchor = new Date(rule.alternateAnchorDate); anchor.setHours(0, 0, 0, 0);
       const diffDays = Math.round((d - anchor) / 86400000);
-      return diffDays >= 0 && diffDays % 2 === 0 ? true : null;
+      if (diffDays < 0) return null; // before the rule's anchor point — doesn't apply yet
+      return diffDays % 2 === 0;
     }
     case 'customRecurring': {
       if (!rule.alternateAnchorDate || !rule.customIntervalDays) return null;
       if (!withinBounds(d, rule.effectiveFrom, rule.effectiveTo)) return null;
       const anchor = new Date(rule.alternateAnchorDate); anchor.setHours(0, 0, 0, 0);
       const diffDays = Math.round((d - anchor) / 86400000);
-      return diffDays >= 0 && diffDays % rule.customIntervalDays === 0 ? true : null;
+      if (diffDays < 0) return null;
+      return diffDays % rule.customIntervalDays === 0;
     }
     default:
       return null;

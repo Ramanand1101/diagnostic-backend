@@ -8,6 +8,8 @@ const { logActivity } = require('../utils/activityLog');
 const { isAvailable, getUnavailableDatesForTestLab } = require('../utils/testAvailability');
 const { resolveLabIdsForLocation } = require('../utils/geoLabs');
 
+const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const SCHEDULE_TYPES = ['everyday', 'selectedDays', 'alternateDays', 'specificDates', 'dateRange', 'customRecurring', 'temporaryDisable', 'permanentDisable'];
 
 function validateRulePayload(payload) {
@@ -229,7 +231,7 @@ exports.bulkUploadCsv = asyncHandler(async (req, res) => {
     try {
       let testMasterId = null;
       if (row.testname) {
-        const tm = await TestMaster.findOne({ name: new RegExp(`^${row.testname}$`, 'i') }).select('_id');
+        const tm = await TestMaster.findOne({ name: new RegExp(`^${escapeRegex(row.testname)}$`, 'i') }).select('_id');
         if (!tm) { errors.push({ row: i + 2, error: `Test "${row.testname}" not found` }); continue; }
         testMasterId = tm._id;
       }
@@ -238,7 +240,7 @@ exports.bulkUploadCsv = asyncHandler(async (req, res) => {
       if (row.scope === 'lab') {
         const labName = (row.labname || '').trim();
         if (!labName) { errors.push({ row: i + 2, error: 'labName is required for scope=lab' }); continue; }
-        const labDoc = await Lab.findOne({ name: new RegExp(`^${labName}$`, 'i') }).select('_id');
+        const labDoc = await Lab.findOne({ name: new RegExp(`^${escapeRegex(labName)}$`, 'i') }).select('_id');
         if (!labDoc) { errors.push({ row: i + 2, error: `Lab "${labName}" not found` }); continue; }
         labId = labDoc._id;
       }
@@ -248,7 +250,7 @@ exports.bulkUploadCsv = asyncHandler(async (req, res) => {
         const Brand = require('../models/Brand');
         const brandName = (row.brandname || '').trim();
         if (!brandName) { errors.push({ row: i + 2, error: 'brandName is required for scope=brand' }); continue; }
-        const brandDoc = await Brand.findOne({ name: new RegExp(`^${brandName}$`, 'i') }).select('_id');
+        const brandDoc = await Brand.findOne({ name: new RegExp(`^${escapeRegex(brandName)}$`, 'i') }).select('_id');
         if (!brandDoc) { errors.push({ row: i + 2, error: `Brand "${brandName}" not found` }); continue; }
         brandId = brandDoc._id;
       }
