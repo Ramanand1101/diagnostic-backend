@@ -3,6 +3,7 @@ const Lab = require('../models/Lab');
 const Product = require('../models/Product');
 const { hasAlgoliaConfig } = require('../config/algolia');
 const { searchIndex, syncObjects, replaceAllObjects, setIndexSettings } = require('../services/algoliaSync');
+const { resolveLabIdsForLocation } = require('../utils/geoLabs');
 
 // ─── Algolia record builders ────────────────────────────────────────────────
 
@@ -76,23 +77,18 @@ function escapeRegex(str) {
 
 // ─── MongoDB fallback search ─────────────────────────────────────────────────
 
-async function mongoSearch(q, type, city, limit) {
+async function mongoSearch(q, type, city, limit, geo = {}) {
+  const { lat, lng, radiusKm } = geo;
   const regex = new RegExp(escapeRegex(q), 'i');
   const cityRegex = city ? new RegExp(escapeRegex(city), 'i') : null;
   const result = { labs: [], products: [], pages: [] };
 
-  // Pre-fetch inactive brand IDs to exclude their labs
-  const Brand = require('../models/Brand');
-  const inactiveBrands = await Brand.find({ isActive: false }).select('_id').lean();
-  const inactiveBrandIds = inactiveBrands.map((b) => b._id);
-
-  // When city is given, find matching lab IDs once and reuse for both labs + products
-  let cityLabIds = null;
-  if (cityRegex) {
-    const cityFilter = { city: cityRegex, approved: true };
-    if (inactiveBrandIds.length) cityFilter.$or = [{ brand: { $nin: inactiveBrandIds } }, { brand: null }];
-    const cityLabs = await Lab.find(cityFilter).select('_id').lean();
-    cityLabIds = cityLabs.map((l) => l._id);
+  // lat/lng ("near me") takes priority over plain city text when resolving which
+  // labs are in scope for both the labs and products sub-searches below.
+  const locationLabIds = await resolveLabIdsForLocation({ city, lat, lng, radiusKm });
+  if (locationLabIds !== null && locationLabIds.length === 0 && lat !== undefined && lng !== undefined) {
+    result.noCoverage = true;
+    return result;
   }
 
   if (type === 'all' || type === 'labs') {
@@ -100,8 +96,8 @@ async function mongoSearch(q, type, city, limit) {
       approved: true,
       name: regex, // match only on lab name
     };
-    if (inactiveBrandIds.length) filter.$or = [{ brand: { $nin: inactiveBrandIds } }, { brand: null }];
-    if (cityRegex) filter.city = cityRegex;
+    if (locationLabIds) filter._id = { $in: locationLabIds };
+    else if (cityRegex) filter.city = cityRegex;
     result.labs = await Lab.find(filter).populate('brand', 'name slug logo').limit(limit).lean();
   }
 
@@ -112,7 +108,7 @@ async function mongoSearch(q, type, city, limit) {
       populate: { path: 'brand', select: 'name slug logo' },
     };
     const tmPopulate = { path: 'testMaster', select: 'name description sampleType reportTime fastingRequired homeCollection' };
-    const baseFilter = { isActive: true, ...(cityLabIds ? { lab: { $in: cityLabIds } } : {}) };
+    const baseFilter = { isActive: true, ...(locationLabIds ? { lab: { $in: locationLabIds } } : {}) };
 
     const exactRegex   = new RegExp(`^${escapeRegex(q)}$`, 'i');
     const prefixRegex  = new RegExp(`^${escapeRegex(q)}`,  'i');
@@ -200,23 +196,19 @@ function expandQuery(q) {
 
 exports.popular = asyncHandler(async (req, res) => {
   const city  = String(req.query.city  || '').trim();
+  const { lat, lng, radiusKm } = req.query;
   const limit = Math.min(Number(req.query.limit || 10), 20);
 
-  const Brand = require('../models/Brand');
-  const inactiveBrands = await Brand.find({ isActive: false }).select('_id').lean();
-  const inactiveBrandIds = inactiveBrands.map((b) => b._id);
-
-  let cityLabIds = null;
-  if (city) {
-    const cityFilter = { city: new RegExp(city, 'i'), approved: true };
-    if (inactiveBrandIds.length) cityFilter.$or = [{ brand: { $nin: inactiveBrandIds } }, { brand: null }];
-    const cityLabs = await Lab.find(cityFilter).select('_id').lean();
-    cityLabIds = cityLabs.map((l) => l._id);
-    // If no labs found in city, fall back to all cities (don't show empty)
-  }
+  // lat/lng ("near me") takes priority over plain city text. Unlike the city-only
+  // path (which quietly falls back to all cities when nothing matches, to avoid
+  // ever showing an empty homepage), an explicit geolocation search that resolves
+  // to zero labs is a real "no coverage here" result — we report it as such.
+  const locationLabIds = await resolveLabIdsForLocation({ city, lat, lng, radiusKm });
+  const noCoverage = locationLabIds !== null && locationLabIds.length === 0 && (lat !== undefined && lng !== undefined);
+  if (noCoverage) return res.json({ tests: [], noCoverage: true });
 
   const matchStage = { isActive: true };
-  if (cityLabIds && cityLabIds.length) matchStage.lab = { $in: cityLabIds };
+  if (locationLabIds && locationLabIds.length) matchStage.lab = { $in: locationLabIds };
 
   const grouped = await Product.aggregate([
     { $match: matchStage },
@@ -252,28 +244,21 @@ exports.popular = asyncHandler(async (req, res) => {
 exports.suggest = asyncHandler(async (req, res) => {
   const q = String(req.query.q || '').trim();
   const city = String(req.query.city || '').trim();
+  const { lat, lng, radiusKm } = req.query;
   const limit = Math.min(Number(req.query.limit || 10), 20);
 
   if (q.length < 2) return res.json({ tests: [], labs: [] });
 
-  const Brand = require('../models/Brand');
-  const inactiveBrands = await Brand.find({ isActive: false }).select('_id').lean();
-  const inactiveBrandIds = inactiveBrands.map((b) => b._id);
-
   const terms = expandQuery(q);
   const orPatterns = terms.map((t) => ({ name: new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }));
 
-  let cityLabIds = null;
-  if (city) {
-    const cityFilter = { city: new RegExp(city, 'i'), approved: true };
-    if (inactiveBrandIds.length) cityFilter.$or = [{ brand: { $nin: inactiveBrandIds } }, { brand: null }];
-    const cityLabs = await Lab.find(cityFilter).select('_id').lean();
-    cityLabIds = cityLabs.map((l) => l._id);
-    // If no labs in city, fall back to all (don't return empty)
+  const locationLabIds = await resolveLabIdsForLocation({ city, lat, lng, radiusKm });
+  if (locationLabIds !== null && locationLabIds.length === 0 && lat !== undefined && lng !== undefined) {
+    return res.json({ tests: [], labs: [], noCoverage: true });
   }
 
   const matchStage = { isActive: true, $or: orPatterns };
-  if (cityLabIds && cityLabIds.length) matchStage.lab = { $in: cityLabIds };
+  if (locationLabIds && locationLabIds.length) matchStage.lab = { $in: locationLabIds };
 
   const grouped = await Product.aggregate([
     { $match: matchStage },
@@ -291,10 +276,10 @@ exports.suggest = asyncHandler(async (req, res) => {
     { $limit: limit },
   ]);
 
-  // Also fetch a few matching labs (exclude inactive brands)
+  // Also fetch a few matching labs, scoped to the same location when one was given
   const labFilter = { approved: true, $or: terms.map((t) => ({ name: new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') })) };
-  if (city) labFilter.city = new RegExp(city, 'i');
-  if (inactiveBrandIds.length) labFilter.$and = [{ $or: [{ brand: { $nin: inactiveBrandIds } }, { brand: null }] }];
+  if (locationLabIds) labFilter._id = { $in: locationLabIds };
+  else if (city) labFilter.city = new RegExp(city, 'i');
   const labs = await Lab.find(labFilter).select('name slug city ratingAvg').limit(4).lean();
 
   res.json({
@@ -316,10 +301,25 @@ exports.globalSearch = asyncHandler(async (req, res) => {
   const q = String(req.query.q || '').trim();
   const type = String(req.query.type || 'all');
   const city = String(req.query.city || '').trim();
+  const { lat, lng, radiusKm } = req.query;
   const limit = Math.min(Number(req.query.limit || 12), 30);
+  const geo = { lat, lng, radiusKm };
+  const hasCoords = lat !== undefined && lng !== undefined;
 
   const response = { query: q, labs: [], products: [], pages: [] };
   if (!q) return res.json(response);
+
+  // Algolia's indices aren't geo-tagged for products/labs yet, so a "near me" search
+  // (lat/lng present) always goes straight to the geo-aware MongoDB path below —
+  // otherwise we keep using Algolia's superior text relevance when configured.
+  if (hasCoords) {
+    const fallback = await mongoSearch(q, type, city, limit, geo);
+    response.labs = fallback.labs;
+    response.products = fallback.products;
+    response.pages = fallback.pages;
+    if (fallback.noCoverage) response.noCoverage = true;
+    return res.json(response);
+  }
 
   if (hasAlgoliaConfig()) {
     try {

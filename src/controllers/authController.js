@@ -5,36 +5,13 @@ const User = require('../models/User');
 const Otp = require('../models/Otp');
 const { sendMail } = require('../config/email');
 const { sendSms, sendWhatsapp } = require('../config/sms');
-const { logActivity } = require('../utils/activityLog');
+const { logActivity, requestMeta } = require('../utils/activityLog');
+const { createOtpRecord } = require('../utils/otp');
 
 function signToken(user) {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
   });
-}
-
-function generateOtp(length = 6) {
-  const min = Math.pow(10, length - 1);
-  const max = Math.pow(10, length) - 1;
-  return String(Math.floor(min + Math.random() * (max - min)));
-}
-
-async function createOtpRecord({ identifier, purpose }) {
-  const length = Number(process.env.OTP_LENGTH || 6);
-  const expiryMinutes = Number(process.env.OTP_EXPIRY_MINUTES || 10);
-  const otp = generateOtp(length);
-  const otpHash = await bcrypt.hash(otp, 10);
-
-  await Otp.deleteMany({ identifier, purpose, isUsed: false });
-
-  const record = await Otp.create({
-    identifier,
-    otpHash,
-    purpose,
-    expiresAt: new Date(Date.now() + expiryMinutes * 60 * 1000)
-  });
-
-  return { otp, record };
 }
 
 const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.(com|co\.in|co|in|net|info|ai)$/i;
@@ -89,7 +66,7 @@ exports.login = asyncHandler(async (req, res) => {
 
   // Non-blocking — don't let lastLoginAt update cause a 500
   User.updateOne({ _id: user._id }, { lastLoginAt: new Date() }).catch(() => {});
-  logActivity({ actor: user, action: 'user.login', entity: 'User', entityId: user._id, description: `${user.name} logged in (password)` });
+  logActivity({ actor: user, action: 'user.login', entity: 'User', entityId: user._id, description: `${user.name} logged in (password)`, ...requestMeta(req) });
 
   const token = signToken(user);
   res.json({
@@ -102,6 +79,13 @@ exports.login = asyncHandler(async (req, res) => {
       role: user.role
     }
   });
+});
+
+// POST /api/v1/auth/logout — purely for the audit trail (JWTs are stateless, so there's
+// nothing server-side to invalidate); the frontend clears its own token regardless.
+exports.logout = asyncHandler(async (req, res) => {
+  logActivity({ actor: req.user, action: 'user.logout', entity: 'User', entityId: req.user._id, description: `${req.user.name} logged out`, ...requestMeta(req) });
+  res.json({ message: 'Logged out' });
 });
 
 exports.sendOtp = asyncHandler(async (req, res) => {
@@ -199,7 +183,7 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
   }
 
   const token = signToken(user);
-  logActivity({ actor: user, action: 'user.login', entity: 'User', entityId: user._id, description: `${user.name} logged in (OTP)` });
+  logActivity({ actor: user, action: 'user.login', entity: 'User', entityId: user._id, description: `${user.name} logged in (OTP)`, ...requestMeta(req) });
 
   res.json({
     message: 'OTP verified',
@@ -339,7 +323,7 @@ exports.googleAuth = asyncHandler(async (req, res) => {
   await user.save();
 
   const token = signToken(user);
-  logActivity({ actor: user, action: 'user.login', entity: 'User', entityId: user._id, description: `${user.name} logged in (Google)` });
+  logActivity({ actor: user, action: 'user.login', entity: 'User', entityId: user._id, description: `${user.name} logged in (Google)`, ...requestMeta(req) });
   res.json({
     token,
     user: {

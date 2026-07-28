@@ -10,6 +10,7 @@ const { sendWhatsapp } = require('../config/sms');
 const { parseSpreadsheet } = require('../utils/csvParser');
 const { logActivity } = require('../utils/activityLog');
 const { emailDomain } = require('../utils/validators');
+const { findBlockingRule } = require('../utils/labHolidayCheck');
 
 // Employee emails must match one of the corporate's configured Allowed Email Domain(s).
 // Returns an error message string, or null if the email is missing/valid.
@@ -137,6 +138,11 @@ exports.createAppointment = asyncHandler(async (req, res) => {
   const lab = await Lab.findById(labId);
   if (!lab) return res.status(404).json({ message: 'Lab not found' });
 
+  if (slotDate) {
+    const blockingRule = await findBlockingRule(lab, slotDate);
+    if (blockingRule) return res.status(400).json({ message: 'This lab is closed on the selected date due to a holiday. Please choose another date.' });
+  }
+
   let finalItems = items || [];
   let amount = 0;
   if (packageId) {
@@ -203,6 +209,11 @@ exports.bulkUploadAppointments = asyncHandler(async (req, res) => {
 
       const lab = corporate.assignedLabs.find((l) => l.name.toLowerCase() === row.lab.toLowerCase());
       if (!lab) { errors.push({ row: i + 2, error: `Lab "${row.lab}" is not assigned to this corporate` }); continue; }
+
+      if (row.slotdate) {
+        const blockingRule = await findBlockingRule(lab, row.slotdate);
+        if (blockingRule) { errors.push({ row: i + 2, error: `${lab.name} is closed on ${row.slotdate} due to a holiday` }); continue; }
+      }
 
       let finalItems = [];
       let packageId = null;
@@ -454,6 +465,12 @@ exports.rescheduleAppointment = asyncHandler(async (req, res) => {
     newLab = labDoc._id;
     appointment.city = labDoc.city;
     appointment.state = labDoc.state;
+  }
+
+  if (slotDate) {
+    const labForCheck = await Lab.findById(newLab).select('city state');
+    const blockingRule = labForCheck && await findBlockingRule(labForCheck, slotDate);
+    if (blockingRule) return res.status(400).json({ message: 'This lab is closed on the selected date due to a holiday. Please choose another date.' });
   }
 
   appointment.rescheduleHistory.push({

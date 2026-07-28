@@ -44,6 +44,9 @@ const corporateAppointmentRoutes = require('./routes/corporateAppointmentRoutes'
 const corporateInvoiceRoutes = require('./routes/corporateInvoiceRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
 const integrationSettingRoutes = require('./routes/integrationSettingRoutes');
+const labHolidayRoutes = require('./routes/labHolidayRoutes');
+const testAvailabilityRoutes = require('./routes/testAvailabilityRoutes');
+const reportNoteRoutes = require('./routes/reportNoteRoutes');
 
 const app = express();
 
@@ -157,6 +160,9 @@ app.use('/api/v1/corporate-appointments', corporateAppointmentRoutes);
 app.use('/api/v1/corporate-invoices', corporateInvoiceRoutes);
 app.use('/api/v1/activity-log', activityLogRoutes);
 app.use('/api/v1/integrations', integrationSettingRoutes);
+app.use('/api/v1/lab-holidays', labHolidayRoutes);
+app.use('/api/v1/test-availability', testAvailabilityRoutes);
+app.use('/api/v1/report-notes', reportNoteRoutes);
 
 // ── Error handlers ────────────────────────────────────────────────────────────
 app.use(notFound);

@@ -8,6 +8,8 @@ const { queueEmail } = require('../queues/index');
 const { sendSms, sendWhatsapp } = require('../config/sms');
 const { WARNING_MESSAGES, computeBookingWarnings } = require('../utils/bookingWarnings');
 const { logActivity } = require('../utils/activityLog');
+const { findBlockingRule } = require('../utils/labHolidayCheck');
+const { isAvailable } = require('../utils/testAvailability');
 
 // Atomic, collision-safe booking number — DDMMYYYY-1550 (resets per day, starts at 1550)
 async function nextBookingNo() {
@@ -46,6 +48,38 @@ exports.createBooking = asyncHandler(async (req, res) => {
     }
     if (slotDay > maxDay) {
       return res.status(400).json({ message: 'Bookings can only be scheduled up to 30 days in advance.' });
+    }
+  }
+
+  // ── Lab holiday restriction — server-side, so it can't be bypassed by a client
+  // that skips the date-picker's greyed-out dates ────────────────────────────────
+  let bookingLab = null;
+  if (payload.slotDate && payload.lab) {
+    const Lab = require('../models/Lab');
+    bookingLab = await Lab.findById(payload.lab).select('city state brand');
+    if (bookingLab) {
+      const blockingRule = await findBlockingRule(bookingLab, payload.slotDate);
+      if (blockingRule) {
+        return res.status(400).json({ message: 'This lab is closed on the selected date due to a holiday. Please choose another date.' });
+      }
+    }
+  }
+
+  // ── Test availability restriction — server-side; blocks booking a test/package
+  // that's been marked unavailable at this lab/city/state/brand for this date, even
+  // if the client bypassed the greyed-out date picker or a stale cached listing ──
+  if (payload.slotDate && bookingLab && items.length) {
+    for (const item of items) {
+      if (!item.product) continue;
+      const product = await Product.findById(item.product).select('name testMaster');
+      if (!product || !product.testMaster) continue;
+      const verdict = await isAvailable({ testMasterId: product.testMaster, lab: bookingLab, date: payload.slotDate });
+      if (!verdict.available) {
+        return res.status(400).json({
+          message: `"${product.name}" is not available at this lab on the selected date${verdict.reason ? ` (${verdict.reason})` : ''}. Please choose another date or lab.`,
+          unavailableProduct: product._id,
+        });
+      }
     }
   }
 
@@ -299,6 +333,32 @@ exports.updateBooking = asyncHandler(async (req, res) => {
   if (lab !== undefined) update.lab = lab;
   if (items !== undefined) update.items = items;
   if (notes !== undefined) update.notes = notes;
+
+  if (slotDate) {
+    const Lab = require('../models/Lab');
+    const existing = await Booking.findById(req.params.id).select('lab items');
+    if (!existing) return res.status(404).json({ message: 'Booking not found' });
+    const labDoc = await Lab.findById(lab || existing.lab).select('city state brand');
+    if (labDoc) {
+      const blockingRule = await findBlockingRule(labDoc, slotDate);
+      if (blockingRule) {
+        return res.status(400).json({ message: 'This lab is closed on the selected date due to a holiday. Please choose another date.' });
+      }
+
+      const itemsToCheck = items !== undefined ? items : existing.items;
+      for (const item of itemsToCheck || []) {
+        if (!item.product) continue;
+        const product = await Product.findById(item.product).select('name testMaster');
+        if (!product || !product.testMaster) continue;
+        const verdict = await isAvailable({ testMasterId: product.testMaster, lab: labDoc, date: slotDate });
+        if (!verdict.available) {
+          return res.status(400).json({
+            message: `"${product.name}" is not available at this lab on the selected date${verdict.reason ? ` (${verdict.reason})` : ''}. Please choose another date or lab.`,
+          });
+        }
+      }
+    }
+  }
 
   const booking = await Booking.findByIdAndUpdate(req.params.id, update, { new: true })
     .populate('user lab items.product');

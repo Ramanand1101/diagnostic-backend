@@ -5,7 +5,7 @@ const otpSchema = new mongoose.Schema({
   otpHash: { type: String, required: true },
   purpose: {
     type: String,
-    enum: ['login', 'register', 'verify_email', 'reset_password'],
+    enum: ['login', 'register', 'verify_email', 'reset_password', 'change_email', 'change_mobile'],
     default: 'login'
   },
   expiresAt: { type: Date, required: true },

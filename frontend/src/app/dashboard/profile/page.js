@@ -5,15 +5,116 @@ import { userApi } from '@/lib/api';
 import { getErrorMessage } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 import Spinner from '@/components/ui/Spinner';
+import Modal from '@/components/ui/Modal';
 import {
   FiUser, FiMail, FiPhone, FiMapPin, FiNavigation,
-  FiSave, FiPlus, FiTrash2, FiEdit2, FiCheck, FiX, FiLock, FiEye, FiEyeOff,
+  FiSave, FiPlus, FiTrash2, FiEdit2, FiCheck, FiX, FiLock, FiEye, FiEyeOff, FiSend, FiShield,
 } from 'react-icons/fi';
+
+// ── OTP-verified email/mobile change (customer role only) ────────────────────
+function ContactChangeModal({ user, onClose, onUpdated }) {
+  const { login } = useAuth();
+  const [newEmail, setNewEmail] = useState(user?.email || '');
+  const [newMobile, setNewMobile] = useState(user?.mobile || '');
+  const [stage, setStage] = useState('edit'); // 'edit' | 'otp'
+  const [pending, setPending] = useState({ email: false, mobile: false });
+  const [emailOtp, setEmailOtp] = useState('');
+  const [mobileOtp, setMobileOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleRequest = async (e) => {
+    e.preventDefault();
+    const payload = {};
+    if (newEmail.trim() !== (user?.email || '')) payload.email = newEmail.trim();
+    if (newMobile.trim() !== (user?.mobile || '')) payload.mobile = newMobile.trim();
+    if (!payload.email && !payload.mobile) return toast.error('Change the email and/or mobile field first.');
+    setLoading(true);
+    try {
+      const res = await userApi.requestContactChange(payload);
+      setPending({ email: res.data.emailOtpSent, mobile: res.data.mobileOtpSent });
+      setStage('otp');
+      toast.success(res.data.message);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirm = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await userApi.confirmContactChange({ emailOtp: emailOtp.trim(), mobileOtp: mobileOtp.trim() });
+      toast.success('Contact details updated successfully!');
+      login(null, res.data.user);
+      onUpdated?.(res.data.user);
+      onClose();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {stage === 'edit' ? (
+        <form onSubmit={handleRequest} className="space-y-4">
+          <p className="text-xs text-gray-500">
+            Changing your email or mobile requires OTP verification. We&apos;ll send a one-time code to whichever value you change.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="input" placeholder="you@example.com" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+            <input type="tel" inputMode="numeric" maxLength={10} value={newMobile} onChange={(e) => setNewMobile(e.target.value.replace(/\D/g, '').slice(0, 10))} className="input" placeholder="98765 43210" />
+          </div>
+          <div className="flex gap-3 justify-end pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={loading} className="btn-primary flex items-center gap-2">
+              <FiSend size={13} /> {loading ? 'Sending…' : 'Send OTP'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <form onSubmit={handleConfirm} className="space-y-4">
+          <p className="text-xs text-gray-500 flex items-start gap-2">
+            <FiShield className="shrink-0 mt-0.5 text-primary-500" />
+            Enter the OTP(s) sent to confirm your change{pending.email && pending.mobile ? ' — both are required together' : ''}.
+          </p>
+          {pending.email && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email OTP (sent to {newEmail})</label>
+              <input value={emailOtp} onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} className="input" inputMode="numeric" placeholder="6-digit code" />
+            </div>
+          )}
+          {pending.mobile && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Mobile OTP (sent to {newMobile})</label>
+              <input value={mobileOtp} onChange={(e) => setMobileOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} className="input" inputMode="numeric" placeholder="6-digit code" />
+            </div>
+          )}
+          <div className="flex gap-3 justify-end pt-1">
+            <button type="button" onClick={() => setStage('edit')} className="btn-secondary">Back</button>
+            <button type="submit" disabled={loading} className="btn-primary flex items-center gap-2">
+              <FiCheck size={13} /> {loading ? 'Verifying…' : 'Confirm Change'}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
 
 const EMPTY_ADDRESS = { label: 'Home', line1: '', area: '', city: '', state: '', pincode: '' };
 
 export default function ProfilePage() {
   const { user, login } = useAuth();
+  const isCustomer = user?.role === 'customer';
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     name: user?.name || '',
@@ -149,9 +250,11 @@ export default function ProfilePage() {
   // ── Save profile ───────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Validate all fields and show ALL inline errors at once
+    // Validate all fields and show ALL inline errors at once — email/mobile are
+    // read-only for customers here (changed via the OTP flow instead), so skip them.
     const errors = {};
-    ['email', 'alternateEmail', 'mobile', 'alternateMobile'].forEach((name) => {
+    const fieldsToValidate = isCustomer ? ['alternateEmail', 'alternateMobile'] : ['email', 'alternateEmail', 'mobile', 'alternateMobile'];
+    fieldsToValidate.forEach((name) => {
       const err = validateField(name, form[name]);
       if (err) errors[name] = err;
     });
@@ -167,6 +270,7 @@ export default function ProfilePage() {
         addresses,
         ...(location && { location: { ...location, address: manualAddress || location.address } }),
       };
+      if (isCustomer) { delete payload.email; delete payload.mobile; }
       const res = await userApi.updateMe(payload);
       login(null, res.data.user || res.data);
       toast.success('Profile saved!');
@@ -214,10 +318,16 @@ export default function ProfilePage() {
             <div className="relative">
               <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
               <input name="email" type="text" value={form.email} onChange={handleChange} onBlur={handleBlur}
-                className={`input pl-9 ${fieldErrors.email ? 'border-red-400 focus:ring-red-300' : ''}`}
+                readOnly={isCustomer}
+                className={`input pl-9 ${isCustomer ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''} ${fieldErrors.email ? 'border-red-400 focus:ring-red-300' : ''}`}
                 placeholder="you@example.com" />
             </div>
             {fieldErrors.email && <p className="text-xs text-red-500 mt-1 flex items-center gap-1">⚠ Email — {fieldErrors.email}</p>}
+            {isCustomer && (
+              <button type="button" onClick={() => setContactModalOpen(true)} className="text-xs text-primary-600 hover:underline mt-1 flex items-center gap-1">
+                <FiShield size={11} /> Change Email / Mobile (OTP verification required)
+              </button>
+            )}
           </div>
 
           <div>
@@ -226,7 +336,8 @@ export default function ProfilePage() {
               <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
               <input name="mobile" type="tel" inputMode="numeric" maxLength={10} value={form.mobile}
                 onChange={handleChange} onBlur={handleBlur}
-                className={`input pl-9 ${fieldErrors.mobile ? 'border-red-400 focus:ring-red-300' : ''}`}
+                readOnly={isCustomer}
+                className={`input pl-9 ${isCustomer ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''} ${fieldErrors.mobile ? 'border-red-400 focus:ring-red-300' : ''}`}
                 placeholder="98765 43210" />
             </div>
             {fieldErrors.mobile && <p className="text-xs text-red-500 mt-1 flex items-center gap-1">⚠ Mobile — {fieldErrors.mobile}</p>}
@@ -361,6 +472,16 @@ export default function ProfilePage() {
           {loading ? 'Saving...' : 'Save Profile'}
         </button>
       </form>
+
+      {isCustomer && (
+        <Modal open={contactModalOpen} onClose={() => setContactModalOpen(false)} title="Change Email / Mobile">
+          <ContactChangeModal
+            user={user}
+            onClose={() => setContactModalOpen(false)}
+            onUpdated={(updatedUser) => setForm((f) => ({ ...f, email: updatedUser.email || '', mobile: updatedUser.mobile || '' }))}
+          />
+        </Modal>
+      )}
 
       {/* ── Change Password ── */}
       <form onSubmit={handleChangePassword} className="space-y-4 mt-2">

@@ -2,9 +2,11 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { sendMail } = require('../config/email');
+const { sendSms } = require('../config/sms');
 const { isValidEmail, isValidPhone, emailDomain } = require('../utils/validators');
-const { logActivity } = require('../utils/activityLog');
+const { logActivity, requestMeta } = require('../utils/activityLog');
 const { invalidateUserCache } = require('../middleware/authMiddleware');
+const { createOtpRecord, verifyOtpRecord } = require('../utils/otp');
 
 const HOT_EMPLOYEE_DOMAIN = 'healthontime.in';
 
@@ -68,6 +70,13 @@ exports.updateProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).select('-password');
   if (!user) return res.status(404).json({ message: 'User not found' });
 
+  // Customers can never change email/mobile directly here — use the OTP-verified
+  // request-contact-change / confirm-contact-change flow instead.
+  if (user.role === 'customer' && (req.body.email !== undefined || req.body.mobile !== undefined)) {
+    return res.status(400).json({ message: 'Email and mobile number can only be changed via OTP verification — use "Change Email/Mobile" in your profile.' });
+  }
+
+  const previousName = user.name;
   ['name', 'email', 'mobile', 'alternateMobile', 'alternateEmail', 'avatar'].forEach((field) => {
     if (req.body[field] !== undefined) user[field] = req.body[field];
   });
@@ -86,7 +95,122 @@ exports.updateProfile = asyncHandler(async (req, res) => {
 
   if (req.body.password) user.password = req.body.password;
   await user.save();
+  await invalidateUserCache(user._id);
+  if (req.body.name !== undefined && req.body.name !== previousName) {
+    logActivity({
+      actor: req.user, action: 'user.profile_updated', entity: 'User', entityId: user._id,
+      description: `${user.name} updated their profile name from "${previousName}" to "${user.name}"`,
+      previousValue: previousName, newValue: user.name, ...requestMeta(req),
+    });
+  }
   res.json(user);
+});
+
+// POST /api/v1/users/me/request-contact-change — customer stages a new email and/or
+// mobile and receives OTP(s) to confirm. Nothing on the real email/mobile fields
+// changes until confirmContactChange succeeds.
+exports.requestContactChange = asyncHandler(async (req, res) => {
+  const { email, mobile } = req.body;
+  if (!email && !mobile) return res.status(400).json({ message: 'Provide a new email and/or mobile number.' });
+
+  const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  const result = { emailOtpSent: false, mobileOtpSent: false };
+
+  if (email !== undefined && email !== user.email) {
+    if (!isValidEmail(email)) return res.status(400).json({ message: 'Enter a valid email address.' });
+    const taken = await User.findOne({ email: new RegExp(`^${email}$`, 'i'), _id: { $ne: user._id } });
+    if (taken) return res.status(409).json({ message: 'This email is already in use by another account.' });
+
+    const { otp } = await createOtpRecord({ identifier: email, purpose: 'change_email' });
+    try {
+      await sendMail({
+        to: email,
+        subject: 'Confirm your new email address — HealthOnTime',
+        html: `<p>Your OTP to confirm this email as your new HealthOnTime login email is <b>${otp}</b>. It expires in ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.</p>`,
+      });
+    } catch (e) {
+      return res.status(500).json({ message: 'Failed to send email OTP. Please try again.' });
+    }
+    user.pendingEmail = email;
+    result.emailOtpSent = true;
+  }
+
+  if (mobile !== undefined && mobile !== user.mobile) {
+    if (!isValidPhone(mobile)) return res.status(400).json({ message: 'Enter a valid mobile number.' });
+    const taken = await User.findOne({ mobile, _id: { $ne: user._id } });
+    if (taken) return res.status(409).json({ message: 'This mobile number is already in use by another account.' });
+
+    const { otp } = await createOtpRecord({ identifier: mobile, purpose: 'change_mobile' });
+    try {
+      await sendSms({ to: mobile, message: `Your HealthOnTime OTP to confirm this mobile number is ${otp}. Valid for ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.` });
+    } catch (e) {
+      return res.status(500).json({ message: 'Failed to send mobile OTP. Please try again.' });
+    }
+    user.pendingMobile = mobile;
+    result.mobileOtpSent = true;
+  }
+
+  if (!result.emailOtpSent && !result.mobileOtpSent) {
+    return res.status(400).json({ message: 'No change detected — the value(s) provided match your current email/mobile.' });
+  }
+
+  await user.save();
+  res.json({ message: 'OTP sent. Enter it to confirm the change.', ...result });
+});
+
+// POST /api/v1/users/me/confirm-contact-change — verifies whichever OTP(s) are
+// pending; if BOTH email and mobile are being changed together, both must verify
+// successfully before either change is saved.
+exports.confirmContactChange = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('-password');
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  if (!user.pendingEmail && !user.pendingMobile) {
+    return res.status(400).json({ message: 'No pending email/mobile change to confirm.' });
+  }
+
+  const { emailOtp, mobileOtp } = req.body;
+  const changes = [];
+
+  if (user.pendingEmail) {
+    if (!emailOtp) return res.status(400).json({ message: 'Email OTP is required.' });
+    const result = await verifyOtpRecord({ identifier: user.pendingEmail, purpose: 'change_email', otp: emailOtp });
+    if (!result.ok) return res.status(400).json({ message: `Email OTP: ${result.message}` });
+  }
+  if (user.pendingMobile) {
+    if (!mobileOtp) return res.status(400).json({ message: 'Mobile OTP is required.' });
+    const result = await verifyOtpRecord({ identifier: user.pendingMobile, purpose: 'change_mobile', otp: mobileOtp });
+    if (!result.ok) return res.status(400).json({ message: `Mobile OTP: ${result.message}` });
+  }
+
+  // Both required OTPs verified — now apply, and only now.
+  if (user.pendingEmail) {
+    changes.push({ field: 'email', previous: user.email || '(none)', next: user.pendingEmail });
+    user.email = user.pendingEmail;
+    user.pendingEmail = null;
+  }
+  if (user.pendingMobile) {
+    changes.push({ field: 'mobile', previous: user.mobile || '(none)', next: user.pendingMobile });
+    user.mobile = user.pendingMobile;
+    user.pendingMobile = null;
+  }
+
+  await user.save();
+  await invalidateUserCache(user._id);
+
+  changes.forEach((c) => {
+    logActivity({
+      actor: req.user,
+      action: `user.${c.field}_changed`,
+      entity: 'User',
+      entityId: user._id,
+      description: `${req.user.name} changed their ${c.field} from "${c.previous}" to "${c.next}" (OTP verified)`,
+      previousValue: c.previous, newValue: c.next, ...requestMeta(req),
+    });
+  });
+
+  res.json({ message: 'Contact details updated successfully.', user });
 });
 
 exports.changePassword = asyncHandler(async (req, res) => {
@@ -102,6 +226,11 @@ exports.changePassword = asyncHandler(async (req, res) => {
 
   user.password = newPassword;
   await user.save();
+  logActivity({
+    actor: req.user, action: 'user.password_changed', entity: 'User', entityId: user._id,
+    description: `${user.name} changed their own password`,
+    previousValue: '(hidden)', newValue: '(hidden)', ...requestMeta(req),
+  });
   res.json({ message: 'Password changed successfully.' });
 });
 
@@ -118,6 +247,25 @@ exports.listUsers = asyncHandler(async (req, res) => {
   ]);
 
   res.json({ items: users, total, page: Number(page), limit: safeLimit });
+});
+
+// PATCH /api/v1/users/:id/status — admin activates/deactivates an account
+exports.toggleUserStatus = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  if (user.role === 'superadmin') return res.status(403).json({ message: 'Cannot deactivate a superadmin account.' });
+
+  const previous = user.isActive;
+  user.isActive = typeof req.body.isActive === 'boolean' ? req.body.isActive : !user.isActive;
+  await user.save();
+  await invalidateUserCache(user._id);
+
+  logActivity({
+    actor: req.user, action: 'user.status_changed', entity: 'User', entityId: user._id,
+    description: `${req.user.name} ${user.isActive ? 'activated' : 'deactivated'} ${user.name}'s account`,
+    previousValue: previous ? 'active' : 'inactive', newValue: user.isActive ? 'active' : 'inactive', ...requestMeta(req),
+  });
+  res.json({ _id: user._id, name: user.name, isActive: user.isActive });
 });
 
 exports.updateRole = asyncHandler(async (req, res) => {
@@ -156,7 +304,11 @@ exports.updateRole = asyncHandler(async (req, res) => {
   user.role = role;
   await user.save();
   await invalidateUserCache(user._id);
-  logActivity({ actor: req.user, action: 'user.role_changed', entity: 'User', entityId: user._id, description: `${user.name}'s role changed from ${oldRole} to ${role}` });
+  logActivity({
+    actor: req.user, action: 'user.role_changed', entity: 'User', entityId: user._id,
+    description: `${req.user.name} changed ${user.name}'s role from ${oldRole} to ${role}`,
+    previousValue: oldRole, newValue: role, ...requestMeta(req),
+  });
   res.json({ message: `Role updated to ${role}`, user: { _id: user._id, name: user.name, role: user.role } });
 });
 
@@ -168,11 +320,11 @@ exports.updateUserDetails = asyncHandler(async (req, res) => {
     return res.status(403).json({ message: 'Only superadmin can edit a superadmin\'s details' });
 
   const { name, email, mobile } = req.body;
-  const changes = [];
+  const changes = []; // [{ field, action, previous, next }]
 
   if (name !== undefined) {
     if (!name.trim()) return res.status(400).json({ message: 'Name cannot be empty.' });
-    if (name !== user.name) changes.push(`name: "${user.name}" → "${name}"`);
+    if (name !== user.name) changes.push({ field: 'name', action: 'user.profile_updated', previous: user.name, next: name });
     user.name = name;
   }
   if (email !== undefined && email !== user.email) {
@@ -182,7 +334,7 @@ exports.updateUserDetails = asyncHandler(async (req, res) => {
     }
     const exists = await User.findOne({ email: new RegExp(`^${email}$`, 'i'), _id: { $ne: user._id } });
     if (exists) return res.status(409).json({ message: 'This email is already used by another account.' });
-    changes.push(`email: "${user.email || ''}" → "${email}"`);
+    changes.push({ field: 'email', action: email ? 'user.email_changed' : 'user.email_removed', previous: user.email || '(none)', next: email || '(removed)' });
     user.email = email;
   }
   if (mobile !== undefined && mobile !== user.mobile) {
@@ -191,15 +343,20 @@ exports.updateUserDetails = asyncHandler(async (req, res) => {
       const exists = await User.findOne({ mobile, _id: { $ne: user._id } });
       if (exists) return res.status(409).json({ message: 'This mobile number is already used by another account.' });
     }
-    changes.push(`mobile: "${user.mobile || ''}" → "${mobile || ''}"`);
+    changes.push({ field: 'mobile', action: mobile ? 'user.mobile_changed' : 'user.mobile_removed', previous: user.mobile || '(none)', next: mobile || '(removed)' });
     user.mobile = mobile || undefined;
   }
 
   await user.save();
   await invalidateUserCache(user._id);
-  if (changes.length) {
-    logActivity({ actor: req.user, action: 'user.updated', entity: 'User', entityId: user._id, description: `${req.user.name} updated ${user.name}'s details: ${changes.join(', ')}` });
-  }
+  const meta = requestMeta(req);
+  changes.forEach((c) => {
+    logActivity({
+      actor: req.user, action: c.action, entity: 'User', entityId: user._id,
+      description: `${req.user.name} changed ${user.name}'s ${c.field} from "${c.previous}" to "${c.next}"`,
+      previousValue: c.previous, newValue: c.next, ...meta,
+    });
+  });
   res.json({ _id: user._id, name: user.name, email: user.email, mobile: user.mobile, role: user.role });
 });
 
@@ -216,6 +373,8 @@ const PERMISSION_MODULES = [
   { key: 'bookings',      label: 'Bookings' },
   { key: 'reports',       label: 'Reports' },
   { key: 'lab-changes',   label: 'Lab Profile Changes' },
+  { key: 'lab-holidays',  label: 'Lab Holiday Management' },
+  { key: 'test-availability', label: 'Test Availability Management' },
   { key: 'users',         label: 'Users' },
   { key: 'reviews',       label: 'Reviews' },
   { key: 'tickets',       label: 'Tickets' },
@@ -328,6 +487,12 @@ exports.resetPassword = asyncHandler(async (req, res) => {
       console.error('[resetPassword] email failed:', e.message);
     }
   }
+
+  logActivity({
+    actor: req.user, action: 'user.password_reset', entity: 'User', entityId: user._id,
+    description: `${req.user.name} reset ${user.name}'s password`,
+    previousValue: '(hidden)', newValue: '(hidden)', ...requestMeta(req),
+  });
 
   res.json({
     message: 'Password reset successfully',

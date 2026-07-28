@@ -4,6 +4,8 @@ const TestMaster = require('../models/TestMaster');
 const { syncObjects, deleteObject } = require('../services/algoliaSync');
 const makeSlug   = require('../utils/slug');
 const { parseCSV } = require('../utils/csvParser');
+const { resolveLabIdsForLocation } = require('../utils/geoLabs');
+const { filterAvailableProducts } = require('../utils/testAvailability');
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -60,13 +62,13 @@ function toAlgoliaRecord(p) {
 }
 
 const TM_POPULATE = { path: 'testMaster', select: 'name category subcategory description sampleType reportTime fastingRequired homeCollection' };
-const LAB_SELECT  = 'name slug city state address area pincode email homeCollection ratingAvg accreditation verificationStatus';
+const LAB_SELECT  = 'name slug city state brand address area pincode email homeCollection ratingAvg accreditation verificationStatus';
 
 // ─── public routes ────────────────────────────────────────────────────────────
 
 exports.listProducts = asyncHandler(async (req, res) => {
-  const { type, q, lab, city, page = 1, limit = 20, sort = '-createdAt',
-          brand, featured } = req.query;
+  const { type, q, lab, city, lat, lng, radiusKm, page = 1, limit = 20, sort = '-createdAt',
+          brand, featured, date } = req.query;
 
   const filter = { isActive: true };
   if (type)     filter.type      = type;
@@ -74,23 +76,30 @@ exports.listProducts = asyncHandler(async (req, res) => {
   if (brand)    filter.brand     = new RegExp(brand, 'i');
   if (featured) filter.isFeatured = featured === 'true';
 
-  if (city) {
-    const Lab = require('../models/Lab');
-    const cityLabs = await Lab.find({ city: new RegExp(city, 'i'), approved: true }).select('_id').lean();
-    filter.lab = { $in: cityLabs.map((l) => l._id) };
+  // lat/lng ("near me") takes priority over a plain city name; both resolve to a
+  // set of serving lab IDs. An empty (but non-null) array means "a location was
+  // given, but zero labs serve it" — the frontend shows the no-coverage message.
+  const locationLabIds = await resolveLabIdsForLocation({ city, lat, lng, radiusKm });
+  if (locationLabIds) {
+    filter.lab = { $in: locationLabIds };
   } else if (lab) {
     filter.lab = lab;
   }
 
   const skip = (Number(page) - 1) * Number(limit);
-  const [items, total] = await Promise.all([
+  const [rawItems, total] = await Promise.all([
     Product.find(filter)
       .populate(TM_POPULATE)
       .populate('lab', LAB_SELECT)
       .sort(sort).skip(skip).limit(Number(limit)),
     Product.countDocuments(filter),
   ]);
-  res.json({ items, page: Number(page), limit: Number(limit), total });
+
+  // Hide tests/packages that a Test Availability rule has marked unavailable at their
+  // lab for the requested date — applied after pagination since the rule set is small
+  // relative to the page size, so this never runs against the whole catalogue.
+  const items = date ? await filterAvailableProducts(rawItems, new Date(date)) : rawItems;
+  res.json({ items, page: Number(page), limit: Number(limit), total, locationFiltered: locationLabIds !== null, dateFiltered: !!date });
 });
 
 exports.getProductBySlug = asyncHandler(async (req, res) => {

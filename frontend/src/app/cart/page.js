@@ -6,7 +6,7 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { bookingApi, userApi, authApi, settingApi } from '@/lib/api';
+import { bookingApi, userApi, authApi, settingApi, labHolidayApi, testAvailabilityApi } from '@/lib/api';
 import BookingAnimation from '@/components/booking/BookingAnimation';
 import { getErrorMessage } from '@/utils/helpers';
 import {
@@ -99,7 +99,7 @@ function TimeSlotPicker({ value, onChange, slotDate }) {
 // ── DD / MM / YYYY date picker ────────────────────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function DateSelectPicker({ value, onChange, minDate, maxDate }) {
+function DateSelectPicker({ value, onChange, minDate, maxDate, blockedDates = [] }) {
   const [dd, setDd] = useState('');
   const [mm, setMm] = useState('');
   const [yyyy, setYyyy] = useState('');
@@ -113,6 +113,12 @@ function DateSelectPicker({ value, onChange, minDate, maxDate }) {
       setYyyy(''); setMm(''); setDd('');
     }
   }, [value]);
+
+  // If the lab's holiday list loads (or changes) after a date was already picked,
+  // and that date is now blocked, clear the selection so it can't be submitted.
+  useEffect(() => {
+    if (value && blockedDates.includes(value)) onChange('');
+  }, [blockedDates]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const emit = (newYyyy, newMm, newDd) => {
     if (newYyyy && newMm && newDd) {
@@ -140,9 +146,11 @@ function DateSelectPicker({ value, onChange, minDate, maxDate }) {
 
   // Day options: filter by month length, past days (min), and future days (max)
   const daysInMonth = yyyy && mm ? new Date(Number(yyyy), Number(mm), 0).getDate() : 31;
+  const blockedSet = new Set(blockedDates);
   const dayOpts = Array.from({ length: daysInMonth }, (_, i) => i + 1).filter((d) => {
     if (Number(yyyy) === minY && Number(mm) === minM && d < minD) return false;
     if (Number(yyyy) === maxY && Number(mm) === maxM && d > maxD) return false;
+    if (yyyy && mm && blockedSet.has(`${yyyy}-${mm}-${String(d).padStart(2, '0')}`)) return false;
     return true;
   });
 
@@ -359,6 +367,55 @@ function BookingForm({ groups, onReadyForPayment }) {
   const [pincodeValid, setPincodeValid] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [blockedDates, setBlockedDates] = useState([]);
+  const [unavailableToday, setUnavailableToday] = useState(null); // { product, reason } | null
+  const [alternatives, setAlternatives] = useState([]);
+
+  const labId = groups[0]?.labId;
+  const cartTestMasterIds = useMemo(
+    () => [...new Set((groups[0]?.items || []).map((i) => i.testMaster?._id || i.testMaster).filter(Boolean))],
+    [groups]
+  );
+
+  useEffect(() => {
+    if (!labId) { setBlockedDates([]); return; }
+    Promise.all([
+      labHolidayApi.getBlockedDates(labId, 30).then((res) => res.data.blockedDates || []).catch(() => []),
+      ...cartTestMasterIds.map((tm) =>
+        testAvailabilityApi.getUnavailableDates({ testMaster: tm, lab: labId, days: 30 })
+          .then((res) => res.data.unavailableDates || []).catch(() => [])
+      ),
+    ]).then((lists) => setBlockedDates([...new Set(lists.flat())]));
+  }, [labId, cartTestMasterIds]);
+
+  // Live-check the selected date against every test in the cart — a rule created
+  // after blockedDates was fetched (or one keyed off a scope the picker doesn't
+  // pre-list) can still slip through, so this is the last line of UX defense before
+  // the server-side booking validation would reject it anyway.
+  useEffect(() => {
+    setUnavailableToday(null);
+    setAlternatives([]);
+    if (!labId || !form.slotDate || !cartTestMasterIds.length) return;
+    let cancelled = false;
+    (async () => {
+      for (const item of groups[0]?.items || []) {
+        const tm = item.testMaster?._id || item.testMaster;
+        if (!tm) continue;
+        try {
+          const res = await testAvailabilityApi.check({ testMaster: tm, lab: labId, date: form.slotDate });
+          if (cancelled) return;
+          if (!res.data.available) {
+            setUnavailableToday({ product: item.name, reason: res.data.reason });
+            testAvailabilityApi.getAlternatives({
+              testMaster: tm, lab: labId, date: form.slotDate, city: item.lab?.city,
+            }).then((r) => { if (!cancelled) setAlternatives(r.data.alternatives || []); }).catch(() => {});
+            return;
+          }
+        } catch { /* non-blocking UX check */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [labId, form.slotDate, cartTestMasterIds, groups]);
 
   // Load saved form — works for both guests and logged-in users
   useEffect(() => {
@@ -414,6 +471,9 @@ function BookingForm({ groups, onReadyForPayment }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (unavailableToday) {
+      toast.error(`"${unavailableToday.product}" is not available on the selected date. Please choose another date.`); return;
+    }
     const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.(com|co\.in|co|in|net|info|ai)$/i;
     if (!form.phone || !/^[6-9]\d{9}$/.test(form.phone)) {
       toast.error('Please enter a valid 10-digit mobile number starting with 6–9.'); return;
@@ -565,10 +625,37 @@ function BookingForm({ groups, onReadyForPayment }) {
             onChange={(v) => setForm((f) => ({ ...f, slotDate: v }))}
             minDate={today}
             maxDate={maxBookingDate}
+            blockedDates={blockedDates}
           />
-          <p className="text-[10px] text-gray-400 mt-1">Bookings can be scheduled up to 30 days in advance</p>
+          {blockedDates.length >= 30 ? (
+            <p className="text-[11px] text-red-600 mt-1 font-medium">
+              No diagnostic centers are available on the selected date. Please choose another date.
+            </p>
+          ) : (
+            <p className="text-[10px] text-gray-400 mt-1">Bookings can be scheduled up to 30 days in advance</p>
+          )}
         </div>
       </div>
+
+      {unavailableToday && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 space-y-2">
+          <p className="text-sm text-red-700 font-medium">
+            &quot;{unavailableToday.product}&quot; is not available at this lab on the selected date{unavailableToday.reason ? ` (${unavailableToday.reason})` : ''}. Please pick another date.
+          </p>
+          {alternatives.length > 0 && (
+            <div>
+              <p className="text-xs text-red-600 mb-1.5">This test is available at nearby labs instead:</p>
+              <div className="flex flex-wrap gap-2">
+                {alternatives.map((a) => (
+                  <span key={a.lab._id} className="text-xs bg-white border border-red-200 rounded-lg px-2.5 py-1.5 text-gray-700">
+                    {a.lab.name} — {a.lab.city}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Row 3: Time slot picker (full width) */}
       <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
@@ -625,7 +712,7 @@ function BookingForm({ groups, onReadyForPayment }) {
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || !!unavailableToday}
         className="w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold text-sm transition-colors mt-2"
       >
         {submitting

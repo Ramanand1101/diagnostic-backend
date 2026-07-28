@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { corporateAppointmentApi, corporateApi } from '@/lib/api';
+import { corporateAppointmentApi, corporateApi, labHolidayApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
@@ -45,11 +45,18 @@ function ScheduleForm({ onSave, onClose }) {
   });
   const [customItems, setCustomItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [blockedDates, setBlockedDates] = useState([]);
 
   const today = TODAY;
   const maxBookingDate = MAX_BOOKING_DATE;
 
   useEffect(() => { corporateApi.getAll({ limit: 200, active: 'true' }).then((r) => setCorporates(r.data.items || [])); }, []);
+  useEffect(() => {
+    if (!form.lab) { setBlockedDates([]); return; }
+    labHolidayApi.getBlockedDates(form.lab, 30)
+      .then((res) => setBlockedDates(res.data.blockedDates || []))
+      .catch(() => setBlockedDates([]));
+  }, [form.lab]);
   useEffect(() => {
     if (!corporateId) { setCorpDetail(null); return; }
     corporateApi.getOne(corporateId).then((r) => setCorpDetail(r.data));
@@ -169,8 +176,13 @@ function ScheduleForm({ onSave, onClose }) {
           onChange={(v) => set('slotDate', v)}
           minDate={today}
           maxDate={maxBookingDate}
+          blockedDates={blockedDates}
         />
-        <p className="text-[10px] text-gray-400 mt-1">Appointments can be scheduled up to 30 days in advance</p>
+        {blockedDates.length >= 30 ? (
+          <p className="text-[11px] text-red-600 mt-1 font-medium">No diagnostic centers are available on the selected date. Please choose another date.</p>
+        ) : (
+          <p className="text-[10px] text-gray-400 mt-1">Appointments can be scheduled up to 30 days in advance</p>
+        )}
       </div>
       <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
         <TimeSlotPicker
@@ -240,6 +252,15 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
   const [reportType, setReportType] = useState('complete');
   const [missingSelected, setMissingSelected] = useState([]);
   const reportFileRef = useRef(null);
+  const [rescheduleBlockedDates, setRescheduleBlockedDates] = useState([]);
+
+  useEffect(() => {
+    const labId = appointment.lab?._id || appointment.lab;
+    if (!labId) return;
+    labHolidayApi.getBlockedDates(labId, 30)
+      .then((res) => setRescheduleBlockedDates(res.data.blockedDates || []))
+      .catch(() => setRescheduleBlockedDates([]));
+  }, [appointment.lab]);
 
   const run = async (fn, successMsg) => {
     setBusy(true);
@@ -373,7 +394,11 @@ function AppointmentDetail({ appointment, onClose, onChanged }) {
               onChange={(v) => setRescheduleForm((f) => ({ ...f, slotDate: v }))}
               minDate={TODAY}
               maxDate={MAX_BOOKING_DATE}
+              blockedDates={rescheduleBlockedDates}
             />
+            {rescheduleBlockedDates.length >= 30 && (
+              <p className="text-[11px] text-red-600 mt-1 font-medium">No diagnostic centers are available on the selected date. Please choose another date.</p>
+            )}
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-3">
             <TimeSlotPicker

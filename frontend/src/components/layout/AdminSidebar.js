@@ -7,7 +7,7 @@ import {
   FiFileText, FiPercent, FiStar, FiBook, FiFile, FiMail,
   FiSettings, FiHelpCircle, FiImage, FiUploadCloud, FiLayers,
   FiBriefcase, FiUserCheck, FiPhoneCall, FiActivity, FiList, FiLayout, FiFilePlus,
-  FiDollarSign, FiChevronsLeft, FiChevronsRight, FiLink,
+  FiDollarSign, FiChevronsLeft, FiChevronsRight, FiLink, FiToggleRight,
 } from 'react-icons/fi';
 import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -28,6 +28,8 @@ const navSections = [
       { href: '/admin/categories',  label: 'Categories',      icon: FiTag,         permission: 'categories' },
       { href: '/admin/test-master', label: 'Test Master List',icon: FiList,        permission: 'test-master' },
       { href: '/admin/bulk-upload', label: 'Bulk Upload',     icon: FiUploadCloud, permission: 'bulk-upload' },
+      { href: '/admin/lab-holidays',label: 'Lab Holidays',    icon: FiCalendar,    permission: 'lab-holidays' },
+      { href: '/admin/test-availability', label: 'Test Availability', icon: FiToggleRight, permission: 'test-availability' },
     ],
   },
   {

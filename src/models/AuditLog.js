@@ -8,6 +8,10 @@ const auditSchema = new mongoose.Schema({
   entity: String,        // e.g. 'Corporate', 'CorporateAppointment', 'User'
   entityId: String,
   description: String,   // human-readable summary for the activity feed
+  previousValue: String,
+  newValue: String,
+  ipAddress: String,
+  userAgent: String,
   payload: mongoose.Schema.Types.Mixed
 }, { timestamps: true });
 

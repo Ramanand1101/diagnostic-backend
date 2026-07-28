@@ -27,6 +27,9 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    // Fire-and-forget — purely records the logout in the Activity Log; the token is
+    // cleared client-side regardless of whether this call succeeds.
+    if (Cookies.get('token')) authApi.logout().catch(() => {});
     Cookies.remove('token');
     setUser(null);
   };

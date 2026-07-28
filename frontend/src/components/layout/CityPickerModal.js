@@ -6,7 +6,7 @@ import { labApi } from '@/lib/api';
 import CityLandmark from './CityLandmark';
 
 export default function CityPickerModal({ open, onClose }) {
-  const { city, setCity } = useCity();
+  const { city, setCity, setCoords } = useCity();
   const [cities, setCities] = useState([]);
   const [filter, setFilter] = useState('');
   const [detecting, setDetecting] = useState(false);
@@ -41,24 +41,29 @@ export default function CityPickerModal({ open, onClose }) {
     if (!navigator.geolocation) return;
     setDetecting(true);
     navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
+      async ({ coords: geo }) => {
+        let detected = '';
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
+            `https://nominatim.openstreetmap.org/reverse?lat=${geo.latitude}&lon=${geo.longitude}&format=json`
           );
           const data = await res.json();
-          const detected =
+          detected =
             data.address?.city ||
             data.address?.town ||
             data.address?.village ||
             data.address?.state_district ||
             '';
-          if (detected) selectCity(detected);
         } catch {
-          // silently fail
-        } finally {
-          setDetecting(false);
+          // Reverse-geocoding for a display label failed — the coordinates below
+          // are what actually drives serviceable-area filtering, so still proceed.
         }
+        if (detected) setCity(detected);
+        // Set after setCity, since picking a city clears any previously-set coords.
+        setCoords({ lat: geo.latitude, lng: geo.longitude });
+        onClose();
+        setFilter('');
+        setDetecting(false);
       },
       () => setDetecting(false),
       { timeout: 8000 }

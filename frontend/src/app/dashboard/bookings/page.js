@@ -1,11 +1,26 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { bookingApi } from '@/lib/api';
-import { formatDate, formatCurrency, statusColor } from '@/utils/helpers';
+import { bookingApi, reportApi } from '@/lib/api';
+import { formatDate, formatCurrency, statusColor, getErrorMessage } from '@/utils/helpers';
 import Pagination from '@/components/ui/Pagination';
 import { PageLoader } from '@/components/ui/Spinner';
-import { FiCalendar } from 'react-icons/fi';
+import { FiCalendar, FiEye, FiDownload } from 'react-icons/fi';
+import toast from 'react-hot-toast';
+
+// Opens the newest uploaded report for a booking — inline (View) or as a forced
+// download — fetched on demand so the list doesn't need N report lookups upfront.
+async function openBookingReport(bookingId, inline) {
+  try {
+    const res = await reportApi.getAll({ booking: bookingId });
+    const reports = res.data.items || [];
+    if (!reports.length) return toast.error('Report not available yet');
+    const urlRes = await reportApi.getDownloadUrl(reports[0]._id, inline);
+    window.open(urlRes.data.url, '_blank');
+  } catch (err) {
+    toast.error(getErrorMessage(err));
+  }
+}
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState([]);
@@ -78,7 +93,19 @@ export default function BookingsPage() {
                       </td>
                       <td className="table-cell font-semibold">{formatCurrency(b.total)}</td>
                       <td className="table-cell">
-                        <Link href={`/dashboard/bookings/${b._id}`} className="text-primary-600 hover:underline text-sm">View</Link>
+                        <div className="flex items-center gap-3">
+                          <Link href={`/dashboard/bookings/${b._id}`} className="text-primary-600 hover:underline text-sm">View</Link>
+                          {b.reportStatus && b.reportStatus !== 'none' && (
+                            <>
+                              <button onClick={() => openBookingReport(b._id, true)} title="View Report" className="text-gray-400 hover:text-primary-600 flex items-center gap-1 text-xs">
+                                <FiEye size={13} /> Report
+                              </button>
+                              <button onClick={() => openBookingReport(b._id, false)} title="Download Report" className="text-gray-400 hover:text-primary-600">
+                                <FiDownload size={13} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -4,7 +4,7 @@ import { userApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
-import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX, FiCheck, FiPlus, FiKey, FiCopy, FiEdit } from 'react-icons/fi';
+import { FiCheckCircle, FiSearch, FiTrash2, FiShield, FiDownload, FiSliders, FiX, FiCheck, FiPlus, FiKey, FiCopy, FiEdit, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 
@@ -481,6 +481,16 @@ export default function AdminUsersPage() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
+  const handleToggleStatus = async (user) => {
+    const next = !user.isActive;
+    if (!confirm(`${next ? 'Activate' : 'Deactivate'} "${user.name}"'s account?`)) return;
+    try {
+      await userApi.toggleStatus(user._id, next);
+      toast.success(`Account ${next ? 'activated' : 'deactivated'}`);
+      fetchUsers();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selected.size} user(s)? This cannot be undone. Superadmins are protected and won't be deleted.`)) return;
     setBulkDeleting(true);
@@ -811,6 +821,12 @@ export default function AdminUsersPage() {
                               className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors"
                             >
                               <FiKey size={12} /> Reset Pwd
+                            </button>
+                          )}
+                          {!isSuper && isSuperAdmin && (
+                            <button onClick={() => handleToggleStatus(u)} title={u.isActive ? 'Deactivate account' : 'Activate account'}
+                              className={`transition-colors p-1 rounded ${u.isActive ? 'text-green-500 hover:bg-green-50' : 'text-gray-300 hover:bg-gray-50'}`}>
+                              {u.isActive ? <FiToggleRight size={16} /> : <FiToggleLeft size={16} />}
                             </button>
                           )}
                           {!isSuper && (

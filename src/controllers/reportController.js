@@ -202,10 +202,13 @@ exports.getDownloadUrl = asyncHandler(async (req, res) => {
     }
   }
 
+  // ?inline=true → opens/previews in the browser tab ("View Report");
+  // default → forces a save-as download ("Download Report").
+  const disposition = req.query.inline === 'true' ? 'inline' : 'attachment';
   const url = await getSignedUrl(s3, new GetObjectCommand({
     Bucket: bucket,
     Key: report.storageKey,
-    ResponseContentDisposition: `attachment; filename="${report.fileName || 'report.pdf'}"`
+    ResponseContentDisposition: `${disposition}; filename="${report.fileName || 'report.pdf'}"`
   }), { expiresIn: 300 });
 
   res.json({ url });

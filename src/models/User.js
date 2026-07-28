@@ -25,6 +25,10 @@ const userSchema = new mongoose.Schema({
   mobile: { type: String, unique: true, sparse: true },
   alternateMobile: { type: String, default: '' },
   alternateEmail: { type: String, default: '' },
+  // Staged email/mobile awaiting OTP confirmation — never applied to the real
+  // email/mobile fields until verifyOtpRecord succeeds for it.
+  pendingEmail: { type: String, default: null },
+  pendingMobile: { type: String, default: null },
   password: { type: String, select: false },
   googleId: { type: String, unique: true, sparse: true },
   role: {

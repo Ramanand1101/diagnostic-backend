@@ -2,21 +2,115 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { bookingApi } from '@/lib/api';
-import { formatDate, formatCurrency, statusColor } from '@/utils/helpers';
+import { bookingApi, reportApi, reportNoteApi } from '@/lib/api';
+import { formatDate, formatCurrency, statusColor, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Badge from '@/components/ui/Badge';
+import { FiFileText, FiEye, FiDownload, FiEdit2, FiTrash2, FiPlus } from 'react-icons/fi';
+import toast from 'react-hot-toast';
+
+// ── Customer's private notes for one report — never touches the report file itself ──
+function ReportNotes({ reportId }) {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState('');
+
+  const fetchNotes = () => {
+    setLoading(true);
+    reportNoteApi.getAll(reportId).then((res) => setNotes(res.data.items || [])).finally(() => setLoading(false));
+  };
+  useEffect(() => { fetchNotes(); }, [reportId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!draft.trim()) return;
+    try {
+      await reportNoteApi.create(reportId, draft.trim());
+      setDraft('');
+      fetchNotes();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const handleSaveEdit = async (id) => {
+    if (!editDraft.trim()) return;
+    try {
+      await reportNoteApi.update(id, editDraft.trim());
+      setEditingId(null);
+      fetchNotes();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this note?')) return;
+    try {
+      await reportNoteApi.remove(id);
+      fetchNotes();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  return (
+    <div className="mt-2 pl-3 border-l-2 border-gray-100 space-y-2">
+      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">My Notes (private)</p>
+      {loading ? <p className="text-xs text-gray-400">Loading…</p> : (
+        <div className="space-y-1.5">
+          {notes.map((n) => (
+            <div key={n._id} className="bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">
+              {editingId === n._id ? (
+                <div className="flex gap-1.5">
+                  <input value={editDraft} onChange={(e) => setEditDraft(e.target.value)} className="input text-xs flex-1 py-1" autoFocus />
+                  <button onClick={() => handleSaveEdit(n._id)} className="text-primary-600 text-xs font-medium">Save</button>
+                  <button onClick={() => setEditingId(null)} className="text-gray-400 text-xs">Cancel</button>
+                </div>
+              ) : (
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs text-gray-700">{n.note}</p>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button onClick={() => { setEditingId(n._id); setEditDraft(n.note); }} className="text-gray-400 hover:text-primary-600"><FiEdit2 size={11} /></button>
+                    <button onClick={() => handleDelete(n._id)} className="text-gray-400 hover:text-red-500"><FiTrash2 size={11} /></button>
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-gray-400 mt-0.5">{formatDate(n.updatedAt)}</p>
+            </div>
+          ))}
+          {notes.length === 0 && <p className="text-xs text-gray-400">No personal notes yet — add a reminder for yourself below.</p>}
+        </div>
+      )}
+      <form onSubmit={handleAdd} className="flex gap-1.5">
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="e.g. Repeat CBC after 3 months" className="input text-xs flex-1 py-1.5" />
+        <button type="submit" className="text-xs px-2.5 py-1.5 bg-primary-600 text-white rounded-lg flex items-center gap-1 shrink-0"><FiPlus size={11} /> Add</button>
+      </form>
+    </div>
+  );
+}
 
 export default function BookingDetailPage() {
   const { id } = useParams();
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reports, setReports] = useState([]);
 
   useEffect(() => {
     bookingApi.getById(id)
       .then((res) => setBooking(res.data.booking || res.data))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    reportApi.getAll({ booking: id }).then((res) => setReports(res.data.items || [])).catch(() => setReports([]));
+  }, [id]);
+
+  const openReport = async (reportId, inline) => {
+    try {
+      const res = await reportApi.getDownloadUrl(reportId, inline);
+      window.open(res.data.url, '_blank');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
 
   if (loading) return <PageLoader />;
   if (!booking) return <div className="text-center py-20 text-gray-500">Booking not found</div>;
@@ -114,6 +208,36 @@ export default function BookingDetailPage() {
               </div>
             </dl>
           </div>
+
+          {booking.reportStatus && booking.reportStatus !== 'none' && reports.length > 0 && (
+            <div className="card">
+              <h2 className="font-semibold text-gray-900 mb-3">Report</h2>
+              <div className="space-y-2">
+                {reports.map((r) => (
+                  <div key={r._id} className="bg-gray-50 rounded-xl px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FiFileText className="text-gray-400 shrink-0" />
+                        <span className="text-sm text-gray-700 truncate">{r.fileName || 'report.pdf'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button onClick={() => openReport(r._id, true)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-primary-600 hover:border-primary-300">
+                          <FiEye size={12} /> View
+                        </button>
+                        <button onClick={() => openReport(r._id, false)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700">
+                          <FiDownload size={12} /> Download
+                        </button>
+                      </div>
+                    </div>
+                    <ReportNotes reportId={r._id} />
+                  </div>
+                ))}
+              </div>
+              {booking.reportStatus === 'partial' && (
+                <p className="text-xs text-amber-600 mt-2">Some test results are still pending — this report will be updated once complete.</p>
+              )}
+            </div>
+          )}
 
           {booking.patients?.length > 0 && (
             <div className="card">

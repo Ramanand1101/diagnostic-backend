@@ -39,12 +39,15 @@ export const authApi = {
   verifyOtp: (data) => api.post('/auth/verify-otp', data),
   me: () => api.get('/auth/me'),
   autoRegister: (data) => api.post('/auth/auto-register', data),
+  logout: () => api.post('/auth/logout'),
 };
 
 // Users
 export const userApi = {
   getMe: () => api.get('/users/me'),
   updateMe: (data) => api.put('/users/me', data),
+  requestContactChange: (data) => api.post('/users/me/request-contact-change', data),
+  confirmContactChange: (data) => api.post('/users/me/confirm-contact-change', data),
   changePassword: (data) => api.put('/users/me/change-password', data),
   create: (data) => api.post('/users', data),
   getAll: (params) => api.get('/users', { params }),
@@ -56,6 +59,7 @@ export const userApi = {
   getPermissionModules: () => api.get('/users/permission-modules'),
   updatePermissions: (id, permissions) => api.patch(`/users/${id}/permissions`, { permissions }),
   resetPassword: (id, sendEmail = true) => api.post(`/users/${id}/reset-password`, { sendEmail }),
+  toggleStatus: (id, isActive) => api.patch(`/users/${id}/status`, { isActive }),
 };
 
 // Labs
@@ -75,6 +79,36 @@ export const labApi = {
   demoCsvUrl: () => `${BASE_URL}/labs/demo-csv`,
   bulkDelete: (ids) => api.delete('/labs/bulk-delete', { data: { ids } }),
   exportCsv: (params) => api.get('/labs/export-csv', { params, responseType: 'blob' }),
+};
+
+// Lab Holidays
+export const labHolidayApi = {
+  getAll: (params) => api.get('/lab-holidays', { params }),
+  create: (data) => api.post('/lab-holidays', data),
+  update: (id, data) => api.put(`/lab-holidays/${id}`, data),
+  toggleActive: (id) => api.patch(`/lab-holidays/${id}/toggle`),
+  remove: (id) => api.delete(`/lab-holidays/${id}`),
+  getBlockedDates: (lab, days = 30) => api.get('/lab-holidays/blocked-dates', { params: { lab, days } }),
+  bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/lab-holidays/bulk-csv', fd); },
+  demoCsv: () => api.get('/lab-holidays/demo-csv', { responseType: 'blob' }),
+  demoCsvUrl: () => `${BASE_URL}/lab-holidays/demo-csv`,
+};
+
+// Test Availability Management
+export const testAvailabilityApi = {
+  getAll: (params) => api.get('/test-availability', { params }),
+  create: (data) => api.post('/test-availability', data),
+  update: (id, data) => api.put(`/test-availability/${id}`, data),
+  toggleActive: (id) => api.patch(`/test-availability/${id}/toggle`),
+  remove: (id) => api.delete(`/test-availability/${id}`),
+  bulkToggle: (ids, active) => api.post('/test-availability/bulk-toggle', { ids, active }),
+  bulkApply: (labIds, rule) => api.post('/test-availability/bulk-apply', { labIds, ...rule }),
+  bulkCsv: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/test-availability/bulk-csv', fd); },
+  demoCsv: () => api.get('/test-availability/demo-csv', { responseType: 'blob' }),
+  demoCsvUrl: () => `${BASE_URL}/test-availability/demo-csv`,
+  check: (params) => api.get('/test-availability/check', { params }),
+  getUnavailableDates: (params) => api.get('/test-availability/unavailable-dates', { params }),
+  getAlternatives: (params) => api.get('/test-availability/alternatives', { params }),
 };
 
 // Corporates
@@ -234,9 +268,17 @@ export const reportApi = {
     return api.post('/reports', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
   getShared: (token) => api.get(`/reports/share/${token}`),
-  getDownloadUrl: (id) => api.get(`/reports/${id}/download`),
+  getDownloadUrl: (id, inline = false) => api.get(`/reports/${id}/download`, { params: inline ? { inline: 'true' } : {} }),
   deleteReport: (id) => api.delete(`/reports/${id}`),
   replaceReport: (id, formData) => api.put(`/reports/${id}/replace`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+};
+
+// Report Notes — customer's private per-report reminders
+export const reportNoteApi = {
+  getAll: (reportId) => api.get('/report-notes', { params: { report: reportId } }),
+  create: (reportId, note) => api.post('/report-notes', { report: reportId, note }),
+  update: (id, note) => api.put(`/report-notes/${id}`, { note }),
+  remove: (id) => api.delete(`/report-notes/${id}`),
 };
 
 // Coupons
@@ -286,7 +328,8 @@ export const ticketApi = {
   getAll: (params) => api.get('/tickets', { params }),
   getById: (id) => api.get(`/tickets/${id}`),
   create: (data) => api.post('/tickets', data),
-  update: (id, data) => api.put(`/tickets/${id}`, data),
+  reply: (id, message) => api.post(`/tickets/${id}/reply`, { message }),
+  updateStatus: (id, data) => api.patch(`/tickets/${id}/status`, data),
   delete: (id) => api.delete(`/tickets/${id}`),
 };
 

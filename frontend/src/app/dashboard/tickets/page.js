@@ -1,18 +1,110 @@
 'use client';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { ticketApi } from '@/lib/api';
-import { formatDate, statusColor, getErrorMessage } from '@/utils/helpers';
+import { useAuth } from '@/context/AuthContext';
+import { formatDate, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
-import { FiPlus, FiMessageSquare } from 'react-icons/fi';
+import { FiPlus, FiMessageSquare, FiSend } from 'react-icons/fi';
+
+// ── Conversation / reply modal ────────────────────────────────────────────────
+function TicketDetailModal({ ticketId, onClose, onChanged }) {
+  const { user } = useAuth();
+  const [ticket, setTicket] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const fetchTicket = () => {
+    setLoading(true);
+    ticketApi.getById(ticketId)
+      .then((res) => setTicket(res.data))
+      .catch((err) => toast.error(getErrorMessage(err)))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchTicket(); }, [ticketId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleReply = async (e) => {
+    e.preventDefault();
+    if (!replyText.trim()) return;
+    setSending(true);
+    try {
+      const res = await ticketApi.reply(ticketId, replyText.trim());
+      setTicket(res.data);
+      setReplyText('');
+      onChanged();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const closed = ticket && ['resolved', 'closed'].includes(ticket.status);
+
+  return (
+    <div className="space-y-4">
+      {loading || !ticket ? <PageLoader /> : (
+        <>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-mono text-gray-400">{ticket.ticketNo}</p>
+              <h3 className="font-semibold text-gray-900">{ticket.subject}</h3>
+              <p className="text-xs text-gray-400 mt-0.5">{formatDate(ticket.createdAt)} &bull; {ticket.category} &bull; {ticket.priority} priority</p>
+            </div>
+            <Badge status={ticket.status} label={ticket.status?.replace('_', ' ')} />
+          </div>
+
+          <div className="max-h-80 overflow-y-auto space-y-3 pr-1">
+            {/* Original message */}
+            <div className="bg-gray-50 rounded-xl p-3 max-w-[85%]">
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{ticket.message}</p>
+              <p className="text-[10px] text-gray-400 mt-1">{user?.name || 'You'} &bull; {formatDate(ticket.createdAt)}</p>
+            </div>
+            {/* Replies */}
+            {(ticket.replies || []).map((r, i) => (
+              <div key={i} className={`rounded-xl p-3 max-w-[85%] ${r.isAdmin ? 'bg-primary-50 ml-auto' : 'bg-gray-50'}`}>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{r.message}</p>
+                <p className="text-[10px] text-gray-400 mt-1">{r.isAdmin ? `${r.repliedByName || 'HealthOnTime Support'} (Support)` : (r.repliedByName || 'You')} &bull; {formatDate(r.createdAt)}</p>
+              </div>
+            ))}
+          </div>
+
+          {closed ? (
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 text-center">
+              This ticket is {ticket.status} and can no longer receive replies.
+            </p>
+          ) : (
+            <form onSubmit={handleReply} className="flex gap-2 pt-1">
+              <input
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Type your reply…"
+                className="input flex-1 text-sm"
+              />
+              <button type="submit" disabled={sending || !replyText.trim()} className="btn-primary text-sm px-4 flex items-center gap-1.5 disabled:opacity-50">
+                <FiSend size={13} /> {sending ? 'Sending…' : 'Reply'}
+              </button>
+            </form>
+          )}
+
+          <div className="flex justify-end">
+            <button onClick={onClose} className="btn-secondary text-sm">Close</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function CustomerTicketsPage() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
+  const [openTicketId, setOpenTicketId] = useState(null);
   const [form, setForm] = useState({ subject: '', message: '', category: 'general', priority: 'medium' });
   const [submitting, setSubmitting] = useState(false);
 
@@ -30,8 +122,8 @@ export default function CustomerTicketsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await ticketApi.create(form);
-      toast.success('Ticket submitted!');
+      const res = await ticketApi.create(form);
+      toast.success(`Ticket ${res.data.ticketNo} submitted!`);
       setModal(false);
       setForm({ subject: '', message: '', category: 'general', priority: 'medium' });
       fetchTickets();
@@ -44,6 +136,12 @@ export default function CustomerTicketsPage() {
 
   return (
     <div className="space-y-6">
+      {openTicketId && (
+        <Modal open={!!openTicketId} onClose={() => setOpenTicketId(null)} title="Support Ticket">
+          <TicketDetailModal ticketId={openTicketId} onClose={() => setOpenTicketId(null)} onChanged={fetchTickets} />
+        </Modal>
+      )}
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Support Tickets</h1>
         <button onClick={() => setModal(true)} className="btn-primary flex items-center gap-2 text-sm">
@@ -65,7 +163,11 @@ export default function CustomerTicketsPage() {
       ) : (
         <div className="space-y-3">
           {tickets.map((t) => (
-            <div key={t._id} className="card flex items-start gap-4">
+            <button
+              key={t._id}
+              onClick={() => setOpenTicketId(t._id)}
+              className="card flex items-start gap-4 w-full text-left hover:border-primary-200 hover:shadow-sm transition-all"
+            >
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                 t.priority === 'high' ? 'bg-red-50 text-red-500' :
                 t.priority === 'medium' ? 'bg-yellow-50 text-yellow-500' :
@@ -75,13 +177,24 @@ export default function CustomerTicketsPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-4">
-                  <p className="font-medium text-gray-900 truncate">{t.subject}</p>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-mono text-gray-400">{t.ticketNo}</p>
+                    <p className="font-medium text-gray-900 truncate">{t.subject}</p>
+                  </div>
                   <Badge status={t.status} label={t.status?.replace('_', ' ')} />
                 </div>
-                <p className="text-sm text-gray-500 mt-1 line-clamp-2">{t.message}</p>
-                <p className="text-xs text-gray-400 mt-2">{formatDate(t.createdAt)} &bull; {t.category} &bull; {t.priority} priority</p>
+                <p className="text-sm text-gray-500 mt-1 line-clamp-1">
+                  <span className="text-gray-400">{t.latestReply?.isAdmin ? 'Support: ' : ''}</span>
+                  {t.latestReply?.message || t.message}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">
+                  {formatDate(t.createdAt)} &bull; {t.category} &bull; {t.priority} priority
+                  {t.latestReply?.createdAt && t.latestReply.createdAt !== t.createdAt && (
+                    <> &bull; last reply {formatDate(t.latestReply.createdAt)}</>
+                  )}
+                </p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

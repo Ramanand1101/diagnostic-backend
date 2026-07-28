@@ -7,8 +7,9 @@ import Footer from '@/components/layout/Footer';
 import { PageLoader } from '@/components/ui/Spinner';
 import { searchApi } from '@/lib/api';
 import { useCart } from '@/context/CartContext';
+import { useCity } from '@/context/CityContext';
 import {
-  FiSearch, FiX, FiMapPin, FiClock,
+  FiSearch, FiX, FiMapPin, FiClock, FiCrosshair,
   FiChevronDown, FiChevronUp, FiChevronRight, FiFilter, FiShoppingCart, FiCheck,
   FiDroplet, FiHome, FiAlertCircle, FiInfo, FiExternalLink,
 } from 'react-icons/fi';
@@ -411,12 +412,15 @@ function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  const { coords, radiusKm, setCoords } = useCity();
   const testParams = searchParams.getAll('test');
   const [multiTests, setMultiTests] = useState(() => testParams);
   const [inputVal, setInputVal] = useState(() => searchParams.get('q') || '');
   const [city, setCity] = useState(() => searchParams.get('city') || '');
   const [results, setResults] = useState({ labs: [], products: [], pages: [] });
   const [loading, setLoading] = useState(false);
+  const [noCoverage, setNoCoverage] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [selectedLabs, setSelectedLabs] = useState(new Set());
   const [selectedLocations, setSelectedLocations] = useState(new Set());
   const [mobileSidebar, setMobileSidebar] = useState(false);
@@ -438,21 +442,30 @@ function SearchContent() {
     setCity(searchParams.get('city') || '');
   }, [searchParams]);
 
-  const runSearch = useCallback(async (q, c, tests = []) => {
+  const runSearch = useCallback(async (q, c, tests = [], geo = null) => {
     // Include inputVal only when meaningful (≥2 chars) to avoid single-letter noise
     const queries = [...tests];
     if (q.trim().length >= 2 && !queries.some((t) => t.toLowerCase() === q.trim().toLowerCase())) {
       queries.push(q.trim());
     }
-    if (queries.length === 0) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
+    if (queries.length === 0) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); setNoCoverage(false); return; }
     setLoading(true);
     setSelectedLabs(new Set());
     setSelectedLocations(new Set());
     setActiveProduct(null);
+    setNoCoverage(false);
     try {
+      const geoParams = geo ? { lat: geo.lat, lng: geo.lng, radiusKm } : {};
       const responses = await Promise.all(
-        queries.map((term) => searchApi.search({ q: term.trim(), city: c.trim() }).catch(() => ({ data: {} })))
+        queries.map((term) => searchApi.search({ q: term.trim(), city: c.trim(), ...geoParams }).catch(() => ({ data: {} })))
       );
+      // A "near me" search that resolves to zero serviceable labs is a hard stop —
+      // don't show any tests/packages, and don't let any response's stray hits leak through.
+      if (geo && responses.some((res) => res.data?.noCoverage)) {
+        setResults({ labs: [], products: [], pages: [] });
+        setNoCoverage(true);
+        return;
+      }
       const seen = new Set();
       const mergedProducts = [];
       const mergedLabs = [];
@@ -472,7 +485,7 @@ function SearchContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [radiusKm]);
 
   const effectiveQuery = multiTests.length > 0
     ? (inputVal.trim().length >= 2 ? [...multiTests, inputVal.trim()].join(', ') : multiTests.join(', '))
@@ -486,7 +499,7 @@ function SearchContent() {
     const hasQuery = multiTests.length > 0 || inputVal.trim().length >= 2;
     if (!hasQuery) { setResults({ labs: [], products: [], pages: [] }); setActiveProduct(null); return; }
     debounceRef.current = setTimeout(() => {
-      runSearch(qToSearch, city, multiTests);
+      runSearch(qToSearch, city, multiTests, coords);
       isOwnNavRef.current = true;
       const params = new URLSearchParams();
       if (multiTests.length > 0) multiTests.forEach((t) => params.append('test', t));
@@ -495,10 +508,10 @@ function SearchContent() {
       router.replace(`/search?${params.toString()}`, { scroll: false });
     }, 400);
     return () => clearTimeout(debounceRef.current);
-  }, [inputVal, multiTests]);
+  }, [inputVal, multiTests, coords]);
 
   const applyCity = () => {
-    runSearch(inputVal, city, multiTests);
+    runSearch(inputVal, city, multiTests, coords);
     isOwnNavRef.current = true;
     const params = new URLSearchParams();
     if (multiTests.length > 0) multiTests.forEach((t) => params.append('test', t));
@@ -518,7 +531,8 @@ function SearchContent() {
     suggestTimerRef.current = setTimeout(async () => {
       setSuggesting(true);
       try {
-        const res = await searchApi.suggest({ q: inputVal.trim(), city, limit: 8 });
+        const geoParams = coords ? { lat: coords.lat, lng: coords.lng, radiusKm } : {};
+        const res = await searchApi.suggest({ q: inputVal.trim(), city, limit: 8, ...geoParams });
         setLiveResults(res.data.tests || []);
         setShowDrop(true);
       } catch {
@@ -528,7 +542,7 @@ function SearchContent() {
       }
     }, 280);
     return () => clearTimeout(suggestTimerRef.current);
-  }, [inputVal, city]);
+  }, [inputVal, city, coords, radiusKm]);
 
   /* ── Close dropdown on outside click ── */
   useEffect(() => {
@@ -687,6 +701,30 @@ function SearchContent() {
 
             {/* City + Filter button row (below search on mobile, beside on sm+) */}
             <div className="flex gap-2 sm:flex-shrink-0">
+              {coords ? (
+                <span className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-primary-200 bg-primary-50 text-primary-700 flex-shrink-0">
+                  <FiCrosshair size={12} /> Near you ({radiusKm}km)
+                  <button onClick={() => setCoords(null)} title="Clear location" className="text-primary-400 hover:text-red-500">
+                    <FiX size={11} />
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (!navigator.geolocation) return;
+                    setLocating(true);
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => { setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
+                      () => { toast.error('Could not detect your location'); setLocating(false); },
+                      { enableHighAccuracy: true, timeout: 10000 }
+                    );
+                  }}
+                  disabled={locating}
+                  title="Use my current location"
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-500 hover:border-primary-300 hover:text-primary-600 transition-colors flex-shrink-0 disabled:opacity-50">
+                  <FiCrosshair className={locating ? 'animate-pulse' : ''} />
+                </button>
+              )}
               <div className="relative flex-1 sm:flex-none">
                 <FiMapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
                 <input
@@ -700,7 +738,7 @@ function SearchContent() {
               </div>
               {city && (
                 <button
-                  onClick={() => { setCity(''); runSearch(inputVal, ''); }}
+                  onClick={() => { setCity(''); runSearch(inputVal, '', multiTests, coords); }}
                   className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-500 transition-colors flex-shrink-0">
                   <FiX />
                 </button>
@@ -755,7 +793,29 @@ function SearchContent() {
             </div>
 
           ) : !hasResults ? (
-            city.trim() ? (
+            noCoverage ? (
+              <div className="text-center py-20 sm:py-24 px-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-50 mb-4">
+                  <FiCrosshair className="text-3xl text-amber-400" />
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-1">
+                  No diagnostic centers available here
+                </h2>
+                <p className="text-sm text-gray-400 max-w-xs mx-auto mb-5">
+                  Sorry, no diagnostic centers are currently available in your selected location. Please try another location or search by PIN code/city.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={() => { setCoords(null); runSearch(inputVal, city, multiTests, null); }}
+                    className="px-5 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-xl transition-colors">
+                    Clear location
+                  </button>
+                  <Link href="/labs" className="px-5 py-2 border border-gray-200 text-gray-600 hover:border-gray-300 text-sm font-medium rounded-xl transition-colors">
+                    Browse all labs
+                  </Link>
+                </div>
+              </div>
+            ) : city.trim() ? (
               <div className="text-center py-20 sm:py-24 px-4">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-50 mb-4">
                   <FiMapPin className="text-3xl text-amber-400" />
@@ -768,7 +828,7 @@ function SearchContent() {
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                   <button
-                    onClick={() => { setCity(''); runSearch(inputVal, '', multiTests); }}
+                    onClick={() => { setCity(''); runSearch(inputVal, '', multiTests, coords); }}
                     className="px-5 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-xl transition-colors">
                     Search all cities
                   </button>

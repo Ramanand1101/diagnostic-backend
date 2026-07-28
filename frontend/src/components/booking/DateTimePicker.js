@@ -83,7 +83,7 @@ export function TimeSlotPicker({ value, onChange, slotDate, onlyMorning }) {
 }
 
 // ── DD / MM / YYYY date picker ────────────────────────────────────────────────
-export function DateSelectPicker({ value, onChange, minDate, maxDate }) {
+export function DateSelectPicker({ value, onChange, minDate, maxDate, blockedDates = [] }) {
   const [dd, setDd] = useState('');
   const [mm, setMm] = useState('');
   const [yyyy, setYyyy] = useState('');
@@ -96,6 +96,12 @@ export function DateSelectPicker({ value, onChange, minDate, maxDate }) {
       setYyyy(''); setMm(''); setDd('');
     }
   }, [value]);
+
+  // If the lab's holiday list loads (or changes) after a date was already picked,
+  // and that date is now blocked, clear the selection so it can't be submitted.
+  useEffect(() => {
+    if (value && blockedDates.includes(value)) onChange('');
+  }, [blockedDates]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const emit = (newYyyy, newMm, newDd) => {
     if (newYyyy && newMm && newDd) {
@@ -125,9 +131,11 @@ export function DateSelectPicker({ value, onChange, minDate, maxDate }) {
   });
 
   const daysInMonth = yyyy && mm ? new Date(Number(yyyy), Number(mm), 0).getDate() : 31;
+  const blockedSet = new Set(blockedDates);
   const dayOpts = Array.from({ length: daysInMonth }, (_, i) => i + 1).filter((d) => {
     if (Number(yyyy) === minY && Number(mm) === minM && d < minD) return false;
     if (Number(yyyy) === maxY && Number(mm) === maxM && d > maxD) return false;
+    if (yyyy && mm && blockedSet.has(`${yyyy}-${mm}-${String(d).padStart(2, '0')}`)) return false;
     return true;
   });
 
