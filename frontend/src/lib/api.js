@@ -19,10 +19,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Public auth endpoints where a 401 is a normal "wrong credentials/OTP" business
+// response, not a sign that an existing session died — these must never trigger
+// the redirect-to-login below, or the error toast gets wiped by the reload before
+// the user ever sees it.
+const PUBLIC_AUTH_PATHS = ['/auth/login', '/auth/register', '/auth/send-otp', '/auth/verify-otp', '/auth/google'];
+
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const url = err.config?.url || '';
+    const isPublicAuthCall = PUBLIC_AUTH_PATHS.some((p) => url.includes(p));
+    if (err.response?.status === 401 && !isPublicAuthCall) {
       Cookies.remove('token');
       if (typeof window !== 'undefined') window.location.href = '/login';
     }

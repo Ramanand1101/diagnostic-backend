@@ -61,7 +61,11 @@ function toAlgoliaRecord(p) {
   };
 }
 
-const TM_POPULATE = { path: 'testMaster', select: 'name category subcategory description sampleType reportTime fastingRequired homeCollection' };
+const TM_POPULATE = {
+  path: 'testMaster',
+  select: 'name category subcategory description sampleType reportTime fastingRequired homeCollection',
+  populate: { path: 'category', select: 'name slug' },
+};
 const LAB_SELECT  = 'name slug city state brand address area pincode email homeCollection ratingAvg accreditation verificationStatus';
 
 // ─── public routes ────────────────────────────────────────────────────────────

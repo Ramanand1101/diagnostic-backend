@@ -5,6 +5,7 @@ import Hero from '@/components/home/Hero';
 import NewsletterSection from '@/components/home/NewsletterSection';
 import FeaturedLabsSection from '@/components/home/FeaturedLabsSection';
 import FeaturedProductsSection from '@/components/home/FeaturedProductsSection';
+import RecommendedTestsCarousel from '@/components/home/RecommendedTestsCarousel';
 import {
   FiActivity, FiShield, FiClock, FiAward,
   FiSearch, FiCalendar, FiFileText, FiArrowRight,
@@ -159,6 +160,9 @@ export default async function HomePage() {
 
         {/* Top Labs (city-aware client component) */}
         <FeaturedLabsSection />
+
+        {/* Recommended tests, icon-per-category carousel (city-aware client component) */}
+        <RecommendedTestsCarousel />
 
         {/* Why choose us / Features */}
         <section className="py-16 bg-white">

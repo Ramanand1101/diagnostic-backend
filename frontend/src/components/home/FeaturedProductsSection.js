@@ -33,7 +33,7 @@ export default function FeaturedProductsSection() {
     const base = { isActive: 'true', limit: 8 };
     if (city) base.city = city;
 
-    productApi.getAll({ ...base, isFeatured: 'true' })
+    productApi.getAll({ ...base, featured: 'true' })
       .then((res) => {
         const items = res.data.items || [];
         if (items.length > 0) {
