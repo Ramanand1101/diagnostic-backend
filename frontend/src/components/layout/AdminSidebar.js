@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -7,7 +7,7 @@ import {
   FiFileText, FiPercent, FiStar, FiBook, FiFile, FiMail,
   FiSettings, FiHelpCircle, FiImage, FiUploadCloud, FiLayers,
   FiBriefcase, FiUserCheck, FiPhoneCall, FiActivity, FiList, FiLayout, FiFilePlus,
-  FiDollarSign, FiChevronsLeft, FiChevronsRight, FiLink, FiToggleRight,
+  FiDollarSign, FiChevronsLeft, FiChevronsRight, FiLink, FiToggleRight, FiX,
 } from 'react-icons/fi';
 import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -85,10 +85,24 @@ const navSections = [
   },
 ];
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ mobileOpen = false, onCloseMobile = () => {} }) {
   const pathname = usePathname();
   const { isSuperAdmin, hasPermission } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // The icon-only "collapsed" mode only makes sense on desktop, where the sidebar
+  // is always visible and shrinking it reclaims page width. On mobile the sidebar
+  // is an on-demand overlay drawer — it should always show full labels when open,
+  // regardless of whatever collapsed state was last left on desktop.
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    setIsDesktop(mq.matches);
+    const handler = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  const effectiveCollapsed = collapsed && isDesktop;
 
   const visibleSections = navSections
     .map((section) => ({
@@ -108,14 +122,24 @@ export default function AdminSidebar() {
     .filter((href) => pathname === href || (href !== '/admin' && pathname.startsWith(href + '/')))
     .sort((a, b) => b.length - a.length)[0];
 
+  // Auto-close the mobile drawer whenever the route changes (same pattern as the
+  // public Navbar's mobile menu) — otherwise it stays open over the new page.
+  useEffect(() => { onCloseMobile(); }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <aside
-      className="bg-gray-900 h-screen sticky top-0 flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden"
-      style={{ width: collapsed ? '64px' : '256px' }}
-    >
+    <>
+      {/* Mobile backdrop — tapping it closes the drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onCloseMobile} />
+      )}
+      <aside
+        className={`bg-gray-900 h-screen flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden
+          fixed inset-y-0 left-0 z-50 w-64 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:sticky lg:top-0 lg:z-auto lg:translate-x-0 ${collapsed ? 'lg:w-16' : 'lg:w-64'}`}
+      >
       {/* Logo + collapse toggle */}
-      <div className={`border-b border-gray-800 flex items-center ${collapsed ? 'justify-center py-4 px-2' : 'justify-between p-5'}`}>
-        {!collapsed && (
+      <div className={`border-b border-gray-800 flex items-center ${effectiveCollapsed ? 'justify-center py-4 px-2' : 'justify-between p-5'}`}>
+        {!effectiveCollapsed && (
           <Link href="/" className="min-w-0">
             <HealthOnTimeLogo dark size="text-lg" />
             <p className="text-xs text-gray-500 mt-0.5">Admin Panel</p>
@@ -128,10 +152,13 @@ export default function AdminSidebar() {
         )}
         <button
           onClick={() => setCollapsed((c) => !c)}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className={`flex-shrink-0 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg p-1.5 transition-colors ${collapsed ? '' : 'ml-2'}`}
+          title={effectiveCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className={`hidden lg:block flex-shrink-0 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg p-1.5 transition-colors ${effectiveCollapsed ? '' : 'ml-2'}`}
         >
-          {collapsed ? <FiChevronsRight size={18} /> : <FiChevronsLeft size={18} />}
+          {effectiveCollapsed ? <FiChevronsRight size={18} /> : <FiChevronsLeft size={18} />}
+        </button>
+        <button onClick={onCloseMobile} className="lg:hidden flex-shrink-0 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg p-1.5 transition-colors">
+          <FiX size={18} />
         </button>
       </div>
 
@@ -140,13 +167,13 @@ export default function AdminSidebar() {
         {visibleSections.map((section, si) => (
           <div key={si}>
             {/* Section label — hidden when collapsed */}
-            {section.label && !collapsed && (
+            {section.label && !effectiveCollapsed && (
               <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-5 pt-4 pb-1">
                 {section.label}
               </p>
             )}
             {/* Divider line when collapsed */}
-            {section.label && collapsed && si > 0 && (
+            {section.label && effectiveCollapsed && si > 0 && (
               <div className="border-t border-gray-800 mx-3 my-1" />
             )}
 
@@ -156,9 +183,9 @@ export default function AdminSidebar() {
                 <Link
                   key={href}
                   href={href}
-                  title={collapsed ? label : undefined}
+                  title={effectiveCollapsed ? label : undefined}
                   className={`flex items-center transition-colors ${
-                    collapsed ? 'justify-center px-0 py-3 mx-2 rounded-lg' : 'gap-3 px-5 py-2.5'
+                    effectiveCollapsed ? 'justify-center px-0 py-3 mx-2 rounded-lg' : 'gap-3 px-5 py-2.5'
                   } text-sm font-medium ${
                     active
                       ? 'bg-primary-600 text-white'
@@ -166,7 +193,7 @@ export default function AdminSidebar() {
                   }`}
                 >
                   <Icon className="text-base flex-shrink-0" />
-                  {!collapsed && <span className="truncate">{label}</span>}
+                  {!effectiveCollapsed && <span className="truncate">{label}</span>}
                 </Link>
               );
             })}
@@ -175,8 +202,8 @@ export default function AdminSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className={`border-t border-gray-800 ${collapsed ? 'py-3 flex justify-center' : 'p-4'}`}>
-        {collapsed ? (
+      <div className={`border-t border-gray-800 ${effectiveCollapsed ? 'py-3 flex justify-center' : 'p-4'}`}>
+        {effectiveCollapsed ? (
           <Link href="/" title="Back to Site" className="text-gray-500 hover:text-white transition-colors">
             ←
           </Link>
@@ -187,5 +214,6 @@ export default function AdminSidebar() {
         )}
       </div>
     </aside>
+    </>
   );
 }

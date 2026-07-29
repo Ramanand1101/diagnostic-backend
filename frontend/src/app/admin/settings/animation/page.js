@@ -75,7 +75,7 @@ export default function BookingAnimationSettingsPage() {
           {/* Preset picker */}
           <div className="card p-5 space-y-3">
             <p className="font-medium text-gray-800">Choose character / style</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {Object.entries(ANIMATION_PRESETS).map(([key, p]) => (
                 <button
                   key={key}

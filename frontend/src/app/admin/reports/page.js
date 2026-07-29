@@ -92,6 +92,7 @@ export default function AdminReportsPage() {
 
       {loading ? <PageLoader /> : (
         <div className="card p-0 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
@@ -133,6 +134,7 @@ export default function AdminReportsPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

@@ -98,6 +98,7 @@ export default function AdminBlogsPage() {
 
       {loading ? <PageLoader /> : (
         <div className="card p-0 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
@@ -123,6 +124,7 @@ export default function AdminBlogsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
       <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />

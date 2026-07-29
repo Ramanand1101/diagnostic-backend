@@ -127,6 +127,7 @@ function RequestCard({ req, onReviewed }) {
       {open && (
         <div className="border-t border-gray-100 px-4 pb-4">
           <div className="mt-3 rounded-xl overflow-hidden border border-gray-100">
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
@@ -147,6 +148,7 @@ function RequestCard({ req, onReviewed }) {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

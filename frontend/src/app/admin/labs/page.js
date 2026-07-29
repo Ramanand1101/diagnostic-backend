@@ -289,7 +289,7 @@ function LabForm({ initial, onSave, onClose }) {
         <label className="block text-sm font-medium text-gray-700 mb-1">Area / Locality</label>
         <input value={form.area || ''} onChange={(e) => set('area', e.target.value)} className="input" placeholder="e.g. Gomti Nagar, Hazratganj" />
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
           <input value={form.city} onChange={(e) => set('city', e.target.value)} className="input" placeholder="Lucknow" />

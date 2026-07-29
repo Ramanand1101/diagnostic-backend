@@ -279,7 +279,7 @@ export default function MyLabPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Area / Locality</label>
             <input name="area" value={form.area} onChange={handle} className="input" placeholder="e.g. Gomti Nagar, Hazratganj" />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">City <span className="text-accent-500">*</span></label>
               <input name="city" required value={form.city} onChange={handle} className="input" placeholder="Lucknow" />

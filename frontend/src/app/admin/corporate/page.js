@@ -201,7 +201,7 @@ function CorporateForm({ initial, onSave, onClose }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
           <input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" placeholder="Street / building" />
         </div>
-        <div className="grid grid-cols-3 gap-3 mt-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
             <input value={form.city} onChange={(e) => set('city', e.target.value)} className="input" />
@@ -262,7 +262,7 @@ function CorporateForm({ initial, onSave, onClose }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
           <input value={form.hr.address} onChange={(e) => setHr('address', e.target.value)} className="input" />
         </div>
-        <div className="grid grid-cols-3 gap-3 mt-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
             <input value={form.hr.city} onChange={(e) => setHr('city', e.target.value)} className="input" />
