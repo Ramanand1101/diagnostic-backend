@@ -447,9 +447,8 @@ function BookingForm({ groups, onReadyForPayment }) {
   const [alternatives, setAlternatives] = useState([]);
 
   const labId = groups[0]?.labId;
-  // groups may now be split by patient as well as lab (each patient's tests still
-  // count toward the same lab's holiday/availability rules), so flatten across all
-  // of them rather than reading only the first patient's slice of the cart.
+  // `groups` here is lab-only (see displayGroups in CartPage) — flatten across all of
+  // them for the rare case of more than one, rather than assuming there's exactly one.
   const allGroupItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
   const cartTestMasterIds = useMemo(
     () => [...new Set(allGroupItems.map((i) => i.testMaster?._id || i.testMaster).filter(Boolean))],
@@ -1260,13 +1259,22 @@ export default function CartPage() {
 
   const isRestricted = user && (user.role === 'superadmin' || user.role === 'subadmin' || user.role === 'lab');
 
-  // Bookings are grouped by lab (only one lab is allowed per checkout — see the
-  // "one lab at a time" gate below) AND by patient, so a cart mixing tests for
-  // "self" and a family member creates one Booking per patient. `distinctLabIds`
-  // (lab only) drives the one-lab gate; `groups` (lab + patient) drives both the
-  // cart item display and what gets sent to bookingApi.create.
+  // Only one lab is allowed per checkout (see the gate below) — `distinctLabIds`
+  // drives that. What the customer SEES is grouped by lab only (`displayGroups`) so a
+  // test picked for 2 patients still shows as one card with its "Booking for +1 more"
+  // picker, not duplicated. What actually gets BOOKED is a separate concern — a test
+  // picked for N patients becomes N bookings, computed as `bookingGroups` (lab +
+  // patient) only for PaymentScreen to iterate when calling bookingApi.create.
   const distinctLabIds = [...new Set(items.map((i) => String(i.lab?._id || i.lab || 'unknown')))];
-  const groups = Object.values(
+  const displayGroups = Object.values(
+    items.reduce((acc, item) => {
+      const labId = item.lab?._id || item.lab || 'unknown';
+      if (!acc[labId]) acc[labId] = { labId, labName: item.lab?.name || 'Unknown Lab', items: [] };
+      acc[labId].items.push(item);
+      return acc;
+    }, {})
+  );
+  const bookingGroups = Object.values(
     items.reduce((acc, item) => {
       const labId = item.lab?._id || item.lab || 'unknown';
       const patientIds = itemPatients[item.cartItemId]?.length ? itemPatients[item.cartItemId] : [selfPatient?._id || 'self'];
@@ -1326,7 +1334,7 @@ export default function CartPage() {
           <div className="max-w-2xl mx-auto px-4 py-8">
             <PaymentScreen
               form={paymentMeta.form}
-              groups={groups}
+              groups={bookingGroups}
               total={total}
               onSuccess={handlePaymentSuccess}
               onBack={() => setStep('cart')}
@@ -1394,18 +1402,17 @@ export default function CartPage() {
           {/* TOP: Cart items (left) + Price summary (right, sticky) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6">
 
-            {/* LEFT: Cart items grouped by lab (and, when a family member is
-                assigned, further split so each person's tests are visually distinct —
-                they'll become separate bookings) */}
+            {/* LEFT: Cart items grouped by lab — each test shows once, regardless of
+                how many patients it's booked for (that's what its own "Booking for"
+                picker is for; splitting into per-patient bookings happens only at
+                payment time via bookingGroups, not in what's displayed here) */}
             <div className="lg:col-span-2 space-y-6">
-              {groups.map((group) => (
-                <div key={`${group.labId}-${group.patientId}`}>
-                  {(groups.length > 1) && (
+              {displayGroups.map((group) => (
+                <div key={group.labId}>
+                  {displayGroups.length > 1 && (
                     <div className="flex items-center gap-2 mb-2">
                       <FiMapPin className="text-gray-400 text-sm" />
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                        {group.labName}{group.patientName ? ` · for ${group.patientName}` : ''}
-                      </span>
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{group.labName}</span>
                     </div>
                   )}
                   <div className="space-y-3">
@@ -1452,6 +1459,42 @@ export default function CartPage() {
                   </p>
                 )}
               </div>
+
+              {/* Booking Summary — who's getting what, so a cart with several people
+                  and several tests each stays easy to scan at a glance */}
+              {patients.length > 0 && bookingGroups.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-5 mt-4">
+                  <h2 className="font-bold text-gray-800 text-sm mb-4">Booking Summary</h2>
+                  <div className="space-y-3">
+                    {bookingGroups.map((group) => {
+                      const p = patients.find((pp) => pp._id === group.patientId);
+                      const subtotal = group.items.reduce((s, i) => s + (i.salePrice || i.price || 0), 0);
+                      return (
+                        <div key={group.patientId} className="border border-gray-100 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {p?.relation === 'self' ? `${p.name} (You)` : p?.name || group.patientName || 'Patient'}
+                            </p>
+                            <span className="text-[10px] text-gray-400 shrink-0">{group.items.length} test{group.items.length !== 1 ? 's' : ''}</span>
+                          </div>
+                          <ul className="space-y-1">
+                            {group.items.map((item) => (
+                              <li key={item.cartItemId} className="flex items-center justify-between gap-2 text-xs text-gray-600">
+                                <span className="truncate">{item.name}</span>
+                                <span className="shrink-0 font-medium text-gray-700">₹{(item.salePrice || item.price)?.toLocaleString('en-IN')}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-100 text-xs font-semibold text-gray-800">
+                            <span>Subtotal</span>
+                            <span>₹{subtotal.toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1501,7 +1544,7 @@ export default function CartPage() {
               ) : (
                 <>
                   <BookingForm
-                    groups={groups}
+                    groups={displayGroups}
                     onReadyForPayment={handleReadyForPayment}
                   />
                   <p className="text-xs text-center text-gray-400">
