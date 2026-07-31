@@ -86,7 +86,7 @@ export default async function CityPage({ params }) {
             </div>
 
             {labs.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-5">
                 {labs.map((lab) => <LabCard key={lab._id} lab={lab} />)}
               </div>
             ) : (
