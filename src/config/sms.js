@@ -1,6 +1,23 @@
+const https = require('https');
 const twilio = require('twilio');
 const IntegrationSetting = require('../models/IntegrationSetting');
 const { decrypt } = require('../utils/encryption');
+
+// Plain https.get instead of the global `fetch` — fetch is only available on Node 18+,
+// and relying on it silently 500s every SMS send on an older Node runtime.
+function httpsGetJson(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        let data = {};
+        try { data = JSON.parse(body); } catch { /* non-JSON response, handled by caller via empty data */ }
+        resolve({ statusCode: res.statusCode, data });
+      });
+    }).on('error', reject);
+  });
+}
 
 // Admin-saved credentials (Admin > Integrations) take priority over .env — cached
 // briefly so every send isn't a DB round-trip, but a saved change picks up quickly.
@@ -53,10 +70,9 @@ async function sendSms({ to, message }) {
     params.set('message', message);
   }
 
-  const res = await fetch(`https://www.fast2sms.com/dev/bulkV2?${params.toString()}`);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.return !== true) {
-    const reason = Array.isArray(data.message) ? data.message.join(', ') : (data.message || `HTTP ${res.status}`);
+  const { statusCode, data } = await httpsGetJson(`https://www.fast2sms.com/dev/bulkV2?${params.toString()}`);
+  if (statusCode < 200 || statusCode >= 300 || data.return !== true) {
+    const reason = Array.isArray(data.message) ? data.message.join(', ') : (data.message || `HTTP ${statusCode}`);
     throw new Error(`Fast2SMS send failed: ${reason}`);
   }
   return data;
