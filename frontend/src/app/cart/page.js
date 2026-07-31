@@ -1451,9 +1451,6 @@ export default function CartPage() {
             </button>
           </div>
 
-          {/* Add more tests search bar */}
-          <AddMoreSearch cartCity={cartCity} />
-
           {/* TOP: Cart items (left) + Price summary (right, sticky) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6">
 
