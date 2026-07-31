@@ -6,10 +6,12 @@ import NewsletterSection from '@/components/home/NewsletterSection';
 import FeaturedLabsSection from '@/components/home/FeaturedLabsSection';
 import RecommendedTestsCarousel from '@/components/home/RecommendedTestsCarousel';
 import PopularTestTiles from '@/components/home/PopularTestTiles';
+import { getApprovedCities } from '@/lib/cities';
+import { slugifyCity } from '@/utils/city';
 import {
   FiActivity, FiShield, FiClock, FiAward,
   FiSearch, FiCalendar, FiFileText, FiArrowRight,
-  FiHeart, FiStar, FiDroplet, FiEye,
+  FiHeart, FiStar, FiDroplet, FiEye, FiMapPin,
 } from 'react-icons/fi';
 
 // Icon map for serialized icon names from CMS
@@ -98,7 +100,7 @@ function SectionHeader({ title, subtitle, href, linkLabel = 'View all' }) {
 }
 
 export default async function HomePage() {
-  const content = await getHomeContent();
+  const [content, cities] = await Promise.all([getHomeContent(), getApprovedCities()]);
 
   const hero = content.hero || DEFAULT_CONTENT.hero;
   const stats = content.stats || DEFAULT_CONTENT.stats;
@@ -203,6 +205,26 @@ export default async function HomePage() {
             <PopularTestTiles popularTests={popularTests} />
           </div>
         </section>
+
+        {/* Cities we serve */}
+        {cities.length > 0 && (
+          <section className="py-12 bg-[#F8FAFC] border-t border-gray-100">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+                <FiMapPin className="text-primary-600" /> Book Lab Tests in Your City
+              </h2>
+              <p className="text-sm text-gray-500 mb-4">Choose your city to see labs and tests available near you</p>
+              <div className="flex flex-wrap gap-x-1 gap-y-2 text-sm text-gray-500">
+                {cities.map((c, i) => (
+                  <span key={c}>
+                    <Link href={`/city/${slugifyCity(c)}`} className="hover:text-primary-600 hover:underline">{c}</Link>
+                    {i < cities.length - 1 && <span className="mx-1.5 text-gray-300">|</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Trust banner */}
         <section className="bg-gradient-to-br from-primary-700 to-primary-900 py-14">
