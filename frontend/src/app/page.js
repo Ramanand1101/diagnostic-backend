@@ -155,16 +155,16 @@ export default async function HomePage() {
               <h2 className="text-2xl font-bold text-gray-900">{whyUs.title}</h2>
               <div className="text-sm text-gray-500 mt-2 rich-html" dangerouslySetInnerHTML={{ __html: whyUs.subtitle }} />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {features.map(({ icon, title, desc, color, bg }) => {
                 const Icon = ICON_MAP[icon] || FiShield;
                 return (
-                  <div key={title} className="group p-6 rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all">
-                    <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center mb-4`}>
-                      <Icon className={`text-xl ${color}`} />
+                  <div key={title} className="group p-4 sm:p-6 rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all">
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 ${bg} rounded-xl flex items-center justify-center mb-3 sm:mb-4`}>
+                      <Icon className={`text-lg sm:text-xl ${color}`} />
                     </div>
-                    <h3 className="font-semibold text-gray-900 mb-2">{title}</h3>
-                    <div className="text-sm text-gray-500 leading-relaxed rich-html" dangerouslySetInnerHTML={{ __html: desc }} />
+                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base mb-1.5 sm:mb-2">{title}</h3>
+                    <div className="text-xs sm:text-sm text-gray-500 leading-relaxed rich-html" dangerouslySetInnerHTML={{ __html: desc }} />
                   </div>
                 );
               })}
@@ -179,21 +179,21 @@ export default async function HomePage() {
               <h2 className="text-2xl font-bold text-gray-900">{howItWorks.title}</h2>
               <div className="text-sm text-gray-500 mt-2 rich-html" dangerouslySetInnerHTML={{ __html: howItWorks.subtitle }} />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 relative">
               <div className="hidden md:block absolute top-8 left-1/3 right-1/3 h-0.5 bg-primary-100 z-0" />
               {steps.map(({ title, desc }, idx) => {
                 const Icon = STEP_ICONS[idx] || FiSearch;
                 const num = String(idx + 1).padStart(2, '0');
                 return (
-                  <div key={num} className="relative z-10 flex flex-col items-center text-center">
-                    <div className="w-16 h-16 rounded-full bg-primary-600 text-white flex items-center justify-center shadow-lg shadow-primary-200 mb-5 relative">
-                      <Icon className="text-2xl" />
+                  <div key={num} className={`relative z-10 flex flex-col items-center text-center ${idx === 2 ? 'col-span-2 md:col-span-1' : ''}`}>
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary-600 text-white flex items-center justify-center shadow-lg shadow-primary-200 mb-3 sm:mb-5 relative">
+                      <Icon className="text-lg sm:text-2xl" />
                       <span className="absolute -top-1 -right-1 w-5 h-5 bg-secondary-500 rounded-full text-white text-[10px] font-bold flex items-center justify-center">
                         {idx + 1}
                       </span>
                     </div>
-                    <h3 className="font-semibold text-gray-900 text-lg mb-2">{title}</h3>
-                    <div className="text-sm text-gray-500 leading-relaxed max-w-xs rich-html" dangerouslySetInnerHTML={{ __html: desc }} />
+                    <h3 className="font-semibold text-gray-900 text-sm sm:text-lg mb-1.5 sm:mb-2">{title}</h3>
+                    <div className="text-xs sm:text-sm text-gray-500 leading-relaxed max-w-xs rich-html" dangerouslySetInnerHTML={{ __html: desc }} />
                   </div>
                 );
               })}
