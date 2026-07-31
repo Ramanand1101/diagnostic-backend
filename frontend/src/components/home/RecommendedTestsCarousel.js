@@ -1,21 +1,68 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCity } from '@/context/CityContext';
+import { useCart } from '@/context/CartContext';
 import { productApi } from '@/lib/api';
+import toast from 'react-hot-toast';
 import { FiChevronLeft, FiChevronRight, FiActivity } from 'react-icons/fi';
-import ProductCard from '@/components/product/ProductCard';
+import { getProductIcon } from '@/lib/productIcon';
 
 const CARDS_PER_VIEW = 5;
 
 function TestCardSkeleton() {
   return (
-    <div className="flex-none snap-start w-[70%] sm:w-[45%] lg:w-[calc(20%-1rem)] bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
-      <div className="h-44 bg-gray-100" />
-      <div className="p-5 space-y-3">
-        <div className="h-4 bg-gray-100 rounded w-3/4" />
-        <div className="h-4 bg-gray-100 rounded w-1/2" />
-        <div className="h-11 bg-gray-100 rounded-lg w-full mt-2" />
-      </div>
+    <div className="flex-none snap-start w-[45%] sm:w-[31%] lg:w-[calc(20%-1rem)] bg-white rounded-2xl border border-gray-100 p-7 animate-pulse space-y-4">
+      <div className="w-28 h-28 rounded-full bg-gray-100 mx-auto" />
+      <div className="h-4 bg-gray-100 rounded w-3/4 mx-auto" />
+      <div className="h-4 bg-gray-100 rounded w-1/2 mx-auto" />
+      <div className="h-11 bg-gray-100 rounded-lg w-full mt-2" />
+    </div>
+  );
+}
+
+function TestCard({ product }) {
+  const router = useRouter();
+  const { addItem } = useCart();
+  const { icon: Icon, color, bg } = getProductIcon(product);
+
+  const mrp = product.price || 0;
+  const sale = product.salePrice && product.salePrice < mrp ? product.salePrice : mrp;
+  const hasDiscount = sale < mrp;
+  const discountPercent = product.discountPercent || (hasDiscount ? Math.round((1 - sale / mrp) * 100) : 0);
+
+  const handleBookNow = () => {
+    addItem(product);
+    toast.success(`${product.name} added to cart!`, { icon: '🛒' });
+    router.push('/cart');
+  };
+
+  return (
+    <div className="flex-none snap-start w-[45%] sm:w-[31%] lg:w-[calc(20%-1rem)] bg-white rounded-2xl border border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all p-7 flex flex-col text-center">
+      <Link href={`/products/${product.slug}`} className="flex flex-col items-center flex-1">
+        <div className={`w-28 h-28 ${bg} rounded-full flex items-center justify-center mb-4`}>
+          <Icon className={`text-5xl ${color}`} />
+        </div>
+        <h3 className="font-semibold text-gray-900 text-base leading-snug line-clamp-2 mb-3 min-h-[2.75rem]">
+          {product.name}
+        </h3>
+        <div className="flex items-baseline justify-center gap-2 flex-wrap mb-1">
+          {hasDiscount && <span className="text-sm line-through text-gray-400">₹{mrp.toLocaleString('en-IN')}</span>}
+          <span className="text-xl font-extrabold text-primary-700">₹{sale.toLocaleString('en-IN')}</span>
+          {discountPercent > 0 && (
+            <span className="text-xs font-bold bg-secondary-100 text-secondary-700 px-2 py-0.5 rounded-full">
+              {discountPercent}% off
+            </span>
+          )}
+        </div>
+      </Link>
+      <button
+        onClick={handleBookNow}
+        className="mt-4 w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-bold text-sm transition-colors shadow-sm"
+      >
+        Book Now
+      </button>
     </div>
   );
 }
@@ -114,11 +161,7 @@ export default function RecommendedTestsCarousel() {
           >
             {loading
               ? [...Array(5)].map((_, i) => <TestCardSkeleton key={i} />)
-              : products.map((p) => (
-                  <div key={p._id} className="flex-none snap-start w-[70%] sm:w-[45%] lg:w-[calc(20%-1rem)]">
-                    <ProductCard product={p} />
-                  </div>
-                ))}
+              : products.map((p) => <TestCard key={p._id} product={p} />)}
           </div>
         </div>
 
