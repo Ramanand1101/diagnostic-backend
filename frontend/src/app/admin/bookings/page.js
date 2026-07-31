@@ -257,9 +257,10 @@ function BookingDetailModal({ booking, statuses, onClose, onChanged }) {
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div><p className="text-gray-400">Lab</p><p className="font-medium">{b.lab?.name || '—'}</p>{b.lab?.city && <p className="text-xs text-gray-400">{b.lab.city}</p>}</div>
         <div><p className="text-gray-400">Total</p><p className="font-medium">{formatCurrency(b.total)}</p></div>
-        <div><p className="text-gray-400">Date</p><p className="font-medium">{formatDate(b.slotDate)}</p></div>
+        <div><p className="text-gray-400">Appointment Date</p><p className="font-medium">{formatDate(b.slotDate)}</p></div>
         <div><p className="text-gray-400">Time Slot</p><p className="font-medium">{b.slotTime || '—'}</p></div>
         <div><p className="text-gray-400">Visit</p><p className="font-medium capitalize">{b.visitType}</p></div>
+        <div><p className="text-gray-400">Booked On</p><p className="font-medium">{formatDate(b.createdAt, 'dd MMM yyyy, hh:mm a')}</p></div>
         {b.cancelledByName && (
           <div><p className="text-gray-400">Cancelled By</p><p className="font-medium text-red-600">{b.cancelledByName}</p></div>
         )}
