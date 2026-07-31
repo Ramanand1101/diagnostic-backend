@@ -26,7 +26,7 @@ export default function LabCard({ lab, compareIds, onToggleCompare }) {
 
         <div className="w-28 h-28 rounded-2xl flex items-center justify-center shadow-md overflow-hidden bg-white">
           {lab.brand?.logo ? (
-            <img src={lab.brand.logo} alt={lab.brand.name} className="w-full h-full object-contain p-0.5" />
+            <img src={lab.brand.logo} alt={lab.brand.name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-primary-600 flex items-center justify-center">
               <GiMicroscope className="text-white text-3xl" />
