@@ -266,6 +266,24 @@ function BookingDetailModal({ booking, statuses, onClose, onChanged }) {
       </div>
 
       <div>
+        <p className="text-xs text-gray-400 mb-2">Tests Booked ({b.items?.length || 0})</p>
+        <div className="border border-gray-100 rounded-lg divide-y divide-gray-100">
+          {(b.items || []).map((item, i) => (
+            <div key={i} className="flex items-center justify-between px-3 py-2 text-sm">
+              <div>
+                <p className="font-medium text-gray-800">{item.name || item.product?.name || 'Unnamed test'}</p>
+                {item.qty > 1 && <p className="text-xs text-gray-400">Qty: {item.qty}</p>}
+              </div>
+              <p className="font-medium text-gray-700">{formatCurrency(item.price)}</p>
+            </div>
+          ))}
+          {(!b.items || b.items.length === 0) && (
+            <p className="text-sm text-gray-400 text-center py-4">No test items on this booking</p>
+          )}
+        </div>
+      </div>
+
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Update Status</label>
         <div className="flex gap-2">
           <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="input flex-1">
