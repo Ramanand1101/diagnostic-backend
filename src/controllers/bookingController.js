@@ -38,6 +38,15 @@ exports.createBooking = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'All items in a booking must be from the same lab.' });
   }
 
+  // ── Slot is mandatory — don't trust the frontend's HTML5 `required` alone,
+  // since a direct API call or a UI bug can still submit without one ───────────
+  if (!payload.slotDate) {
+    return res.status(400).json({ message: 'Please select a date for your booking.' });
+  }
+  if (!payload.slotTime) {
+    return res.status(400).json({ message: 'Please select a preferred time slot.' });
+  }
+
   // ── 30-day date restriction ──────────────────────────────────────────────────
   if (payload.slotDate) {
     const slotDay = new Date(payload.slotDate); slotDay.setHours(0, 0, 0, 0);

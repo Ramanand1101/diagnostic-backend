@@ -474,6 +474,8 @@ function BookingForm({ groups, onReadyForPayment }) {
     if (unavailableToday) {
       toast.error(`"${unavailableToday.product}" is not available on the selected date. Please choose another date.`); return;
     }
+    if (!form.slotDate) { toast.error('Please select a date for your booking.'); return; }
+    if (!form.slotTime) { toast.error('Please select a preferred time slot.'); return; }
     const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.(com|co\.in|co|in|net|info|ai)$/i;
     if (!form.phone || !/^[6-9]\d{9}$/.test(form.phone)) {
       toast.error('Please enter a valid 10-digit mobile number starting with 6–9.'); return;
@@ -790,9 +792,12 @@ function PaymentScreen({ form, groups, total, onSuccess, onBack }) {
   const fmtCard = (v) => v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
   const fmtExpiry = (v) => { const d = v.replace(/\D/g, '').slice(0, 4); return d.length >= 2 ? `${d.slice(0,2)}/${d.slice(2)}` : d; };
 
-  const canPay = payTab === 'upi'        ? upiId.includes('@')
-               : payTab === 'card'       ? cardNo.replace(/\s/g,'').length === 16 && cardExpiry.length === 5 && cardCvv.length === 3
-               : /* netbanking */          !!bank;
+  const hasSlot = !!form.slotDate && !!form.slotTime;
+  const canPay = hasSlot && (
+    payTab === 'upi'        ? upiId.includes('@')
+    : payTab === 'card'       ? cardNo.replace(/\s/g,'').length === 16 && cardExpiry.length === 5 && cardCvv.length === 3
+    : /* netbanking */          !!bank
+  );
 
   const handlePay = async () => {
     setProcessing(true);

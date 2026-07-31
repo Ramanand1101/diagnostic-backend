@@ -23,8 +23,8 @@ const bookingSchema = new mongoose.Schema({
     price: Number
   }],
   patients: [passengerSchema],
-  slotDate: Date,
-  slotTime: String,
+  slotDate: { type: Date, required: true },
+  slotTime: { type: String, required: true },
   visitType: { type: String, enum: ['home', 'lab'], default: 'lab' },
   address: {
     line1: String,
