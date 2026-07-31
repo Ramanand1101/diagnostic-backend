@@ -11,6 +11,10 @@ import { CONTACT_PHONE, CONTACT_EMAIL } from '@/config/contact';
 
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth();
+  const dashboardHref = isAdmin ? '/admin'
+    : user?.role === 'corporate' ? '/dashboard/corporate'
+    : user?.role === 'employee' ? '/dashboard/employee'
+    : '/dashboard';
   const { count: cartCount } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -117,13 +121,11 @@ export default function Navbar() {
 
                   {userOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
-                      {isAdmin ? (
-                        <Link href="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Admin Panel</Link>
-                      ) : (
-                        <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Dashboard</Link>
-                      )}
+                      <Link href={dashboardHref} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">{isAdmin ? 'Admin Panel' : 'My Dashboard'}</Link>
                       <Link href="/dashboard/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Profile</Link>
-                      <Link href="/dashboard/bookings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Bookings</Link>
+                      {user?.role !== 'corporate' && user?.role !== 'employee' && (
+                        <Link href="/dashboard/bookings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Bookings</Link>
+                      )}
                       <hr className="my-1" />
                       <button onClick={() => { setUserOpen(false); setShowLogoutModal(true); }}
                         className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
@@ -162,10 +164,12 @@ export default function Navbar() {
             <div className="border-t border-gray-100 pt-3">
               {user ? (
                 <>
-                  <Link href={isAdmin ? '/admin' : '/dashboard'} className="block text-gray-700 font-medium py-1" onClick={() => setMenuOpen(false)}>
+                  <Link href={dashboardHref} className="block text-gray-700 font-medium py-1" onClick={() => setMenuOpen(false)}>
                     {isAdmin ? 'Admin Panel' : 'Dashboard'}
                   </Link>
-                  <Link href="/dashboard/bookings" className="block text-gray-700 font-medium py-1" onClick={() => setMenuOpen(false)}>My Bookings</Link>
+                  {user?.role !== 'corporate' && user?.role !== 'employee' && (
+                    <Link href="/dashboard/bookings" className="block text-gray-700 font-medium py-1" onClick={() => setMenuOpen(false)}>My Bookings</Link>
+                  )}
                   <button onClick={() => { setMenuOpen(false); setShowLogoutModal(true); }} className="text-red-600 font-medium flex items-center gap-2 py-1"><FiLogOut /> Logout</button>
                 </>
               ) : (

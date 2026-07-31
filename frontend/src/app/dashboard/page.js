@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { bookingApi, labApi, productApi, labCrmApi } from '@/lib/api';
 import { formatDate, formatCurrency, statusColor } from '@/utils/helpers';
@@ -246,6 +247,16 @@ function CustomerDashboard({ user }) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  if (!user) return null;
+  const router = useRouter();
+
+  // Corporate/employee accounts have their own dashboard at a different URL —
+  // this generic /dashboard is the customer view, so redirect them there instead
+  // of silently falling through to it (was happening on refresh/nav-link visits).
+  useEffect(() => {
+    if (user?.role === 'corporate') router.replace('/dashboard/corporate');
+    else if (user?.role === 'employee') router.replace('/dashboard/employee');
+  }, [user, router]);
+
+  if (!user || user.role === 'corporate' || user.role === 'employee') return null;
   return user.role === 'lab' ? <LabDashboard user={user} /> : <CustomerDashboard user={user} />;
 }
