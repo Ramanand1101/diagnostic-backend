@@ -13,9 +13,18 @@ function CouponForm({ initial, onSave, onClose }) {
     validFrom: '', validTo: '', usageLimit: '', active: true,
   });
   const [loading, setLoading] = useState(false);
+  const today = new Date().toISOString().split('T')[0];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const validFrom = form.validFrom?.split('T')[0];
+    const validTo = form.validTo?.split('T')[0];
+    if (validFrom && validFrom < today) {
+      return toast.error('Valid From cannot be before today.');
+    }
+    if (validTo && validFrom && validTo < validFrom) {
+      return toast.error('Valid To cannot be before Valid From.');
+    }
     setLoading(true);
     try {
       if (initial?._id) await couponApi.update(initial._id, form);
@@ -57,11 +66,11 @@ function CouponForm({ initial, onSave, onClose }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Valid From</label>
-          <input type="date" value={form.validFrom?.split('T')[0] || ''} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} className="input" />
+          <input type="date" min={today} value={form.validFrom?.split('T')[0] || ''} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} className="input" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Valid To</label>
-          <input type="date" value={form.validTo?.split('T')[0] || ''} onChange={(e) => setForm({ ...form, validTo: e.target.value })} className="input" />
+          <input type="date" min={form.validFrom?.split('T')[0] || today} value={form.validTo?.split('T')[0] || ''} onChange={(e) => setForm({ ...form, validTo: e.target.value })} className="input" />
         </div>
         <div className="col-span-2 flex items-center gap-2">
           <input type="checkbox" id="couponActive" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-4 h-4 rounded text-primary-600" />
