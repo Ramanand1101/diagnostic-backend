@@ -271,7 +271,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
             >
               {/* Test info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-gray-900 leading-snug">{p.name}</p>
                   {/* Below `lg` the description panel on the right is hidden, so this is
                       the only visible way to reach a test's details — without it, tapping
@@ -304,11 +304,12 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
                 </div>
               </div>
 
-              {/* Price + action */}
-              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                <div className="text-right">
+              {/* Price + action — price pinned to the left edge, button to the right,
+                  as its own full-width row on mobile (sm:flex-shrink-0 for the desktop row) */}
+              <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto sm:flex-shrink-0">
+                <div className="text-left sm:text-right">
                   {discount && (
-                    <span className="text-[9px] sm:text-[10px] font-bold bg-red-500 text-white px-1 sm:px-1.5 py-0.5 rounded-full block mb-0.5 text-center">{discount}%</span>
+                    <span className="text-[9px] sm:text-[10px] font-bold bg-red-500 text-white px-1 sm:px-1.5 py-0.5 rounded-full inline-block sm:block mb-0.5 text-center">{discount}%</span>
                   )}
                   <p className="text-xs sm:text-sm font-extrabold text-gray-900">₹{price?.toLocaleString('en-IN')}</p>
                   {discount && <p className="text-[10px] text-gray-400 line-through">₹{p.price?.toLocaleString('en-IN')}</p>}

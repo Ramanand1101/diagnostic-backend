@@ -75,6 +75,7 @@ export default function BookingsPage() {
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                     <th className="table-header">Booking #</th>
+                    <th className="table-header">Patient</th>
                     <th className="table-header">Date</th>
                     <th className="table-header">Items</th>
                     <th className="table-header">Status</th>
@@ -86,6 +87,7 @@ export default function BookingsPage() {
                   {bookings.map((b) => (
                     <tr key={b._id} className="hover:bg-gray-50 transition-colors">
                       <td className="table-cell font-mono font-medium">{b.bookingNo}</td>
+                      <td className="table-cell">{b.patientSnapshot?.name || '—'}</td>
                       <td className="table-cell">{formatDate(b.slotDate)}</td>
                       <td className="table-cell">{b.items?.length || 0} item(s)</td>
                       <td className="table-cell">
