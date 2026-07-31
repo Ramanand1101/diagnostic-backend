@@ -1200,6 +1200,27 @@ export default function CartPage() {
 
   const selfPatient = patients.find((p) => p.relation === 'self');
 
+  // Persist "who's this test for" selections across navigation — without this, leaving
+  // /cart (e.g. to search for another test) and coming back wiped every manual
+  // multi-select choice back to the "self" default, which is exactly the frustrating
+  // bug that was reported: pick Umesh + Praveen for a test, go add another test, come
+  // back, and it's silently back to just Self.
+  const ITEM_PATIENTS_KEY = `dh_cart_patients_${user?._id || 'guest'}`;
+  const itemPatientsLoaded = useRef(false);
+  useEffect(() => {
+    itemPatientsLoaded.current = false;
+    try {
+      const raw = localStorage.getItem(ITEM_PATIENTS_KEY);
+      if (raw) setItemPatients(JSON.parse(raw));
+    } catch {}
+    itemPatientsLoaded.current = true;
+  }, [ITEM_PATIENTS_KEY]);
+
+  useEffect(() => {
+    if (!itemPatientsLoaded.current) return;
+    try { localStorage.setItem(ITEM_PATIENTS_KEY, JSON.stringify(itemPatients)); } catch {}
+  }, [itemPatients, ITEM_PATIENTS_KEY]);
+
   // Default every cart item to "self" once the patients list (or a new item) shows up
   useEffect(() => {
     if (!selfPatient) return;
@@ -1432,9 +1453,46 @@ export default function CartPage() {
               ))}
             </div>
 
-            {/* RIGHT: Price summary (sticky) */}
+            {/* RIGHT: Booking + price summary, combined into one card (sticky) */}
             <div className="lg:sticky lg:top-24">
               <div className="bg-white rounded-xl border border-gray-100 p-5">
+                {/* Booking Summary — who's getting what, so a cart with several people
+                    and several tests each stays easy to scan at a glance */}
+                {patients.length > 0 && bookingGroups.length > 0 && (
+                  <>
+                    <h2 className="font-bold text-gray-800 text-sm mb-4">Booking Summary</h2>
+                    <div className="space-y-3 mb-5">
+                      {bookingGroups.map((group) => {
+                        const p = patients.find((pp) => pp._id === group.patientId);
+                        const subtotal = group.items.reduce((s, i) => s + (i.salePrice || i.price || 0), 0);
+                        return (
+                          <div key={group.patientId} className="border border-gray-100 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-sm font-semibold text-gray-900">
+                                {p?.relation === 'self' ? `${p.name} (You)` : p?.name || group.patientName || 'Patient'}
+                              </p>
+                              <span className="text-[10px] text-gray-400 shrink-0">{group.items.length} test{group.items.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <ul className="space-y-1">
+                              {group.items.map((item) => (
+                                <li key={item.cartItemId} className="flex items-center justify-between gap-2 text-xs text-gray-600">
+                                  <span className="truncate">{item.name}</span>
+                                  <span className="shrink-0 font-medium text-gray-700">₹{(item.salePrice || item.price)?.toLocaleString('en-IN')}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-100 text-xs font-semibold text-gray-800">
+                              <span>Subtotal</span>
+                              <span>₹{subtotal.toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="h-px bg-gray-100 mb-4" />
+                  </>
+                )}
+
                 <h2 className="font-bold text-gray-800 text-sm mb-4">Price Summary</h2>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between text-gray-600">
@@ -1459,42 +1517,6 @@ export default function CartPage() {
                   </p>
                 )}
               </div>
-
-              {/* Booking Summary — who's getting what, so a cart with several people
-                  and several tests each stays easy to scan at a glance */}
-              {patients.length > 0 && bookingGroups.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-100 p-5 mt-4">
-                  <h2 className="font-bold text-gray-800 text-sm mb-4">Booking Summary</h2>
-                  <div className="space-y-3">
-                    {bookingGroups.map((group) => {
-                      const p = patients.find((pp) => pp._id === group.patientId);
-                      const subtotal = group.items.reduce((s, i) => s + (i.salePrice || i.price || 0), 0);
-                      return (
-                        <div key={group.patientId} className="border border-gray-100 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm font-semibold text-gray-900">
-                              {p?.relation === 'self' ? `${p.name} (You)` : p?.name || group.patientName || 'Patient'}
-                            </p>
-                            <span className="text-[10px] text-gray-400 shrink-0">{group.items.length} test{group.items.length !== 1 ? 's' : ''}</span>
-                          </div>
-                          <ul className="space-y-1">
-                            {group.items.map((item) => (
-                              <li key={item.cartItemId} className="flex items-center justify-between gap-2 text-xs text-gray-600">
-                                <span className="truncate">{item.name}</span>
-                                <span className="shrink-0 font-medium text-gray-700">₹{(item.salePrice || item.price)?.toLocaleString('en-IN')}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-100 text-xs font-semibold text-gray-800">
-                            <span>Subtotal</span>
-                            <span>₹{subtotal.toLocaleString('en-IN')}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
