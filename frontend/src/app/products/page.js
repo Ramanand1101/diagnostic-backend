@@ -10,9 +10,11 @@ import { getErrorMessage } from '@/utils/helpers';
 import { FiFilter, FiX } from 'react-icons/fi';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { useCity } from '@/context/CityContext';
 
 function ProductsContent() {
   const searchParams = useSearchParams();
+  const { city } = useCity();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,7 @@ function ProductsContent() {
     setLoading(true);
     try {
       const params = { page, limit, isActive: true };
+      if (city) params.city = city;
       Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
       const res = await productApi.getAll(params);
       setProducts(res.data.items || res.data.products || []);
@@ -50,7 +53,8 @@ function ProductsContent() {
     }
   };
 
-  useEffect(() => { fetchProducts(); }, [page, filters]);
+  useEffect(() => { setPage(1); }, [city]);
+  useEffect(() => { fetchProducts(); }, [page, filters, city]);
 
   const handleFilter = (key, value) => {
     setFilters((f) => ({ ...f, [key]: value }));
