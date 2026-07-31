@@ -282,7 +282,7 @@ export default function LabBillingPage() {
                           #{b.bookingNo}
                         </td>
                         <td className="px-4 py-3">
-                          <p className="font-medium text-gray-700">{b.user?.name || b.patients?.[0]?.name || '—'}</p>
+                          <p className="font-medium text-gray-700">{b.user?.name || b.patientSnapshot?.name || '—'}</p>
                           {b.user?.mobile && <p className="text-xs text-gray-400">{b.user.mobile}</p>}
                         </td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">

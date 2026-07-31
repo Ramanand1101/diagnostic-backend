@@ -104,7 +104,7 @@ export default function PatientDetailPage() {
   if (loading) return <PageLoader />;
   if (!data) return <div className="text-center py-20 text-gray-400">Patient not found</div>;
 
-  const { user, bookings, reports, followUps, totalSpend } = data;
+  const { user, bookings, reports, patients = [], followUps, totalSpend } = data;
 
   return (
     <div className="space-y-6">
@@ -115,7 +115,9 @@ export default function PatientDetailPage() {
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">{user.name}</h1>
-          <p className="text-sm text-gray-500">Patient 360° View</p>
+          <p className="text-sm text-gray-500">
+            Patient 360° View{user.customerId && <span className="ml-2 text-xs font-mono text-gray-400">{user.customerId}</span>}
+          </p>
         </div>
         <button
           onClick={() => setShowFollowUp(true)}
@@ -172,6 +174,27 @@ export default function PatientDetailPage() {
         </div>
       </div>
 
+      {/* Linked patients under this Customer ID — self + family members */}
+      {patients.length > 0 && (
+        <div className="card">
+          <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <FiUser className="text-primary-500" /> Linked Patients ({patients.length})
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {patients.map((p) => (
+              <div key={p._id} className="p-3 bg-gray-50 rounded-xl">
+                <p className="text-sm font-semibold text-gray-800">
+                  {p.name} {p.relation === 'self' && <span className="text-xs font-normal text-primary-600">(Account holder)</span>}
+                </p>
+                <p className="text-xs text-gray-500 capitalize mt-0.5">{p.relation}{p.age ? ` · ${p.age} yrs` : ''}{p.gender ? ` · ${p.gender}` : ''}</p>
+                <p className="text-[11px] text-gray-400 mt-1 font-mono">{p.patientId}</p>
+                <p className="text-xs text-gray-500 mt-1">{bookings.filter((b) => (b.patient?._id || b.patient) === p._id).length} booking(s)</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Booking history */}
         <div className="card">
@@ -195,6 +218,9 @@ export default function PatientDetailPage() {
                   <p className="text-xs text-gray-500 mt-1">
                     {b.items?.map((i) => i.name).join(', ').slice(0, 60) || 'No items'}
                   </p>
+                  {b.patient?.name && (
+                    <p className="text-[11px] text-primary-600 mt-0.5">For: {b.patient.name}</p>
+                  )}
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-xs text-gray-400">{formatDate(b.createdAt)}</p>
                     <p className="text-sm font-semibold text-green-700">{formatCurrency(b.total)}</p>

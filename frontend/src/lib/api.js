@@ -384,6 +384,16 @@ export const crmApi = {
   patientDetail: (id) => api.get(`/crm/patients/${id}`),
 };
 
+// Patients (self + family members) linked to the logged-in customer's account
+export const patientApi = {
+  getMine: () => api.get('/patients/me'),
+  create: (data) => api.post('/patients', data),
+  update: (id, data) => api.patch(`/patients/${id}`, data),
+  remove: (id) => api.delete(`/patients/${id}`),
+  getBookings: (id) => api.get(`/patients/${id}/bookings`),
+  getReports: (id) => api.get(`/patients/${id}/reports`),
+};
+
 export const leadApi = {
   getAll: (params) => api.get('/leads', { params }),
   create: (data) => api.post('/leads', data),

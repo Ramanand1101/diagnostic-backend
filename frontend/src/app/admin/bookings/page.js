@@ -238,6 +238,7 @@ function BookingDetailModal({ booking, statuses, onClose, onChanged }) {
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div><p className="text-gray-400">Customer</p><p className="font-medium">{b.user?.name || b.guest?.name}</p>{b.user?.mobile && <p className="text-xs text-gray-400">{b.user.mobile}</p>}</div>
+        <div><p className="text-gray-400">Patient</p><p className="font-medium">{b.patientSnapshot?.name || '—'}</p>{b.patient?.patientId && <p className="text-xs text-gray-400 font-mono">{b.patient.patientId}</p>}</div>
         <div><p className="text-gray-400">Lab</p><p className="font-medium">{b.lab?.name || '—'}</p>{b.lab?.city && <p className="text-xs text-gray-400">{b.lab.city}</p>}</div>
         <div><p className="text-gray-400">Total</p><p className="font-medium">{formatCurrency(b.total)}</p></div>
         <div><p className="text-gray-400">Date</p><p className="font-medium">{formatDate(b.slotDate)}</p></div>
@@ -474,6 +475,9 @@ export default function AdminBookingsPage() {
                     <td className="table-cell">
                       <p className="font-medium text-gray-800 text-sm">{b.user?.name || b.guest?.name || '—'}</p>
                       {b.user?.mobile && <p className="text-xs text-gray-400">{b.user.mobile}</p>}
+                      {b.patientSnapshot?.name && (
+                        <p className="text-xs text-primary-600 mt-0.5">For: {b.patientSnapshot.name}</p>
+                      )}
                       {b.cancelledByName && (
                         <p className="text-xs text-red-500 mt-0.5">✕ Cancelled by: {b.cancelledByName}</p>
                       )}

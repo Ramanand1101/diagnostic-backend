@@ -47,6 +47,7 @@ const integrationSettingRoutes = require('./routes/integrationSettingRoutes');
 const labHolidayRoutes = require('./routes/labHolidayRoutes');
 const testAvailabilityRoutes = require('./routes/testAvailabilityRoutes');
 const reportNoteRoutes = require('./routes/reportNoteRoutes');
+const patientRoutes = require('./routes/patientRoutes');
 
 const app = express();
 
@@ -163,6 +164,7 @@ app.use('/api/v1/integrations', integrationSettingRoutes);
 app.use('/api/v1/lab-holidays', labHolidayRoutes);
 app.use('/api/v1/test-availability', testAvailabilityRoutes);
 app.use('/api/v1/report-notes', reportNoteRoutes);
+app.use('/api/v1/patients', patientRoutes);
 
 // ── Error handlers ────────────────────────────────────────────────────────────
 app.use(notFound);

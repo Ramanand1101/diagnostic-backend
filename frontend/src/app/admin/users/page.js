@@ -777,6 +777,9 @@ export default function AdminUsersPage() {
                                   : 'No modules assigned'}
                               </p>
                             )}
+                            {u.role === 'customer' && u.customerId && (
+                              <p className="text-[10px] text-gray-400 mt-0.5 font-mono">{u.customerId}</p>
+                            )}
                           </div>
                         </div>
                       </td>

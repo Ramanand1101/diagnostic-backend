@@ -1,12 +1,5 @@
 const mongoose = require('mongoose');
 
-const passengerSchema = new mongoose.Schema({
-  name: String,
-  age: Number,
-  gender: String,
-  relation: String
-}, { _id: false });
-
 const bookingSchema = new mongoose.Schema({
   bookingNo: { type: String, unique: true, index: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -22,7 +15,17 @@ const bookingSchema = new mongoose.Schema({
     qty: { type: Number, default: 1 },
     price: Number
   }],
-  patients: [passengerSchema],
+  // Who the tests in this booking are for — always exactly one person (the customer
+  // themselves or a family member); mixed-patient carts create one Booking per patient.
+  // `patientSnapshot` freezes the name/age/gender/relation as of booking time, so this
+  // booking still displays correctly even if the Patient profile is edited/removed later.
+  patient: { type: mongoose.Schema.Types.ObjectId, ref: 'Patient', required: true, index: true },
+  patientSnapshot: {
+    name: String,
+    age: Number,
+    gender: String,
+    relation: String,
+  },
   slotDate: { type: Date, required: true },
   slotTime: { type: String, required: true },
   visitType: { type: String, enum: ['home', 'lab'], default: 'lab' },

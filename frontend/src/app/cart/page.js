@@ -6,12 +6,13 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { bookingApi, userApi, authApi, settingApi, labHolidayApi, testAvailabilityApi } from '@/lib/api';
+import { bookingApi, userApi, authApi, patientApi, settingApi, labHolidayApi, testAvailabilityApi } from '@/lib/api';
 import BookingAnimation from '@/components/booking/BookingAnimation';
+import PatientFormModal from '@/components/patient/PatientFormModal';
 import { getErrorMessage } from '@/utils/helpers';
 import {
   FiTrash2, FiShoppingCart, FiMapPin, FiArrowLeft,
-  FiCheckCircle, FiAlertCircle, FiLoader, FiSearch, FiPlus,
+  FiCheckCircle, FiAlertCircle, FiLoader, FiSearch, FiPlus, FiUser,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -219,7 +220,9 @@ const TYPE_COLOR = {
 };
 
 // ── Cart item card ────────────────────────────────────────────────────────────
-function CartItem({ item, onRemove }) {
+const ADD_PATIENT_VALUE = '__add_new__';
+
+function CartItem({ item, onRemove, patients, selectedPatientId, onPatientChange }) {
   const lab = item.lab || {};
   const price = item.salePrice || item.price;
   const discount = item.salePrice && item.salePrice < item.price
@@ -259,6 +262,23 @@ function CartItem({ item, onRemove }) {
             </span>
           )}
         </div>
+        {patients && patients.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <FiUser className="text-gray-400 text-xs" />
+            <select
+              value={selectedPatientId || ''}
+              onChange={(e) => onPatientChange(item._id, e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-gray-50 text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-400"
+            >
+              {patients.map((p) => (
+                <option key={p._id} value={p._id}>
+                  Booking for: {p.relation === 'self' ? `${p.name} (You)` : p.name}
+                </option>
+              ))}
+              <option value={ADD_PATIENT_VALUE}>+ Add family member...</option>
+            </select>
+          </div>
+        )}
       </div>
       <div className="flex flex-col items-end justify-between flex-shrink-0">
         <button onClick={() => onRemove(item._id)} className="text-gray-300 hover:text-red-500 transition-colors p-1">
@@ -372,9 +392,13 @@ function BookingForm({ groups, onReadyForPayment }) {
   const [alternatives, setAlternatives] = useState([]);
 
   const labId = groups[0]?.labId;
+  // groups may now be split by patient as well as lab (each patient's tests still
+  // count toward the same lab's holiday/availability rules), so flatten across all
+  // of them rather than reading only the first patient's slice of the cart.
+  const allGroupItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
   const cartTestMasterIds = useMemo(
-    () => [...new Set((groups[0]?.items || []).map((i) => i.testMaster?._id || i.testMaster).filter(Boolean))],
-    [groups]
+    () => [...new Set(allGroupItems.map((i) => i.testMaster?._id || i.testMaster).filter(Boolean))],
+    [allGroupItems]
   );
 
   useEffect(() => {
@@ -398,7 +422,7 @@ function BookingForm({ groups, onReadyForPayment }) {
     if (!labId || !form.slotDate || !cartTestMasterIds.length) return;
     let cancelled = false;
     (async () => {
-      for (const item of groups[0]?.items || []) {
+      for (const item of allGroupItems) {
         const tm = item.testMaster?._id || item.testMaster;
         if (!tm) continue;
         try {
@@ -551,25 +575,30 @@ function BookingForm({ groups, onReadyForPayment }) {
         </div>
       )}
 
-      {/* Row 1: Name | Age | Phone | Email */}
+      {/* Row 1: Name | Age (guests only — logged-in users pick who each test is for
+          via the "Booking for" dropdown on each cart item instead) | Phone | Email */}
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Patient Name <span className="text-red-500">*</span></label>
-          <input required value={form.patientName} onChange={F('patientName')} className="input text-sm" placeholder="Full name" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Age <span className="text-red-500">*</span></label>
-          <input required type="number" min="1" max="100" value={form.patientAge}
-            onKeyDown={(e) => {
-              if (['Backspace','Delete','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key) || e.ctrlKey || e.metaKey) return;
-              if (!/^\d$/.test(e.key)) { e.preventDefault(); return; }
-              if (Number(e.target.value.slice(0, e.target.selectionStart) + e.key + e.target.value.slice(e.target.selectionEnd)) > 100) e.preventDefault();
-            }}
-            onChange={(e) => {
-              if (e.target.value === '' || Number(e.target.value) <= 100) F('patientAge')(e);
-            }}
-            className="input text-sm" placeholder="Age (1–100)" />
-        </div>
+        {!user && (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Patient Name <span className="text-red-500">*</span></label>
+              <input required value={form.patientName} onChange={F('patientName')} className="input text-sm" placeholder="Full name" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Age <span className="text-red-500">*</span></label>
+              <input required type="number" min="1" max="100" value={form.patientAge}
+                onKeyDown={(e) => {
+                  if (['Backspace','Delete','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key) || e.ctrlKey || e.metaKey) return;
+                  if (!/^\d$/.test(e.key)) { e.preventDefault(); return; }
+                  if (Number(e.target.value.slice(0, e.target.selectionStart) + e.key + e.target.value.slice(e.target.selectionEnd)) > 100) e.preventDefault();
+                }}
+                onChange={(e) => {
+                  if (e.target.value === '' || Number(e.target.value) <= 100) F('patientAge')(e);
+                }}
+                className="input text-sm" placeholder="Age (1–100)" />
+            </div>
+          </>
+        )}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Phone Number <span className="text-red-500">*</span></label>
           <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-primary-500">
@@ -593,16 +622,18 @@ function BookingForm({ groups, onReadyForPayment }) {
         </div>
       </div>
 
-      {/* Row 2: Gender | Visit Type | Pincode | Date */}
+      {/* Row 2: Gender (guests only) | Visit Type | Pincode | Date */}
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
-          <select value={form.patientGender} onChange={F('patientGender')} className="input text-sm">
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
+        {!user && (
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
+            <select value={form.patientGender} onChange={F('patientGender')} className="input text-sm">
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Visit Type</label>
           <select value={form.visitType} onChange={F('visitType')} className="input text-sm">
@@ -803,13 +834,29 @@ function PaymentScreen({ form, groups, total, onSuccess, onBack }) {
     setProcessing(true);
     await new Promise((r) => setTimeout(r, 2200));
     try {
+      // Groups computed before login (guest checkout) carry the 'self' placeholder
+      // instead of a real Patient ID — resolve it once now that the account exists
+      // (BookingForm's handleSubmit already auto-registered + logged in by this point).
+      let selfPatientId = null;
+      if (groups.some((g) => g.patientId === 'self')) {
+        const res = await patientApi.getMine();
+        const self = (res.data.items || []).find((p) => p.relation === 'self');
+        selfPatientId = self?._id || null;
+        if (selfPatientId && (form.patientAge || form.patientGender)) {
+          patientApi.update(selfPatientId, {
+            age: form.patientAge ? Number(form.patientAge) : undefined,
+            gender: form.patientGender,
+          }).catch(() => {});
+        }
+      }
+
       const created = [];
       for (const group of groups) {
         const subtotal = group.items.reduce((s, i) => s + (i.salePrice || i.price), 0);
         const res = await bookingApi.create({
           lab: group.labId,
           items: group.items.map((i) => ({ product: i._id, name: i.name, qty: 1, price: i.salePrice || i.price })),
-          patients: [{ name: form.patientName, age: +form.patientAge, gender: form.patientGender, relation: 'self', phone: form.phone, email: form.email }],
+          patient: group.patientId === 'self' ? selfPatientId : group.patientId,
           slotDate: form.slotDate,
           slotTime: form.slotTime,
           visitType: form.visitType,
@@ -1083,6 +1130,37 @@ export default function CartPage() {
   const [showAnim, setShowAnim] = useState(false);
   const [pendingPayment, setPendingPayment] = useState(null);
 
+  // Who each cart item is being booked for — a saved Patient (self or family member).
+  // Guests (not logged in) never have a patients list yet, so every item silently
+  // falls back to the 'self' placeholder, resolved into a real Patient right after
+  // their account is auto-created during checkout (see PaymentScreen.handlePay).
+  const [patients, setPatients] = useState([]);
+  const [itemPatient, setItemPatient] = useState({}); // item._id -> patientId
+  const [patientModalItemId, setPatientModalItemId] = useState(null);
+
+  useEffect(() => {
+    if (!user) { setPatients([]); return; }
+    patientApi.getMine().then((res) => setPatients(res.data.items || [])).catch(() => {});
+  }, [user]);
+
+  const selfPatient = patients.find((p) => p.relation === 'self');
+
+  // Default every cart item to "self" once the patients list (or a new item) shows up
+  useEffect(() => {
+    if (!selfPatient) return;
+    setItemPatient((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      items.forEach((i) => { if (!next[i._id]) { next[i._id] = selfPatient._id; changed = true; } });
+      return changed ? next : prev;
+    });
+  }, [selfPatient, items]);
+
+  const handlePatientChange = (itemId, value) => {
+    if (value === ADD_PATIENT_VALUE) { setPatientModalItemId(itemId); return; }
+    setItemPatient((prev) => ({ ...prev, [itemId]: value }));
+  };
+
   // Load animation config once on mount
   useEffect(() => {
     settingApi.getPublic('booking_animation')
@@ -1119,11 +1197,22 @@ export default function CartPage() {
 
   const isRestricted = user && (user.role === 'superadmin' || user.role === 'subadmin' || user.role === 'lab');
 
+  // Bookings are grouped by lab (only one lab is allowed per checkout — see the
+  // "one lab at a time" gate below) AND by patient, so a cart mixing tests for
+  // "self" and a family member creates one Booking per patient. `distinctLabIds`
+  // (lab only) drives the one-lab gate; `groups` (lab + patient) drives both the
+  // cart item display and what gets sent to bookingApi.create.
+  const distinctLabIds = [...new Set(items.map((i) => String(i.lab?._id || i.lab || 'unknown')))];
   const groups = Object.values(
     items.reduce((acc, item) => {
       const labId = item.lab?._id || item.lab || 'unknown';
-      if (!acc[labId]) acc[labId] = { labId, labName: item.lab?.name || 'Unknown Lab', items: [] };
-      acc[labId].items.push(item);
+      const patientId = itemPatient[item._id] || selfPatient?._id || 'self';
+      const key = `${labId}::${patientId}`;
+      if (!acc[key]) {
+        const p = patients.find((pp) => pp._id === patientId);
+        acc[key] = { labId, patientId, labName: item.lab?.name || 'Unknown Lab', patientName: p?.name, items: [] };
+      }
+      acc[key].items.push(item);
       return acc;
     }, {})
   );
@@ -1199,6 +1288,15 @@ export default function CartPage() {
   return (
     <>
       {showAnim && <BookingAnimation config={animConfig} onDone={handleAnimDone} />}
+      {patientModalItemId && (
+        <PatientFormModal
+          onClose={() => setPatientModalItemId(null)}
+          onSaved={(saved) => {
+            setPatients((ps) => [...ps, saved]);
+            setItemPatient((prev) => ({ ...prev, [patientModalItemId]: saved._id }));
+          }}
+        />
+      )}
       <Navbar />
       <main className="min-h-screen bg-gray-50">
         <div className="max-w-5xl mx-auto px-4 py-8">
@@ -1226,19 +1324,30 @@ export default function CartPage() {
           {/* TOP: Cart items (left) + Price summary (right, sticky) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6">
 
-            {/* LEFT: Cart items grouped by lab */}
+            {/* LEFT: Cart items grouped by lab (and, when a family member is
+                assigned, further split so each person's tests are visually distinct —
+                they'll become separate bookings) */}
             <div className="lg:col-span-2 space-y-6">
               {groups.map((group) => (
-                <div key={group.labId}>
-                  {groups.length > 1 && (
+                <div key={`${group.labId}-${group.patientId}`}>
+                  {(groups.length > 1) && (
                     <div className="flex items-center gap-2 mb-2">
                       <FiMapPin className="text-gray-400 text-sm" />
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{group.labName}</span>
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                        {group.labName}{group.patientName ? ` · for ${group.patientName}` : ''}
+                      </span>
                     </div>
                   )}
                   <div className="space-y-3">
                     {group.items.map((item) => (
-                      <CartItem key={item._id} item={item} onRemove={removeItem} />
+                      <CartItem
+                        key={item._id}
+                        item={item}
+                        onRemove={removeItem}
+                        patients={patients}
+                        selectedPatientId={itemPatient[item._id] || selfPatient?._id}
+                        onPatientChange={handlePatientChange}
+                      />
                     ))}
                   </div>
                 </div>
@@ -1288,31 +1397,34 @@ export default function CartPage() {
                     Bookings can only be placed by patient/customer accounts.
                   </p>
                 </div>
-              ) : groups.length > 1 ? (
+              ) : distinctLabIds.length > 1 ? (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-5">
                   <div className="flex items-start gap-3 mb-4">
                     <div className="text-2xl shrink-0">⚠️</div>
                     <div>
                       <p className="font-semibold text-red-800 text-sm">One lab at a time only</p>
                       <p className="text-xs text-red-600 mt-0.5">
-                        You have tests from {groups.length} different labs. Please keep tests from only one lab to proceed with booking.
+                        You have tests from {distinctLabIds.length} different labs. Please keep tests from only one lab to proceed with booking.
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    {groups.map((g) => (
-                      <div key={g.labId} className="flex items-center justify-between bg-white border border-red-100 rounded-lg px-3 py-2.5">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800">{g.labName}</p>
-                          <p className="text-xs text-gray-400">{g.items.length} test{g.items.length !== 1 ? 's' : ''}</p>
+                    {distinctLabIds.map((labId) => {
+                      const labItems = items.filter((i) => String(i.lab?._id || i.lab || 'unknown') === labId);
+                      return (
+                        <div key={labId} className="flex items-center justify-between bg-white border border-red-100 rounded-lg px-3 py-2.5">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">{labItems[0]?.lab?.name || 'Unknown Lab'}</p>
+                            <p className="text-xs text-gray-400">{labItems.length} test{labItems.length !== 1 ? 's' : ''}</p>
+                          </div>
+                          <button
+                            onClick={() => labItems.forEach((i) => removeItem(i._id))}
+                            className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors font-medium">
+                            Remove
+                          </button>
                         </div>
-                        <button
-                          onClick={() => g.items.forEach((i) => removeItem(i._id))}
-                          className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors font-medium">
-                          Remove
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ) : (

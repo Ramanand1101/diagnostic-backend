@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { generateDatedId } = require('../utils/idGenerator');
 
 const addressSchema = new mongoose.Schema({
   label: String,
@@ -36,6 +37,9 @@ const userSchema = new mongoose.Schema({
     enum: ['superadmin', 'subadmin', 'hot_employee', 'lab', 'corporate', 'employee', 'customer'],
     default: 'customer'
   },
+  // Human-readable, permanent account identifier — only meaningful for role: 'customer'
+  // (per the Customer/Patient ID feature). Other roles never get one.
+  customerId: { type: String, unique: true, sparse: true, index: true },
   isActive: { type: Boolean, default: true },
   verified: { type: Boolean, default: true },
   avatar: String,
@@ -54,6 +58,13 @@ const userSchema = new mongoose.Schema({
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password') || !this.password) return next();
   this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+userSchema.pre('save', async function(next) {
+  if (this.role === 'customer' && !this.customerId) {
+    this.customerId = await generateDatedId('CUST', new Date());
+  }
   next();
 });
 

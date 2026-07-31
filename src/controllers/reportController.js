@@ -28,7 +28,7 @@ exports.uploadReport = asyncHandler(async (req, res) => {
   const { booking: bookingId, notes } = req.body;
   if (!bookingId) return res.status(400).json({ message: 'Booking ID is required' });
 
-  const booking = await Booking.findById(bookingId).populate('user lab');
+  const booking = await Booking.findById(bookingId).populate('user lab patient');
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
   // 'partial' = some test(s) still pending (see missingTests) — mirrors the same
@@ -71,6 +71,7 @@ exports.uploadReport = asyncHandler(async (req, res) => {
 
     const report = await Report.create({
       booking: bookingId,
+      patient: booking.patient?._id || booking.patient,
       lab: labId,
       uploadedBy: req.user._id,
       storageKey,

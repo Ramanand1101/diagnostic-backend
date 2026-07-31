@@ -12,6 +12,7 @@ const customerNav = [
   { href: '/dashboard', label: 'Overview', icon: FiGrid },
   { href: '/dashboard/bookings', label: 'My Bookings', icon: FiCalendar },
   { href: '/dashboard/reports', label: 'My Reports', icon: FiFileText },
+  { href: '/dashboard/patients', label: 'My Family', icon: FiUsers },
   { href: '/dashboard/tickets', label: 'Support', icon: FiMessageSquare },
   { href: '/dashboard/profile', label: 'Profile', icon: FiUser },
 ];
@@ -84,6 +85,7 @@ export default function DashboardLayout({ children }) {
                 <div>
                   <p className="font-medium text-sm text-gray-900">{user.name}</p>
                   <p className="text-xs text-gray-400 capitalize">{user.role}</p>
+                  {user.customerId && <p className="text-[10px] text-gray-400">{user.customerId}</p>}
                 </div>
               </div>
               <nav className="space-y-1">

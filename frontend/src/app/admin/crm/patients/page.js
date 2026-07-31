@@ -58,6 +58,7 @@ export default function CRMPatientsPage() {
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="table-header">Patient</th>
+                  <th className="table-header">Customer ID</th>
                   <th className="table-header">Contact</th>
                   <th className="table-header">Bookings</th>
                   <th className="table-header">Total Spend</th>
@@ -77,6 +78,7 @@ export default function CRMPatientsPage() {
                         <span className="font-medium text-gray-800">{p.name}</span>
                       </div>
                     </td>
+                    <td className="table-cell text-xs text-gray-500 font-mono">{p.customerId || '—'}</td>
                     <td className="table-cell">
                       <p className="text-sm text-gray-700">{p.mobile || '—'}</p>
                       <p className="text-xs text-gray-400">{p.email || ''}</p>
@@ -96,7 +98,7 @@ export default function CRMPatientsPage() {
                   </tr>
                 ))}
                 {patients.length === 0 && (
-                  <tr><td colSpan={7} className="table-cell text-center text-gray-400 py-10">No patients found</td></tr>
+                  <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-10">No patients found</td></tr>
                 )}
               </tbody>
             </table>

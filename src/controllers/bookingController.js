@@ -3,6 +3,7 @@ const Booking = require('../models/Booking');
 const Coupon  = require('../models/Coupon');
 const Product = require('../models/Product');
 const User    = require('../models/User');
+const Patient = require('../models/Patient');
 const Counter = require('../models/Counter');
 const { queueEmail } = require('../queues/index');
 const { sendSms, sendWhatsapp } = require('../config/sms');
@@ -45,6 +46,16 @@ exports.createBooking = asyncHandler(async (req, res) => {
   }
   if (!payload.slotTime) {
     return res.status(400).json({ message: 'Please select a preferred time slot.' });
+  }
+
+  // ── Patient is mandatory — every booking is for exactly one person (self or a
+  // family member); the client sends a Patient ID which must belong to this customer ──
+  if (!payload.patient) {
+    return res.status(400).json({ message: 'Please select who this booking is for.' });
+  }
+  const patient = await Patient.findOne({ _id: payload.patient, customer: user._id });
+  if (!patient) {
+    return res.status(400).json({ message: 'Selected patient was not found on your account.' });
   }
 
   // ── 30-day date restriction ──────────────────────────────────────────────────
@@ -136,7 +147,8 @@ exports.createBooking = asyncHandler(async (req, res) => {
       qty: i.qty || 1,
       price: i.price || 0
     })),
-    patients: payload.patients || [],
+    patient: patient._id,
+    patientSnapshot: { name: patient.name, age: patient.age, gender: patient.gender, relation: patient.relation },
     slotDate: payload.slotDate,
     slotTime: payload.slotTime,
     visitType: payload.visitType || 'lab',
@@ -288,13 +300,13 @@ exports.listBookings = asyncHandler(async (req, res) => {
   }
 
   const skip = (Number(page) - 1) * safeLimit;
-  const items = await Booking.find(filter).populate('user lab items.product').sort('-createdAt').skip(skip).limit(safeLimit);
+  const items = await Booking.find(filter).populate('user lab items.product patient').sort('-createdAt').skip(skip).limit(safeLimit);
   const total = await Booking.countDocuments(filter);
   res.json({ items, page: Number(page), limit: safeLimit, total });
 });
 
 exports.getBooking = asyncHandler(async (req, res) => {
-  const booking = await Booking.findById(req.params.id).populate('user lab items.product');
+  const booking = await Booking.findById(req.params.id).populate('user lab items.product patient');
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
   if (req.user.role === 'lab') {
@@ -370,7 +382,7 @@ exports.updateBooking = asyncHandler(async (req, res) => {
   }
 
   const booking = await Booking.findByIdAndUpdate(req.params.id, update, { new: true })
-    .populate('user lab items.product');
+    .populate('user lab items.product patient');
   if (!booking) return res.status(404).json({ message: 'Booking not found' });
   res.json(booking);
 });

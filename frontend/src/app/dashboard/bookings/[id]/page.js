@@ -239,15 +239,16 @@ export default function BookingDetailPage() {
             </div>
           )}
 
-          {booking.patients?.length > 0 && (
+          {booking.patientSnapshot?.name && (
             <div className="card">
-              <h2 className="font-semibold text-gray-900 mb-3">Patient(s)</h2>
-              {booking.patients.map((p, i) => (
-                <div key={i} className="text-sm text-gray-600">
-                  <p className="font-medium">{p.name}</p>
-                  <p>{p.age} yrs &bull; {p.gender} &bull; {p.relation}</p>
-                </div>
-              ))}
+              <h2 className="font-semibold text-gray-900 mb-3">Patient</h2>
+              <div className="text-sm text-gray-600">
+                <p className="font-medium">{booking.patientSnapshot.name}</p>
+                <p>{booking.patientSnapshot.age} yrs &bull; {booking.patientSnapshot.gender} &bull; {booking.patientSnapshot.relation}</p>
+                {booking.patient?.patientId && (
+                  <p className="text-xs text-gray-400 mt-1">Patient ID: {booking.patient.patientId}</p>
+                )}
+              </div>
             </div>
           )}
 

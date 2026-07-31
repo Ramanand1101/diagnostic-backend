@@ -3,6 +3,7 @@ const Booking = require('../models/Booking');
 const Report = require('../models/Report');
 const Lead = require('../models/Lead');
 const FollowUp = require('../models/FollowUp');
+const Patient = require('../models/Patient');
 
 // GET /api/v1/crm/stats
 exports.stats = async (req, res) => {
@@ -61,7 +62,7 @@ exports.patientList = async (req, res) => {
     }
 
     const [users, total] = await Promise.all([
-      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(safeLimit).select('name email mobile createdAt lastLoginAt'),
+      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(safeLimit).select('name email mobile customerId createdAt lastLoginAt'),
       User.countDocuments(filter),
     ]);
 
@@ -89,6 +90,7 @@ exports.patientList = async (req, res) => {
         name: u.name,
         email: u.email,
         mobile: u.mobile,
+        customerId: u.customerId,
         createdAt: u.createdAt,
         lastLoginAt: u.lastLoginAt,
         totalBookings: stats.totalBookings,
@@ -109,19 +111,29 @@ exports.patientDetail = async (req, res) => {
     const user = await User.findById(req.params.id).select('-password');
     if (!user) return res.status(404).json({ message: 'Patient not found' });
 
-    const [bookings, reports, followUps] = await Promise.all([
+    const [bookings, patients, followUps] = await Promise.all([
       Booking.find({ user: user._id, isDeleted: false })
         .sort({ createdAt: -1 })
         .populate('lab', 'name city')
         .populate('items.product', 'name')
+        .populate('patient', 'patientId name relation')
         .limit(50),
-      Report.find({ user: user._id }).sort({ createdAt: -1 }).limit(20),
+      // All individuals (self + family members) linked to this Customer ID —
+      // the "Admin Panel should allow viewing all linked patients under a single
+      // Customer ID" requirement.
+      Patient.find({ customer: user._id }).sort({ relation: 1, createdAt: 1 }),
       FollowUp.find({ patient: user._id }).sort({ scheduledAt: -1 }).limit(20),
     ]);
 
+    // Reports have no direct `user` field — they link to a Booking (and, going
+    // forward, a Patient). Fetch via this customer's booking ids instead.
+    const reports = await Report.find({ booking: { $in: bookings.map((b) => b._id) } })
+      .sort({ createdAt: -1 })
+      .limit(20);
+
     const totalSpend = bookings.reduce((s, b) => s + (b.total || 0), 0);
 
-    res.json({ user, bookings, reports, followUps, totalSpend });
+    res.json({ user, bookings, reports, patients, followUps, totalSpend });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

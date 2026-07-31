@@ -254,16 +254,15 @@ export default function LabBookingsPage() {
 
                 {/* Details */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                  {b.patients?.length > 0 && (
+                  {b.patientSnapshot?.name && (
                     <div className="flex items-start gap-2">
                       <FiUser className="text-primary-400 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs text-gray-400">Patient</p>
-                        {b.patients.map((p, i) => (
-                          <p key={i} className="text-gray-700 text-xs font-medium">
-                            {p.name}{p.age ? `, ${p.age} yrs` : ''}{p.gender ? ` (${p.gender})` : ''}
-                          </p>
-                        ))}
+                        <p className="text-gray-700 text-xs font-medium">
+                          {b.patientSnapshot.name}{b.patientSnapshot.age ? `, ${b.patientSnapshot.age} yrs` : ''}{b.patientSnapshot.gender ? ` (${b.patientSnapshot.gender})` : ''}
+                        </p>
+                        {b.patient?.patientId && <p className="text-[10px] text-gray-400">{b.patient.patientId}</p>}
                       </div>
                     </div>
                   )}
