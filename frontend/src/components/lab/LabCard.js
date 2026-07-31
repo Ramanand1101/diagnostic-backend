@@ -25,7 +25,7 @@ export default function LabCard({ lab, compareIds, onToggleCompare }) {
         </span>
 
         {lab.brand?.logo ? (
-          <img src={lab.brand.logo} alt={lab.brand.name} className="absolute inset-0 w-full h-full object-cover" />
+          <img src={lab.brand.logo} alt={lab.brand.name} className="absolute inset-0 w-full h-full object-contain bg-white p-6" />
         ) : (
           <div className="w-28 h-28 rounded-2xl flex items-center justify-center shadow-md overflow-hidden bg-white">
             <div className="w-full h-full bg-primary-600 flex items-center justify-center">
