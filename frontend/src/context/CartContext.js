@@ -39,12 +39,6 @@ export function CartProvider({ children }) {
     });
   }, []);
 
-  // Always adds a new cart line for this product, even if one's already in the cart —
-  // used specifically for "book this same test for another family member too."
-  const addDuplicate = useCallback((product) => {
-    setItems((prev) => persist([...prev, withCartItemId({ ...product, cartItemId: undefined })]));
-  }, []);
-
   const removeItem = useCallback((cartItemId) => {
     setItems((prev) => persist(prev.filter((i) => i.cartItemId !== cartItemId)));
   }, []);
@@ -55,7 +49,7 @@ export function CartProvider({ children }) {
   }, []);
 
   return (
-    <CartContext.Provider value={{ items, addItem, addDuplicate, removeItem, clearCart, count: items.length }}>
+    <CartContext.Provider value={{ items, addItem, removeItem, clearCart, count: items.length }}>
       {children}
     </CartContext.Provider>
   );

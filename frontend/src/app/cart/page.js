@@ -12,7 +12,7 @@ import PatientFormModal from '@/components/patient/PatientFormModal';
 import { getErrorMessage } from '@/utils/helpers';
 import {
   FiTrash2, FiShoppingCart, FiMapPin, FiArrowLeft,
-  FiCheckCircle, FiAlertCircle, FiLoader, FiSearch, FiPlus, FiUser,
+  FiCheckCircle, FiAlertCircle, FiLoader, FiSearch, FiPlus, FiUser, FiChevronDown,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -219,10 +219,74 @@ const TYPE_COLOR = {
   medicine: 'bg-teal-50 text-teal-700 border-teal-100',
 };
 
-// ── Cart item card ────────────────────────────────────────────────────────────
-const ADD_PATIENT_VALUE = '__add_new__';
+// ── "Booking for" multi-select ──────────────────────────────────────────────────
+// A test can be booked for more than one person at once — checking multiple patients
+// here means this same test line becomes a separate booking per person selected.
+function BookingForPicker({ patients, selectedIds, onToggle, onAddNew }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
-function CartItem({ item, onRemove, patients, selectedPatientId, onPatientChange, onDuplicate }) {
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const selected = patients.filter((p) => selectedIds.includes(p._id));
+  const label = selected.length === 0
+    ? 'Select patient'
+    : selected.length === 1
+      ? (selected[0].relation === 'self' ? `${selected[0].name} (You)` : selected[0].name)
+      : `${selected[0].relation === 'self' ? `${selected[0].name} (You)` : selected[0].name} +${selected.length - 1} more`;
+
+  return (
+    <div className="relative mt-3" ref={ref}>
+      <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 rounded-lg pl-3 pr-2 py-2">
+        <div className="w-5 h-5 rounded-full bg-yellow-500 flex items-center justify-center shrink-0">
+          <FiUser className="text-white text-[10px]" />
+        </div>
+        <span className="text-xs font-semibold text-yellow-800 shrink-0">Booking for</span>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex-1 min-w-0 flex items-center justify-between gap-1 text-sm font-semibold text-yellow-900 bg-white border border-yellow-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+        >
+          <span className="truncate">{label}</span>
+          <FiChevronDown className={`text-yellow-600 text-xs shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+          {patients.map((p) => {
+            const checked = selectedIds.includes(p._id);
+            return (
+              <label key={p._id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => onToggle(p._id)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-400"
+                />
+                <span className="text-gray-800">{p.relation === 'self' ? `${p.name} (You)` : p.name}</span>
+              </label>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onAddNew(); }}
+            className="w-full text-left px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 border-t border-gray-100 mt-1"
+          >
+            + Add family member...
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Cart item card ────────────────────────────────────────────────────────────
+function CartItem({ item, onRemove, patients, selectedPatientIds, onPatientToggle, onAddPatient }) {
   const lab = item.lab || {};
   const price = item.salePrice || item.price;
   const discount = item.salePrice && item.salePrice < item.price
@@ -263,33 +327,12 @@ function CartItem({ item, onRemove, patients, selectedPatientId, onPatientChange
           )}
         </div>
         {patients && patients.length > 0 && (
-          <div className="flex items-center gap-2 mt-3 bg-yellow-50 border border-yellow-300 rounded-lg pl-3 pr-2 py-2">
-            <div className="w-5 h-5 rounded-full bg-yellow-500 flex items-center justify-center shrink-0">
-              <FiUser className="text-white text-[10px]" />
-            </div>
-            <span className="text-xs font-semibold text-yellow-800 shrink-0">Booking for</span>
-            <select
-              value={selectedPatientId || ''}
-              onChange={(e) => onPatientChange(item.cartItemId, e.target.value)}
-              className="flex-1 min-w-0 text-sm font-semibold text-yellow-900 bg-white border border-yellow-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-yellow-400 cursor-pointer"
-            >
-              {patients.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.relation === 'self' ? `${p.name} (You)` : p.name}
-                </option>
-              ))}
-              <option value={ADD_PATIENT_VALUE}>+ Add family member...</option>
-            </select>
-          </div>
-        )}
-        {patients && patients.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onDuplicate(item)}
-            className="text-[11px] font-medium text-primary-600 hover:text-primary-700 hover:underline mt-1.5"
-          >
-            + Book this test for another patient too
-          </button>
+          <BookingForPicker
+            patients={patients}
+            selectedIds={selectedPatientIds}
+            onToggle={(patientId) => onPatientToggle(item.cartItemId, patientId)}
+            onAddNew={() => onAddPatient(item.cartItemId)}
+          />
         )}
       </div>
       <div className="flex flex-col items-end justify-between flex-shrink-0">
@@ -1132,7 +1175,7 @@ function SuccessScreen({ bookings }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CartPage() {
-  const { items, removeItem, addDuplicate, clearCart } = useCart();
+  const { items, removeItem, clearCart } = useCart();
   const { user } = useAuth();
 
   const [step, setStep] = useState('cart'); // 'cart' | 'payment' | 'success'
@@ -1142,12 +1185,13 @@ export default function CartPage() {
   const [showAnim, setShowAnim] = useState(false);
   const [pendingPayment, setPendingPayment] = useState(null);
 
-  // Who each cart item is being booked for — a saved Patient (self or family member).
-  // Guests (not logged in) never have a patients list yet, so every item silently
-  // falls back to the 'self' placeholder, resolved into a real Patient right after
-  // their account is auto-created during checkout (see PaymentScreen.handlePay).
+  // Who each cart item is being booked for — one or more saved Patients (self and/or
+  // family members). Selecting more than one for a test books it once per selected
+  // person. Guests (not logged in) never have a patients list yet, so every item
+  // silently falls back to the 'self' placeholder, resolved into a real Patient right
+  // after their account is auto-created during checkout (see PaymentScreen.handlePay).
   const [patients, setPatients] = useState([]);
-  const [itemPatient, setItemPatient] = useState({}); // item.cartItemId -> patientId
+  const [itemPatients, setItemPatients] = useState({}); // item.cartItemId -> patientId[]
   const [patientModalItemId, setPatientModalItemId] = useState(null);
 
   useEffect(() => {
@@ -1160,17 +1204,24 @@ export default function CartPage() {
   // Default every cart item to "self" once the patients list (or a new item) shows up
   useEffect(() => {
     if (!selfPatient) return;
-    setItemPatient((prev) => {
+    setItemPatients((prev) => {
       let changed = false;
       const next = { ...prev };
-      items.forEach((i) => { if (!next[i.cartItemId]) { next[i.cartItemId] = selfPatient._id; changed = true; } });
+      items.forEach((i) => { if (!next[i.cartItemId]?.length) { next[i.cartItemId] = [selfPatient._id]; changed = true; } });
       return changed ? next : prev;
     });
   }, [selfPatient, items]);
 
-  const handlePatientChange = (itemId, value) => {
-    if (value === ADD_PATIENT_VALUE) { setPatientModalItemId(itemId); return; }
-    setItemPatient((prev) => ({ ...prev, [itemId]: value }));
+  // Toggling a patient off when they're the only one selected is a no-op — a test
+  // must always be booked for at least one person.
+  const handlePatientToggle = (itemId, patientId) => {
+    setItemPatients((prev) => {
+      const current = prev[itemId] || [];
+      const next = current.includes(patientId)
+        ? (current.length > 1 ? current.filter((id) => id !== patientId) : current)
+        : [...current, patientId];
+      return { ...prev, [itemId]: next };
+    });
   };
 
   // Load animation config once on mount
@@ -1218,19 +1269,26 @@ export default function CartPage() {
   const groups = Object.values(
     items.reduce((acc, item) => {
       const labId = item.lab?._id || item.lab || 'unknown';
-      const patientId = itemPatient[item.cartItemId] || selfPatient?._id || 'self';
-      const key = `${labId}::${patientId}`;
-      if (!acc[key]) {
-        const p = patients.find((pp) => pp._id === patientId);
-        acc[key] = { labId, patientId, labName: item.lab?.name || 'Unknown Lab', patientName: p?.name, items: [] };
-      }
-      acc[key].items.push(item);
+      const patientIds = itemPatients[item.cartItemId]?.length ? itemPatients[item.cartItemId] : [selfPatient?._id || 'self'];
+      // A test picked for more than one patient becomes one booking per patient —
+      // the same cart line is deliberately pushed into more than one group here.
+      patientIds.forEach((patientId) => {
+        const key = `${labId}::${patientId}`;
+        if (!acc[key]) {
+          const p = patients.find((pp) => pp._id === patientId);
+          acc[key] = { labId, patientId, labName: item.lab?.name || 'Unknown Lab', patientName: p?.name, items: [] };
+        }
+        acc[key].items.push(item);
+      });
       return acc;
     }, {})
   );
 
-  const total    = items.reduce((sum, i) => sum + (i.salePrice || i.price || 0), 0);
-  const mrpTotal = items.reduce((sum, i) => sum + (i.price || 0), 0);
+  // Priced per booking, not per cart line — a test picked for 2 patients is charged
+  // (and totalled) twice, since it becomes two separate bookings at checkout.
+  const patientCount = (item) => itemPatients[item.cartItemId]?.length || 1;
+  const total    = items.reduce((sum, i) => sum + (i.salePrice || i.price || 0) * patientCount(i), 0);
+  const mrpTotal = items.reduce((sum, i) => sum + (i.price || 0) * patientCount(i), 0);
   const savings  = mrpTotal - total;
 
   // Smart back URL — rebuild search from cart items (test names + city)
@@ -1305,7 +1363,7 @@ export default function CartPage() {
           onClose={() => setPatientModalItemId(null)}
           onSaved={(saved) => {
             setPatients((ps) => [...ps, saved]);
-            setItemPatient((prev) => ({ ...prev, [patientModalItemId]: saved._id }));
+            setItemPatients((prev) => ({ ...prev, [patientModalItemId]: [...(prev[patientModalItemId] || []), saved._id] }));
           }}
         />
       )}
@@ -1357,9 +1415,9 @@ export default function CartPage() {
                         item={item}
                         onRemove={removeItem}
                         patients={patients}
-                        selectedPatientId={itemPatient[item.cartItemId] || selfPatient?._id}
-                        onPatientChange={handlePatientChange}
-                        onDuplicate={addDuplicate}
+                        selectedPatientIds={itemPatients[item.cartItemId] || (selfPatient ? [selfPatient._id] : [])}
+                        onPatientToggle={handlePatientToggle}
+                        onAddPatient={setPatientModalItemId}
                       />
                     ))}
                   </div>
