@@ -24,15 +24,15 @@ export default function LabCard({ lab, compareIds, onToggleCompare }) {
             : <FiMapPin className="text-gray-400 text-xs sm:text-sm" />}
         </span>
 
-        <div className="w-28 h-28 rounded-2xl flex items-center justify-center shadow-md overflow-hidden bg-white">
-          {lab.brand?.logo ? (
-            <img src={lab.brand.logo} alt={lab.brand.name} className="w-full h-full object-cover scale-125" />
-          ) : (
+        {lab.brand?.logo ? (
+          <img src={lab.brand.logo} alt={lab.brand.name} className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="w-28 h-28 rounded-2xl flex items-center justify-center shadow-md overflow-hidden bg-white">
             <div className="w-full h-full bg-primary-600 flex items-center justify-center">
               <GiMicroscope className="text-white text-3xl" />
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {typeof lab.distanceKm === 'number' && (
           <span className="absolute bottom-3 right-3 text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-1 rounded-full bg-primary-600 text-white shadow-sm">
