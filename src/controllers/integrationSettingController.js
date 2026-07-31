@@ -27,12 +27,10 @@ const INTEGRATIONS = {
     ],
   },
   sms: {
-    label: 'SMS (AWS SNS)',
-    defaultProvider: 'aws_sns',
+    label: 'SMS (Fast2SMS)',
+    defaultProvider: 'fast2sms',
     fields: [
-      { key: 'accessKeyId', label: 'AWS Access Key ID', sensitive: true },
-      { key: 'secretAccessKey', label: 'AWS Secret Access Key', sensitive: true },
-      { key: 'region', label: 'AWS Region', sensitive: false },
+      { key: 'apiKey', label: 'Fast2SMS API Key', sensitive: true },
     ],
   },
   payment: {

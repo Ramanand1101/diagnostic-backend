@@ -1,5 +1,4 @@
 const twilio = require('twilio');
-const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
 const IntegrationSetting = require('../models/IntegrationSetting');
 const { decrypt } = require('../utils/encryption');
 
@@ -30,26 +29,40 @@ function formatIndian(mobile) {
   return `+91${digits}`;
 }
 
+// ── SMS via Fast2SMS ───────────────────────────────────────────────────────
+// Free Fast2SMS dev keys are only approved for the `otp` route (a fixed,
+// pre-approved template with a single numeric variable) — arbitrary text needs
+// the `q` (quick) route, which requires DLT registration on the account. Since
+// every current caller's message embeds a numeric code, we extract it and use
+// the OTP route; anything without a clear numeric code falls back to `q` and
+// simply surfaces whatever error Fast2SMS returns for that account's plan.
 async function sendSms({ to, message }) {
   const db = await loadDbConfig('sms');
-  const snsClient = new SNSClient({
-    region: db.region || process.env.AWS_SNS_REGION || 'ap-south-1', // Mumbai for India
-    credentials: {
-      accessKeyId: db.accessKeyId || process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: db.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY,
-    },
-  });
-  const command = new PublishCommand({
-    Message: message,
-    PhoneNumber: formatIndian(to),
-    MessageAttributes: {
-      'AWS.SNS.SMS.SMSType': { DataType: 'String', StringValue: 'Transactional' },
-      'AWS.SNS.SMS.SenderID': { DataType: 'String', StringValue: 'DiagHub' },
-    },
-  });
-  return snsClient.send(command);
+  const apiKey = db.apiKey || process.env.FAST2SMS_API_KEY;
+  if (!apiKey) throw new Error('SMS not configured. Add a Fast2SMS API key in Admin > Integrations, or FAST2SMS_API_KEY to .env');
+
+  const mobile = formatIndian(to).replace('+91', '');
+  const otpMatch = String(message).match(/\b\d{4,8}\b/);
+
+  const params = new URLSearchParams({ authorization: apiKey, numbers: mobile });
+  if (otpMatch) {
+    params.set('route', 'otp');
+    params.set('variables_values', otpMatch[0]);
+  } else {
+    params.set('route', 'q');
+    params.set('message', message);
+  }
+
+  const res = await fetch(`https://www.fast2sms.com/dev/bulkV2?${params.toString()}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.return !== true) {
+    const reason = Array.isArray(data.message) ? data.message.join(', ') : (data.message || `HTTP ${res.status}`);
+    throw new Error(`Fast2SMS send failed: ${reason}`);
+  }
+  return data;
 }
 
+// ── WhatsApp via Twilio ──────────────────────────────────────────────────────
 async function sendWhatsapp({ to, message }) {
   const db = await loadDbConfig('whatsapp');
   const accountSid = db.accountSid || process.env.TWILIO_ACCOUNT_SID;

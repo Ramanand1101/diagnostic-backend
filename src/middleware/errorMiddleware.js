@@ -28,6 +28,7 @@ function friendlyMessage(err) {
 
 function errorHandler(err, req, res, next) {
   const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  if (statusCode >= 500) console.error(`[${req.method} ${req.originalUrl}]`, err);
   res.status(statusCode).json({
     message: friendlyMessage(err),
     stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,

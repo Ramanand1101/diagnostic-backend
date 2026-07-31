@@ -131,6 +131,7 @@ exports.requestContactChange = asyncHandler(async (req, res) => {
         html: `<p>Your OTP to confirm this email as your new HealthOnTime login email is <b>${otp}</b>. It expires in ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.</p>`,
       });
     } catch (e) {
+      console.error('[requestContactChange] email OTP send failed:', e.message);
       return res.status(500).json({ message: 'Failed to send email OTP. Please try again.' });
     }
     user.pendingEmail = email;
@@ -146,6 +147,7 @@ exports.requestContactChange = asyncHandler(async (req, res) => {
     try {
       await sendSms({ to: mobile, message: `Your HealthOnTime OTP to confirm this mobile number is ${otp}. Valid for ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.` });
     } catch (e) {
+      console.error('[requestContactChange] mobile OTP send failed:', e.message);
       return res.status(500).json({ message: 'Failed to send mobile OTP. Please try again.' });
     }
     user.pendingMobile = mobile;
