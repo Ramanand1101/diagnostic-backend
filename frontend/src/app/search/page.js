@@ -265,13 +265,24 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
               key={p._id}
               onMouseEnter={() => onHoverProduct(p)}
               onClick={() => { onHoverProduct(p); onTapProduct?.(p); }}
-              className={`flex items-center gap-2 sm:gap-3 px-3 py-2.5 sm:px-4 sm:py-3 cursor-pointer transition-colors ${
+              className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-3 py-3 sm:px-4 cursor-pointer transition-colors ${
                 activeProductId === p._id ? 'bg-primary-50/40' : 'hover:bg-gray-50'
               }`}
             >
               {/* Test info */}
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{p.name}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-900 leading-snug">{p.name}</p>
+                  {/* Below `lg` the description panel on the right is hidden, so this is
+                      the only visible way to reach a test's details — without it, tapping
+                      the row silently opens a bottom sheet with no visual cue it exists. */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onHoverProduct(p); onTapProduct?.(p); }}
+                    className="lg:hidden flex items-center gap-1 text-[10px] font-semibold text-primary-600 bg-primary-50 px-2 py-1 rounded-full shrink-0 whitespace-nowrap"
+                  >
+                    <FiInfo className="text-[11px]" /> Details
+                  </button>
+                </div>
                 <div className="flex flex-wrap items-center gap-x-1 mt-0.5">
                   {p.fastingRequired && (
                     <span className="text-[10px] text-orange-600 font-medium">Fasting Required</span>
@@ -310,7 +321,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
                       <span>View Cart</span>
                     </Link>
                     <button
-                      onClick={() => { removeItem(p._id); toast.success(`${p.name} removed`, { icon: '🗑️' }); }}
+                      onClick={() => { items.filter((i) => i._id === p._id).forEach((i) => removeItem(i.cartItemId)); toast.success(`${p.name} removed`, { icon: '🗑️' }); }}
                       className="flex items-center gap-1 bg-white border border-red-300 text-red-500 hover:bg-red-50 text-[10px] font-semibold px-2 py-1.5 rounded-lg transition-colors whitespace-nowrap">
                       <FiX className="text-[9px]" />
                       <span>Remove</span>
@@ -319,9 +330,9 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
                 ) : (
                   <button
                     onClick={(e) => { e.stopPropagation(); addItem(p); toast.success(`${p.name} added!`, { icon: '🛒' }); }}
-                    className="flex items-center justify-center gap-1 bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-semibold px-2 py-1.5 sm:px-2.5 rounded-lg transition-colors whitespace-nowrap min-w-[32px]">
+                    className="flex items-center justify-center gap-1 bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap">
                     <FiShoppingCart className="text-[10px]" />
-                    <span className="hidden sm:inline">Add</span>
+                    <span>Add</span>
                   </button>
                 )}
               </div>
@@ -340,7 +351,7 @@ function LabGroupCard({ labInfo, products, totalSearched, onHoverProduct, onTapP
           {allInCart ? (
             <Link href="/cart"
               className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors">
-              <FiCheck /> <span className="hidden xs:inline sm:inline">View Cart</span>
+              <FiCheck /> <span className="hidden sm:inline">View Cart</span>
               <span className="sm:hidden">Cart</span>
             </Link>
           ) : (

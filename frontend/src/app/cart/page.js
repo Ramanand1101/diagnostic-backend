@@ -222,7 +222,7 @@ const TYPE_COLOR = {
 // ── Cart item card ────────────────────────────────────────────────────────────
 const ADD_PATIENT_VALUE = '__add_new__';
 
-function CartItem({ item, onRemove, patients, selectedPatientId, onPatientChange }) {
+function CartItem({ item, onRemove, patients, selectedPatientId, onPatientChange, onDuplicate }) {
   const lab = item.lab || {};
   const price = item.salePrice || item.price;
   const discount = item.salePrice && item.salePrice < item.price
@@ -263,15 +263,15 @@ function CartItem({ item, onRemove, patients, selectedPatientId, onPatientChange
           )}
         </div>
         {patients && patients.length > 0 && (
-          <div className="flex items-center gap-2 mt-3 bg-primary-50 border border-primary-200 rounded-lg pl-2.5 pr-1.5 py-1.5">
-            <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-2 mt-3 bg-yellow-50 border border-yellow-300 rounded-lg pl-3 pr-2 py-2">
+            <div className="w-5 h-5 rounded-full bg-yellow-500 flex items-center justify-center shrink-0">
               <FiUser className="text-white text-[10px]" />
             </div>
-            <span className="text-[11px] font-semibold text-primary-700 shrink-0">Booking for</span>
+            <span className="text-xs font-semibold text-yellow-800 shrink-0">Booking for</span>
             <select
               value={selectedPatientId || ''}
-              onChange={(e) => onPatientChange(item._id, e.target.value)}
-              className="flex-1 min-w-0 text-xs font-semibold text-primary-800 bg-white border border-primary-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer"
+              onChange={(e) => onPatientChange(item.cartItemId, e.target.value)}
+              className="flex-1 min-w-0 text-sm font-semibold text-yellow-900 bg-white border border-yellow-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-yellow-400 cursor-pointer"
             >
               {patients.map((p) => (
                 <option key={p._id} value={p._id}>
@@ -282,9 +282,18 @@ function CartItem({ item, onRemove, patients, selectedPatientId, onPatientChange
             </select>
           </div>
         )}
+        {patients && patients.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onDuplicate(item)}
+            className="text-[11px] font-medium text-primary-600 hover:text-primary-700 hover:underline mt-1.5"
+          >
+            + Book this test for another patient too
+          </button>
+        )}
       </div>
       <div className="flex flex-col items-end justify-between flex-shrink-0">
-        <button onClick={() => onRemove(item._id)} className="text-gray-300 hover:text-red-500 transition-colors p-1">
+        <button onClick={() => onRemove(item.cartItemId)} className="text-gray-300 hover:text-red-500 transition-colors p-1">
           <FiTrash2 className="text-base" />
         </button>
         <div className="text-right">
@@ -1123,7 +1132,7 @@ function SuccessScreen({ bookings }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CartPage() {
-  const { items, removeItem, clearCart } = useCart();
+  const { items, removeItem, addDuplicate, clearCart } = useCart();
   const { user } = useAuth();
 
   const [step, setStep] = useState('cart'); // 'cart' | 'payment' | 'success'
@@ -1138,7 +1147,7 @@ export default function CartPage() {
   // falls back to the 'self' placeholder, resolved into a real Patient right after
   // their account is auto-created during checkout (see PaymentScreen.handlePay).
   const [patients, setPatients] = useState([]);
-  const [itemPatient, setItemPatient] = useState({}); // item._id -> patientId
+  const [itemPatient, setItemPatient] = useState({}); // item.cartItemId -> patientId
   const [patientModalItemId, setPatientModalItemId] = useState(null);
 
   useEffect(() => {
@@ -1154,7 +1163,7 @@ export default function CartPage() {
     setItemPatient((prev) => {
       let changed = false;
       const next = { ...prev };
-      items.forEach((i) => { if (!next[i._id]) { next[i._id] = selfPatient._id; changed = true; } });
+      items.forEach((i) => { if (!next[i.cartItemId]) { next[i.cartItemId] = selfPatient._id; changed = true; } });
       return changed ? next : prev;
     });
   }, [selfPatient, items]);
@@ -1209,7 +1218,7 @@ export default function CartPage() {
   const groups = Object.values(
     items.reduce((acc, item) => {
       const labId = item.lab?._id || item.lab || 'unknown';
-      const patientId = itemPatient[item._id] || selfPatient?._id || 'self';
+      const patientId = itemPatient[item.cartItemId] || selfPatient?._id || 'self';
       const key = `${labId}::${patientId}`;
       if (!acc[key]) {
         const p = patients.find((pp) => pp._id === patientId);
@@ -1344,12 +1353,13 @@ export default function CartPage() {
                   <div className="space-y-3">
                     {group.items.map((item) => (
                       <CartItem
-                        key={item._id}
+                        key={item.cartItemId}
                         item={item}
                         onRemove={removeItem}
                         patients={patients}
-                        selectedPatientId={itemPatient[item._id] || selfPatient?._id}
+                        selectedPatientId={itemPatient[item.cartItemId] || selfPatient?._id}
                         onPatientChange={handlePatientChange}
+                        onDuplicate={addDuplicate}
                       />
                     ))}
                   </div>
@@ -1421,7 +1431,7 @@ export default function CartPage() {
                             <p className="text-xs text-gray-400">{labItems.length} test{labItems.length !== 1 ? 's' : ''}</p>
                           </div>
                           <button
-                            onClick={() => labItems.forEach((i) => removeItem(i._id))}
+                            onClick={() => labItems.forEach((i) => removeItem(i.cartItemId))}
                             className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors font-medium">
                             Remove
                           </button>
