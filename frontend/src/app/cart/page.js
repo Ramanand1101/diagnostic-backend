@@ -263,16 +263,19 @@ function CartItem({ item, onRemove, patients, selectedPatientId, onPatientChange
           )}
         </div>
         {patients && patients.length > 0 && (
-          <div className="flex items-center gap-1.5 mt-2">
-            <FiUser className="text-gray-400 text-xs" />
+          <div className="flex items-center gap-2 mt-3 bg-primary-50 border border-primary-200 rounded-lg pl-2.5 pr-1.5 py-1.5">
+            <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center shrink-0">
+              <FiUser className="text-white text-[10px]" />
+            </div>
+            <span className="text-[11px] font-semibold text-primary-700 shrink-0">Booking for</span>
             <select
               value={selectedPatientId || ''}
               onChange={(e) => onPatientChange(item._id, e.target.value)}
-              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-gray-50 text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-400"
+              className="flex-1 min-w-0 text-xs font-semibold text-primary-800 bg-white border border-primary-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer"
             >
               {patients.map((p) => (
                 <option key={p._id} value={p._id}>
-                  Booking for: {p.relation === 'self' ? `${p.name} (You)` : p.name}
+                  {p.relation === 'self' ? `${p.name} (You)` : p.name}
                 </option>
               ))}
               <option value={ADD_PATIENT_VALUE}>+ Add family member...</option>
