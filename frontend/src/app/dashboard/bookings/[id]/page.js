@@ -206,6 +206,10 @@ export default function BookingDetailPage() {
                 <dt className="text-gray-500">Method</dt>
                 <dd className="font-medium capitalize">{booking.paymentMethod}</dd>
               </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Booked On</dt>
+                <dd className="font-medium">{formatDate(booking.createdAt, 'dd MMM yyyy, hh:mm a')}</dd>
+              </div>
             </dl>
           </div>
 
