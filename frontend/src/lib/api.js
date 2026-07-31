@@ -296,6 +296,7 @@ export const couponApi = {
   create: (data) => api.post('/coupons', data),
   update: (id, data) => api.put(`/coupons/${id}`, data),
   delete: (id) => api.delete(`/coupons/${id}`),
+  validate: (data) => api.post('/coupons/validate', data),
 };
 
 // Reviews

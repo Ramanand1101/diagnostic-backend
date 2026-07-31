@@ -6,7 +6,7 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { bookingApi, userApi, authApi, patientApi, settingApi, labHolidayApi, testAvailabilityApi } from '@/lib/api';
+import { bookingApi, userApi, authApi, patientApi, couponApi, settingApi, labHolidayApi, testAvailabilityApi } from '@/lib/api';
 import BookingAnimation from '@/components/booking/BookingAnimation';
 import PatientFormModal from '@/components/patient/PatientFormModal';
 import { getErrorMessage } from '@/utils/helpers';
@@ -858,7 +858,7 @@ const BANKS = [
   'Yes Bank','IndusInd Bank','Federal Bank',
 ];
 
-function PaymentScreen({ form, groups, total, onSuccess, onBack }) {
+function PaymentScreen({ form, groups, total, couponCode, onSuccess, onBack }) {
   const [payTab, setPayTab] = useState('upi');
   const [upiId, setUpiId] = useState('');
   const [cardNo, setCardNo] = useState('');
@@ -919,6 +919,7 @@ function PaymentScreen({ form, groups, total, onSuccess, onBack }) {
             : undefined,
           subtotal,
           total: subtotal,
+          coupon: couponCode || undefined,
           paymentMethod: 'online',
           paymentStatus: 'paid',
           status: 'confirmed',
@@ -1193,6 +1194,14 @@ export default function CartPage() {
   const [itemPatients, setItemPatients] = useState({}); // item.cartItemId -> patientId[]
   const [patientModalItemId, setPatientModalItemId] = useState(null);
 
+  // Coupon — validated against the current cart total for a preview; the actual
+  // discount is always recomputed (and enforced) server-side per booking at checkout,
+  // this just gives the customer an accurate estimate and clear error messages upfront.
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discount, message }
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
+
   useEffect(() => {
     if (!user) { setPatients([]); return; }
     patientApi.getMine().then((res) => setPatients(res.data.items || [])).catch(() => {});
@@ -1319,6 +1328,43 @@ export default function CartPage() {
   const total    = items.reduce((sum, i) => sum + (i.salePrice || i.price || 0) * patientCount(i), 0);
   const mrpTotal = items.reduce((sum, i) => sum + (i.price || 0) * patientCount(i), 0);
   const savings  = mrpTotal - total;
+  const payable  = Math.max(0, total - (appliedCoupon?.discount || 0));
+
+  // Flat, receipt-style rows for the summary — one line per (test, patient) pair,
+  // top to bottom, rather than nested per-patient blocks.
+  const receiptRows = bookingGroups.flatMap((group) => {
+    const p = patients.find((pp) => pp._id === group.patientId);
+    const patientName = p?.relation === 'self' ? `${p.name} (You)` : (p?.name || group.patientName || 'Patient');
+    return group.items.map((item) => ({
+      key: `${group.patientId}-${item.cartItemId}`,
+      testName: item.name,
+      patientName,
+      price: item.salePrice || item.price || 0,
+    }));
+  });
+
+  const handleApplyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponError('');
+    try {
+      const res = await couponApi.validate({ code, subtotal: total });
+      setAppliedCoupon({ code, discount: res.data.discount, message: res.data.message });
+      toast.success(res.data.message);
+    } catch (err) {
+      setCouponError(getErrorMessage(err));
+      setAppliedCoupon(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError('');
+  };
 
   // Smart back URL — rebuild search from cart items (test names + city)
   const cartCity = items[0]?.lab?.city || '';
@@ -1356,7 +1402,8 @@ export default function CartPage() {
             <PaymentScreen
               form={paymentMeta.form}
               groups={bookingGroups}
-              total={total}
+              total={payable}
+              couponCode={appliedCoupon?.code}
               onSuccess={handlePaymentSuccess}
               onBack={() => setStep('cart')}
             />
@@ -1453,47 +1500,61 @@ export default function CartPage() {
               ))}
             </div>
 
-            {/* RIGHT: Booking + price summary, combined into one card (sticky) */}
+            {/* RIGHT: Order summary — a flat receipt: every test + who it's for,
+                top to bottom, then totals/discount below (sticky) */}
             <div className="lg:sticky lg:top-24">
               <div className="bg-white rounded-xl border border-gray-100 p-5">
-                {/* Booking Summary — who's getting what, so a cart with several people
-                    and several tests each stays easy to scan at a glance */}
-                {patients.length > 0 && bookingGroups.length > 0 && (
-                  <>
-                    <h2 className="font-bold text-gray-800 text-sm mb-4">Booking Summary</h2>
-                    <div className="space-y-3 mb-5">
-                      {bookingGroups.map((group) => {
-                        const p = patients.find((pp) => pp._id === group.patientId);
-                        const subtotal = group.items.reduce((s, i) => s + (i.salePrice || i.price || 0), 0);
-                        return (
-                          <div key={group.patientId} className="border border-gray-100 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-sm font-semibold text-gray-900">
-                                {p?.relation === 'self' ? `${p.name} (You)` : p?.name || group.patientName || 'Patient'}
-                              </p>
-                              <span className="text-[10px] text-gray-400 shrink-0">{group.items.length} test{group.items.length !== 1 ? 's' : ''}</span>
-                            </div>
-                            <ul className="space-y-1">
-                              {group.items.map((item) => (
-                                <li key={item.cartItemId} className="flex items-center justify-between gap-2 text-xs text-gray-600">
-                                  <span className="truncate">{item.name}</span>
-                                  <span className="shrink-0 font-medium text-gray-700">₹{(item.salePrice || item.price)?.toLocaleString('en-IN')}</span>
-                                </li>
-                              ))}
-                            </ul>
-                            <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-100 text-xs font-semibold text-gray-800">
-                              <span>Subtotal</span>
-                              <span>₹{subtotal.toLocaleString('en-IN')}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="h-px bg-gray-100 mb-4" />
-                  </>
+                <h2 className="font-bold text-gray-800 text-sm mb-4">Order Summary</h2>
+
+                {receiptRows.length > 0 && (
+                  <div className="space-y-2.5 mb-4">
+                    {receiptRows.map((row) => (
+                      <div key={row.key} className="flex items-start justify-between gap-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="text-gray-800 font-medium truncate">{row.testName}</p>
+                          <p className="text-[11px] text-gray-400">{row.patientName}</p>
+                        </div>
+                        <span className="shrink-0 font-semibold text-gray-700">₹{row.price.toLocaleString('en-IN')}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
 
-                <h2 className="font-bold text-gray-800 text-sm mb-4">Price Summary</h2>
+                <div className="h-px bg-gray-100 my-3" />
+
+                {/* Coupon */}
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-3">
+                    <div>
+                      <p className="text-xs font-bold text-green-700">{appliedCoupon.code} applied</p>
+                      <p className="text-[11px] text-green-600">You saved ₹{appliedCoupon.discount.toLocaleString('en-IN')}</p>
+                    </div>
+                    <button onClick={handleRemoveCoupon} className="text-xs text-red-500 hover:text-red-700 font-medium">Remove</button>
+                  </div>
+                ) : (
+                  <div className="mb-3">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponInput}
+                        onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleApplyCoupon())}
+                        placeholder="Have a coupon code?"
+                        className="flex-1 min-w-0 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        disabled={couponLoading || !couponInput.trim()}
+                        className="text-sm font-semibold px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white transition-colors shrink-0"
+                      >
+                        {couponLoading ? '...' : 'Apply'}
+                      </button>
+                    </div>
+                    {couponError && <p className="text-xs text-red-500 mt-1.5">{couponError}</p>}
+                  </div>
+                )}
+
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between text-gray-600">
                     <span>MRP Total</span>
@@ -1501,19 +1562,25 @@ export default function CartPage() {
                   </div>
                   {savings > 0 && (
                     <div className="flex justify-between text-green-600 font-medium">
-                      <span>Discount</span>
+                      <span>Item Discount</span>
                       <span>- ₹{savings.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {appliedCoupon && (
+                    <div className="flex justify-between text-green-600 font-medium">
+                      <span>Coupon ({appliedCoupon.code})</span>
+                      <span>- ₹{appliedCoupon.discount.toLocaleString('en-IN')}</span>
                     </div>
                   )}
                   <div className="h-px bg-gray-100 my-1" />
                   <div className="flex justify-between font-bold text-gray-900 text-base">
-                    <span>Total</span>
-                    <span>₹{total.toLocaleString('en-IN')}</span>
+                    <span>Total Payable</span>
+                    <span>₹{payable.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
-                {savings > 0 && (
+                {(savings > 0 || appliedCoupon) && (
                   <p className="mt-3 text-xs text-green-600 font-medium bg-green-50 rounded-lg px-3 py-2 text-center">
-                    You save ₹{savings.toLocaleString('en-IN')} on this order!
+                    You save ₹{(savings + (appliedCoupon?.discount || 0)).toLocaleString('en-IN')} on this order!
                   </p>
                 )}
               </div>

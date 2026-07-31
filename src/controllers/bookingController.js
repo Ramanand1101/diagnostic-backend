@@ -121,11 +121,12 @@ exports.createBooking = asyncHandler(async (req, res) => {
       const now = new Date();
       const validFrom = !coupon.validFrom || coupon.validFrom <= now;
       const validTo = !coupon.validTo || coupon.validTo >= now;
-      if (validFrom && validTo && subtotal >= coupon.minOrderAmount) {
+      const underLimit = !coupon.usageLimit || coupon.usedCount < coupon.usageLimit;
+      if (validFrom && validTo && underLimit && subtotal >= coupon.minOrderAmount) {
         if (coupon.type === 'percent') {
           discount = Math.min((subtotal * coupon.value) / 100, coupon.maxDiscount || subtotal);
         } else {
-          discount = coupon.value;
+          discount = Math.min(coupon.value, subtotal);
         }
         coupon.usedCount += 1;
         await coupon.save();
