@@ -27,6 +27,24 @@ const TEST_ICON_MAP = {
   liver: { icon: FiShield, color: 'text-green-500', bg: 'bg-green-50' },
   default: { icon: FiSearch, color: 'text-gray-500', bg: 'bg-gray-50' },
 };
+// Slug from the CMS isn't guaranteed to exactly match the keys above (case,
+// whitespace, or a differently-worded slug) — fall back to matching keywords
+// in the slug/name before giving up and showing the generic search icon.
+const TEST_ICON_KEYWORDS = [
+  { keys: ['cbc', 'complete blood count', 'blood count'], key: 'cbc' },
+  { keys: ['thyroid'], key: 'thyroid' },
+  { keys: ['vitamin d', 'vitamin-d', 'vitamind'], key: 'vitamin-d' },
+  { keys: ['hba1c', 'glycated'], key: 'hba1c' },
+  { keys: ['lipid', 'cholesterol'], key: 'lipid' },
+  { keys: ['liver'], key: 'liver' },
+];
+function getTestTileMeta(name, slug) {
+  const normalizedSlug = (slug || '').toLowerCase().trim();
+  if (TEST_ICON_MAP[normalizedSlug]) return TEST_ICON_MAP[normalizedSlug];
+  const haystack = `${normalizedSlug} ${name || ''}`.toLowerCase();
+  const match = TEST_ICON_KEYWORDS.find(({ keys }) => keys.some((k) => haystack.includes(k)));
+  return (match && TEST_ICON_MAP[match.key]) || TEST_ICON_MAP.default;
+}
 
 const DEFAULT_CONTENT = {
   hero: {
@@ -212,7 +230,7 @@ export default async function HomePage() {
             />
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               {popularTests.map(({ name, slug }) => {
-                const meta = TEST_ICON_MAP[slug] || TEST_ICON_MAP.default;
+                const meta = getTestTileMeta(name, slug);
                 const Icon = meta.icon;
                 return (
                   <Link
