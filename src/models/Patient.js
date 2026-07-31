@@ -15,7 +15,10 @@ const patientSchema = new mongoose.Schema({
   email: String,
 }, { timestamps: true });
 
-patientSchema.pre('save', async function (next) {
+// pre('validate') — not pre('save') — because Mongoose runs schema validation
+// (including this field's `required: true`) BEFORE pre('save') hooks fire. Generating
+// the ID here means it exists by the time the required-field check runs.
+patientSchema.pre('validate', async function (next) {
   if (!this.patientId) {
     this.patientId = await generateDatedId('PAT', new Date());
   }
