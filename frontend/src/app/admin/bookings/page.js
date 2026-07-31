@@ -236,12 +236,29 @@ function BookingDetailModal({ booking, statuses, onClose, onChanged }) {
 
   return (
     <div className="space-y-5">
+      {/* Patient is who the sample is actually collected from/for — lead with that,
+          the account holder is secondary context (who booked/pays), not the headline */}
+      <div className="flex items-start justify-between gap-4 bg-primary-50 border border-primary-100 rounded-xl px-4 py-3">
+        <div>
+          <p className="text-[11px] font-semibold text-primary-600 uppercase tracking-wide">Patient</p>
+          <p className="font-bold text-gray-900 text-base leading-tight">{b.patientSnapshot?.name || '—'}</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {b.patientSnapshot?.age ? `${b.patientSnapshot.age} yrs` : ''}{b.patientSnapshot?.gender ? ` · ${b.patientSnapshot.gender}` : ''}{b.patientSnapshot?.relation ? ` · ${b.patientSnapshot.relation}` : ''}
+          </p>
+          {b.patient?.patientId && <p className="text-[11px] text-gray-400 font-mono mt-1">{b.patient.patientId}</p>}
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Account</p>
+          <p className="text-sm font-medium text-gray-700">{b.user?.name || b.guest?.name}</p>
+          {b.user?.mobile && <p className="text-xs text-gray-400">{b.user.mobile}</p>}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4 text-sm">
-        <div><p className="text-gray-400">Customer</p><p className="font-medium">{b.user?.name || b.guest?.name}</p>{b.user?.mobile && <p className="text-xs text-gray-400">{b.user.mobile}</p>}</div>
-        <div><p className="text-gray-400">Patient</p><p className="font-medium">{b.patientSnapshot?.name || '—'}</p>{b.patient?.patientId && <p className="text-xs text-gray-400 font-mono">{b.patient.patientId}</p>}</div>
         <div><p className="text-gray-400">Lab</p><p className="font-medium">{b.lab?.name || '—'}</p>{b.lab?.city && <p className="text-xs text-gray-400">{b.lab.city}</p>}</div>
         <div><p className="text-gray-400">Total</p><p className="font-medium">{formatCurrency(b.total)}</p></div>
         <div><p className="text-gray-400">Date</p><p className="font-medium">{formatDate(b.slotDate)}</p></div>
+        <div><p className="text-gray-400">Time Slot</p><p className="font-medium">{b.slotTime || '—'}</p></div>
         <div><p className="text-gray-400">Visit</p><p className="font-medium capitalize">{b.visitType}</p></div>
         {b.cancelledByName && (
           <div><p className="text-gray-400">Cancelled By</p><p className="font-medium text-red-600">{b.cancelledByName}</p></div>
@@ -459,9 +476,9 @@ export default function AdminBookingsPage() {
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="table-header">Booking #</th>
-                  <th className="table-header">Customer</th>
+                  <th className="table-header">Patient</th>
                   <th className="table-header">Lab</th>
-                  <th className="table-header">Date</th>
+                  <th className="table-header">Date &amp; Time</th>
                   <th className="table-header">Status</th>
                   <th className="table-header">Payment</th>
                   <th className="table-header">Total</th>
@@ -473,10 +490,10 @@ export default function AdminBookingsPage() {
                   <tr key={b._id} className="hover:bg-gray-50">
                     <td className="table-cell font-mono font-medium text-xs">{b.bookingNo}</td>
                     <td className="table-cell">
-                      <p className="font-medium text-gray-800 text-sm">{b.user?.name || b.guest?.name || '—'}</p>
-                      {b.user?.mobile && <p className="text-xs text-gray-400">{b.user.mobile}</p>}
-                      {b.patientSnapshot?.name && (
-                        <p className="text-xs text-primary-600 mt-0.5">For: {b.patientSnapshot.name}</p>
+                      <p className="font-semibold text-gray-900 text-sm">{b.patientSnapshot?.name || b.user?.name || b.guest?.name || '—'}</p>
+                      {b.patient?.patientId && <p className="text-[11px] text-gray-400 font-mono">{b.patient.patientId}</p>}
+                      {(b.user?.name || b.guest?.name) && (
+                        <p className="text-xs text-gray-400 mt-0.5">Acct: {b.user?.name || b.guest?.name}{b.user?.mobile ? ` · ${b.user.mobile}` : ''}</p>
                       )}
                       {b.cancelledByName && (
                         <p className="text-xs text-red-500 mt-0.5">✕ Cancelled by: {b.cancelledByName}</p>
@@ -490,7 +507,10 @@ export default function AdminBookingsPage() {
                         </div>
                       ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
-                    <td className="table-cell">{formatDate(b.slotDate)}</td>
+                    <td className="table-cell">
+                      <p className="text-sm">{formatDate(b.slotDate)}</p>
+                      {b.slotTime && <p className="text-xs text-gray-400">{b.slotTime}</p>}
+                    </td>
                     <td className="table-cell"><Badge status={b.status} /></td>
                     <td className="table-cell"><Badge status={b.paymentStatus} /></td>
                     <td className="table-cell font-semibold">{formatCurrency(b.total)}</td>
