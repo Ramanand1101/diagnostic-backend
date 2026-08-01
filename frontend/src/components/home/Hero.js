@@ -500,7 +500,7 @@ export default function HeroSlider({ heroContent }) {
       {hc.promoVisible !== false && hc.promoText && (
         <div className="bg-white py-4 px-4 text-center">
           <p
-            className="text-lg sm:text-xl font-semibold text-orange-600 rich-html"
+            className="text-sm sm:text-base font-semibold text-primary-600 rich-html"
             dangerouslySetInnerHTML={{ __html: hc.promoText }}
           />
         </div>

@@ -84,7 +84,7 @@ export default function FeaturedLabsSection() {
   };
 
   return (
-    <section className="py-14 bg-[#F8FAFC]">
+    <section className="py-6 bg-[#F8FAFC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex items-end justify-between mb-7">

@@ -118,7 +118,7 @@ export default async function HomePage() {
         <Hero heroContent={hero} />
 
         {/* Stats — one solid stat block, 2 columns on mobile / 4 in a row on desktop */}
-        <section className="py-6 bg-gray-50">
+        <section className="py-4 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl px-6 py-5 md:px-10 shadow-lg">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-4 text-center">
