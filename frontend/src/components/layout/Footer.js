@@ -1,9 +1,28 @@
+'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { FiFacebook, FiInstagram } from 'react-icons/fi';
 import { RiTwitterXFill } from 'react-icons/ri';
 import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
+import { settingApi } from '@/lib/api';
 
 export default function Footer() {
+  // Admin-configurable (Admin > Settings > Social Links) — an icon only renders once
+  // a real URL is set for it, so nothing links to "#" while it's unconfigured.
+  const [social, setSocial] = useState(null);
+
+  useEffect(() => {
+    settingApi.getPublic('social_links')
+      .then((res) => setSocial(res.data.value || {}))
+      .catch(() => setSocial({}));
+  }, []);
+
+  const socialIcons = [
+    { key: 'facebook', href: social?.facebook, icon: FiFacebook },
+    { key: 'twitter', href: social?.twitter, icon: RiTwitterXFill },
+    { key: 'instagram', href: social?.instagram, icon: FiInstagram },
+  ].filter((s) => s.href);
+
   return (
     <footer className="bg-gray-900 text-gray-300 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -13,11 +32,15 @@ export default function Footer() {
           <div className="mb-4">
             <HealthOnTimeLogo dark size="text-xl" showTagline />
           </div>
-          <div className="flex gap-5 text-lg">
-            <a href="#" className="hover:text-white transition-colors"><FiFacebook /></a>
-            <a href="#" className="hover:text-white transition-colors"><RiTwitterXFill /></a>
-            <a href="#" className="hover:text-white transition-colors"><FiInstagram /></a>
-          </div>
+          {socialIcons.length > 0 && (
+            <div className="flex gap-5 text-lg">
+              {socialIcons.map(({ key, href, icon: Icon }) => (
+                <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+                  <Icon />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── 4 link columns — tight, no mixing ── */}

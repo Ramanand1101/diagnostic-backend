@@ -7,7 +7,7 @@ import {
   FiFileText, FiPercent, FiStar, FiBook, FiFile, FiMail,
   FiSettings, FiHelpCircle, FiImage, FiUploadCloud, FiLayers,
   FiBriefcase, FiUserCheck, FiPhoneCall, FiActivity, FiList, FiLayout, FiFilePlus,
-  FiDollarSign, FiChevronsLeft, FiChevronsRight, FiLink, FiToggleRight, FiX,
+  FiDollarSign, FiChevronsLeft, FiChevronsRight, FiLink, FiToggleRight, FiX, FiShare2,
 } from 'react-icons/fi';
 import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -79,6 +79,7 @@ const navSections = [
       { href: '/admin/pages',              label: 'Pages',             icon: FiFile,     permission: 'pages' },
       { href: '/admin/settings',           label: 'Settings',          icon: FiSettings, permission: 'settings' },
       { href: '/admin/settings/animation', label: 'Booking Animation', icon: FiActivity, permission: 'settings' },
+      { href: '/admin/settings/social',    label: 'Social Links',      icon: FiShare2,   permission: 'settings' },
       { href: '/admin/activity-log',       label: 'Activity Log',      icon: FiList,     permission: 'activity-log' },
       { href: '/admin/integrations',       label: 'Integrations',      icon: FiLink,     permission: null, superAdminOnly: true },
     ],
