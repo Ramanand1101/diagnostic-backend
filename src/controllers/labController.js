@@ -3,6 +3,7 @@ const Lab = require('../models/Lab');
 const { syncObjects, deleteObject, deleteObjects } = require('../services/algoliaSync');
 const makeSlug = require('../utils/slug');
 const { parseCSV } = require('../utils/csvParser');
+const revalidateFrontend = require('../utils/revalidateFrontend');
 
 const RADIUS_OPTIONS_KM = [5, 10, 25, 50];
 const DEFAULT_RADIUS_KM = 10;
@@ -122,6 +123,7 @@ exports.createLab = asyncHandler(async (req, res) => {
   const lab = await Lab.create(req.body);
   console.log('Created Lab:', lab);
   await syncObjects('labs', [labRecord(lab)]);
+  revalidateFrontend(`/labs/${lab.slug}`);
   res.status(201).json(lab);
 });
 
@@ -142,6 +144,7 @@ exports.updateLab = asyncHandler(async (req, res) => {
   const lab = await Lab.findOneAndUpdate(filter, update, { new: true, runValidators: true });
   if (!lab) return res.status(req.user.role === 'lab' ? 403 : 404).json({ message: req.user.role === 'lab' ? 'Not your lab' : 'Lab not found' });
   await syncObjects('labs', [labRecord(lab)]);
+  revalidateFrontend(`/labs/${lab.slug}`);
   res.json(lab);
 });
 
