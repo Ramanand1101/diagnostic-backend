@@ -163,6 +163,7 @@ function LabForm({ initial, onSave, onClose }) {
     lng: initial?.lng ?? null,
     phone: initial?.phone || '',
     email: initial?.email || '',
+    publicPhone: initial?.publicPhone || '',
     homeCollection: initial?.homeCollection || false,
     featured: initial?.featured || false,
     description: initial?.description || '',
@@ -205,6 +206,7 @@ function LabForm({ initial, onSave, onClose }) {
     if (!/^[+\d][\d\s\-().]{6,19}$/.test(form.phone.trim())) return toast.error('Enter a valid phone number');
     if (!form.email.trim()) return toast.error('Email address is required');
     if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.email.trim())) return toast.error('Enter a valid email address');
+    if (form.publicPhone.trim() && !/^[+\d][\d\s\-().]{6,19}$/.test(form.publicPhone.trim())) return toast.error('Enter a valid customer-facing phone number');
     if (form.pincode && !/^\d{6}$/.test(form.pincode)) return toast.error('Pincode must be exactly 6 digits');
     setLoading(true);
     try {
@@ -325,13 +327,20 @@ function LabForm({ initial, onSave, onClose }) {
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone (Internal Use) *</label>
           <input required type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" placeholder="9876543210" />
+          <p className="text-xs text-gray-400 mt-1">For staff/ops communication only — not shown to customers.</p>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email (Internal Use) *</label>
           <input required type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" placeholder="lab@example.com" />
+          <p className="text-xs text-gray-400 mt-1">Never shown to customers.</p>
         </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Phone (Shown to Customers)</label>
+        <input type="tel" value={form.publicPhone} onChange={(e) => set('publicPhone', e.target.value)} className="input" placeholder="9876543210" />
+        <p className="text-xs text-gray-400 mt-1">This number appears on the public lab page. Leave blank to show no phone number to customers.</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <MultiField label="Extra Phone Numbers" values={form.phones}

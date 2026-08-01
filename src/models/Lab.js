@@ -18,6 +18,9 @@ const labSchema = new mongoose.Schema({
   pincode: String,
   phone: String,
   email: String,
+  // Shown on the public lab page / customer-facing views. `phone` above stays
+  // internal-only (e.g. for staff/ops communication); email is never shown to customers.
+  publicPhone: String,
   phones: [String],
   emails: [String],
   website: String,

@@ -169,7 +169,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
   // Populated so the confirmation screen (and this response in general) can show the
   // lab's address/phone, not just its name — previously only the raw lab ObjectId
   // went back to the client, so those fields were unavailable there.
-  await booking.populate('lab', 'name address city phone');
+  await booking.populate('lab', 'name address city phone publicPhone');
 
   logActivity({
     actor: req.user,
@@ -210,7 +210,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
                 ${lab ? `<div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
                   <p style="margin:0;font-weight:600;font-size:15px">${lab.name}</p>
                   ${labAddress ? `<p style="margin:4px 0 0;color:#64748b;font-size:13px">📍 ${labAddress}</p>` : ''}
-                  ${lab.phone ? `<p style="margin:4px 0 0;color:#64748b;font-size:13px">📞 ${lab.phone}</p>` : ''}
+                  ${(lab.publicPhone || lab.phone) ? `<p style="margin:4px 0 0;color:#64748b;font-size:13px">📞 ${lab.publicPhone || lab.phone}</p>` : ''}
                 </div>` : ''}
                 <p style="margin:0 0 6px;font-weight:600">Appointment</p>
                 <p style="margin:0 0 16px;color:#475569;font-size:14px">

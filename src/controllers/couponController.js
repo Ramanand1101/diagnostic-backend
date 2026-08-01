@@ -46,4 +46,23 @@ controller.validate = asyncHandler(async (req, res) => {
   });
 });
 
+// GET /api/v1/coupons/active — public, no auth. Powers the homepage coupon strip,
+// so it only exposes what a customer needs to use the code (not usedCount, owner info, etc).
+controller.listActive = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const coupons = await Coupon.find({
+    active: true,
+    $and: [
+      { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: now } }] },
+      { $or: [{ validTo: null }, { validTo: { $exists: false } }, { validTo: { $gte: now } }] },
+    ],
+    $expr: { $or: [{ $eq: ['$usageLimit', null] }, { $lt: ['$usedCount', '$usageLimit'] }] },
+  })
+    .select('code type value minOrderAmount maxDiscount')
+    .sort('-createdAt')
+    .limit(12);
+
+  res.json({ items: coupons });
+});
+
 module.exports = controller;

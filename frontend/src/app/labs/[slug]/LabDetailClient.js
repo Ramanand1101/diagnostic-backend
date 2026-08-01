@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import ProductCard from '@/components/product/ProductCard';
 import { labApi, productApi, reviewApi } from '@/lib/api';
 import { formatDate, getErrorMessage } from '@/utils/helpers';
-import { FiMapPin, FiPhone, FiMail, FiGlobe, FiStar, FiClock, FiHome, FiCheckCircle } from 'react-icons/fi';
+import { FiMapPin, FiPhone, FiGlobe, FiStar, FiClock, FiHome, FiCheckCircle } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -70,16 +70,10 @@ export default function LabDetailClient({ lab, initialProducts = [] }) {
             so the tests grid below gets the full page width for 5 columns */}
         <div className="bg-primary-50 border border-primary-100 rounded-xl px-5 py-4 mb-6 flex flex-wrap items-center gap-x-8 gap-y-3">
           <h3 className="font-semibold text-gray-900 w-full sm:w-auto">Lab Information</h3>
-          {lab.phone && (
+          {(lab.publicPhone || lab.phone) && (
             <div className="flex items-center gap-2 text-sm text-gray-700">
               <FiPhone className="text-primary-500 flex-shrink-0" />
-              <a href={`tel:${lab.phone}`} className="hover:text-primary-600">{lab.phone}</a>
-            </div>
-          )}
-          {lab.email && (
-            <div className="flex items-center gap-2 text-sm text-gray-700">
-              <FiMail className="text-primary-500 flex-shrink-0" />
-              <a href={`mailto:${lab.email}`} className="hover:text-primary-600">{lab.email}</a>
+              <a href={`tel:${lab.publicPhone || lab.phone}`} className="hover:text-primary-600">{lab.publicPhone || lab.phone}</a>
             </div>
           )}
           {lab.website && (

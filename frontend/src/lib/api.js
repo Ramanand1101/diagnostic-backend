@@ -291,6 +291,7 @@ export const reportNoteApi = {
 
 // Coupons
 export const couponApi = {
+  getActive: () => api.get('/coupons/active'),
   getAll: (params) => api.get('/coupons', { params }),
   getById: (id) => api.get(`/coupons/${id}`),
   create: (data) => api.post('/coupons', data),

@@ -1147,7 +1147,7 @@ function SuccessScreen({ bookings }) {
               {[
                 { label: 'Lab',     value: booking.lab?.name || 'Lab' },
                 booking.lab?.address && { label: 'Address', value: [booking.lab.address, booking.lab.city].filter(Boolean).join(', ') },
-                booking.lab?.phone && { label: 'Lab Phone', value: booking.lab.phone },
+                (booking.lab?.publicPhone || booking.lab?.phone) && { label: 'Lab Phone', value: booking.lab.publicPhone || booking.lab.phone },
                 { label: 'Date',    value: slotDate },
                 { label: 'Time',    value: booking.slotTime || '—' },
                 { label: 'Visit',   value: booking.visitType === 'home' ? 'Home Collection' : 'Visit Lab' },
