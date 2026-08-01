@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { FiFacebook, FiTwitter, FiInstagram } from 'react-icons/fi';
+import { FiFacebook, FiInstagram } from 'react-icons/fi';
+import { RiTwitterXFill } from 'react-icons/ri';
 import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 
 export default function Footer() {
@@ -14,7 +15,7 @@ export default function Footer() {
           </div>
           <div className="flex gap-5 text-lg">
             <a href="#" className="hover:text-white transition-colors"><FiFacebook /></a>
-            <a href="#" className="hover:text-white transition-colors"><FiTwitter /></a>
+            <a href="#" className="hover:text-white transition-colors"><RiTwitterXFill /></a>
             <a href="#" className="hover:text-white transition-colors"><FiInstagram /></a>
           </div>
         </div>

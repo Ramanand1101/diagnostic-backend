@@ -676,8 +676,10 @@ function BookingForm({ groups, onReadyForPayment }) {
         </div>
       </div>
 
-      {/* Row 2: Gender (guests only) | Visit Type | Pincode | Date */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Row 2: Gender (guests only) | Visit Type | Pincode | Date — stacks to 1 column
+          on mobile; at grid-cols-2 the Date field only got half the row, leaving each
+          DD/MM/YYYY select in DateSelectPicker too narrow and clipping the year text */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {!user && (
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
@@ -1144,11 +1146,13 @@ function SuccessScreen({ bookings }) {
             <div className="px-5 py-4 space-y-2.5">
               {[
                 { label: 'Lab',     value: booking.lab?.name || 'Lab' },
+                booking.lab?.address && { label: 'Address', value: [booking.lab.address, booking.lab.city].filter(Boolean).join(', ') },
+                booking.lab?.phone && { label: 'Lab Phone', value: booking.lab.phone },
                 { label: 'Date',    value: slotDate },
                 { label: 'Time',    value: booking.slotTime || '—' },
                 { label: 'Visit',   value: booking.visitType === 'home' ? 'Home Collection' : 'Visit Lab' },
                 { label: 'Paid',    value: `₹${(booking.total || 0).toLocaleString('en-IN')}`, green: true },
-              ].map(({ label, value, green }) => (
+              ].filter(Boolean).map(({ label, value, green }) => (
                 <div key={label} className="flex items-center justify-between text-sm">
                   <span className="text-gray-400 text-xs uppercase tracking-wide font-medium">{label}</span>
                   <span className={`font-semibold ${green ? 'text-green-600' : 'text-gray-800'}`}>{value}</span>

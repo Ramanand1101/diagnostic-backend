@@ -20,7 +20,10 @@ export default function PolicyPage({ title, version, effectiveDate, sections }) 
             <div key={i} className="prose prose-gray max-w-none">
               {section.heading && (
                 <h2 className="text-lg font-semibold text-gray-900 mb-3">
-                  {section.heading}
+                  {/* Section numbers are derived from position, not the source string —
+                      the hardcoded numbers in each page's content array had gaps
+                      (1, 3, 4, 6, 8, 12...) from being trimmed without renumbering. */}
+                  {i + 1}. {section.heading.replace(/^\d+\.\s*/, '')}
                 </h2>
               )}
               {section.content && (

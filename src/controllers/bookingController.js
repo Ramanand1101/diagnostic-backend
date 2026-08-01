@@ -8,7 +8,7 @@ const Counter = require('../models/Counter');
 const { queueEmail } = require('../queues/index');
 const { sendSms, sendWhatsapp } = require('../config/sms');
 const { WARNING_MESSAGES, computeBookingWarnings } = require('../utils/bookingWarnings');
-const { logActivity } = require('../utils/activityLog');
+const { logActivity, requestMeta } = require('../utils/activityLog');
 const { findBlockingRule } = require('../utils/labHolidayCheck');
 const { isAvailable } = require('../utils/testAvailability');
 
@@ -164,6 +164,20 @@ exports.createBooking = asyncHandler(async (req, res) => {
     coupon: payload.coupon,
     notes: payload.notes,
     prescriptionUrl: payload.prescriptionUrl
+  });
+
+  // Populated so the confirmation screen (and this response in general) can show the
+  // lab's address/phone, not just its name — previously only the raw lab ObjectId
+  // went back to the client, so those fields were unavailable there.
+  await booking.populate('lab', 'name address city phone');
+
+  logActivity({
+    actor: req.user,
+    action: 'booking.created',
+    entity: 'Booking',
+    entityId: booking._id,
+    description: `${req.user.name} booked ${items.length} test(s) at ${booking.lab?.name || 'a lab'} for ${patient.name} (${payload.slotDate || 'date TBC'})`,
+    ...requestMeta(req),
   });
 
   // Queue confirmation email/SMS/WhatsApp — response is sent before these complete
