@@ -109,20 +109,26 @@ export default function ScratchCoupon({ promoText }) {
   if (!ready) return <div className="h-10" />;
 
   return (
-    <div ref={containerRef} className="relative h-11 sm:h-10 rounded-xl overflow-hidden select-none">
-      {/* Real promo content — always in the DOM, visible once the foil layer is gone */}
-      <div className="absolute inset-0 flex items-center justify-center px-4 bg-white">
-        <div
-          className={`text-center text-[11px] sm:text-sm text-gray-600 leading-relaxed rich-html transition-opacity duration-500 ${revealed ? 'opacity-100' : 'opacity-0'}`}
-          dangerouslySetInnerHTML={{ __html: revealed ? `🎉 ${promoText}` : '' }}
-        />
-      </div>
+    <div className="relative">
+      {/* Pulsing glow behind the card — draws the eye to it until it's scratched */}
       {!revealed && (
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing touch-none"
-        />
+        <span className="absolute -inset-1 rounded-xl bg-gradient-to-r from-amber-400 to-pink-500 opacity-70 blur-md animate-pulse -z-10" />
       )}
+      <div ref={containerRef} className="relative h-11 sm:h-10 rounded-xl overflow-hidden select-none">
+        {/* Real promo content — always in the DOM, visible once the foil layer is gone */}
+        <div className="absolute inset-0 flex items-center justify-center px-4 bg-white">
+          <div
+            className={`text-center text-[11px] sm:text-sm text-gray-600 leading-relaxed rich-html transition-opacity duration-500 ${revealed ? 'opacity-100' : 'opacity-0'}`}
+            dangerouslySetInnerHTML={{ __html: revealed ? `🎉 ${promoText}` : '' }}
+          />
+        </div>
+        {!revealed && (
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing touch-none"
+          />
+        )}
+      </div>
     </div>
   );
 }
