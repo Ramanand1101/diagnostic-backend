@@ -5,6 +5,7 @@ import { CityProvider } from '@/context/CityContext';
 import { CartProvider } from '@/context/CartContext';
 import GoogleAuthProvider from '@/components/layout/GoogleAuthProvider';
 import CookieConsent from '@/components/ui/CookieConsent';
+import MobileBottomNav from '@/components/layout/MobileBottomNav';
 
 export const metadata = {
   title: 'HealthOnTime - Book Lab Tests & Health Packages',
@@ -25,6 +26,7 @@ export default function RootLayout({ children }) {
             <CityProvider>
               <CartProvider>
                 {children}
+                <MobileBottomNav />
                 <ToasterWithClose />
                 <CookieConsent />
               </CartProvider>
