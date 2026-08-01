@@ -10,7 +10,8 @@ export const dynamicParams = true;
 
 export async function generateMetadata({ params }) {
   try {
-    const res = await fetch(`${API}/products/${params.slug}`, { next: { revalidate: 60 } });
+    const { slug } = await params;
+    const res = await fetch(`${API}/products/${slug}`, { next: { revalidate: 60 } });
     if (!res.ok) return { title: 'Test Not Found' };
     const product = await res.json();
     const tm = product.testMaster || {};
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }) {
       openGraph: {
         title:       product.name,
         description: tm.description || '',
-        type:        'product',
+        type:        'website',
       },
     };
   } catch {
@@ -29,7 +30,8 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function ProductDetailPage({ params }) {
-  const res = await fetch(`${API}/products/${params.slug}`, {
+  const { slug } = await params;
+  const res = await fetch(`${API}/products/${slug}`, {
     next: { revalidate: 60 },
   });
 
