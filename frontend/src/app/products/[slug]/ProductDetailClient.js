@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { formatCurrency } from '@/utils/helpers';
 import { FiClock, FiDroplet, FiHome, FiAlertCircle, FiShoppingCart, FiCheck } from 'react-icons/fi';
@@ -9,6 +10,7 @@ export default function ProductDetailClient({ product }) {
   const { addItem, items } = useCart();
   const inCart = items.some((i) => i._id === product._id);
   const tm     = product.testMaster || {};
+  const router = useRouter();
 
   const hasDiscount     = product.salePrice && product.salePrice < product.price;
   const reportTime      = tm.reportTime      || product.reportTime;
@@ -19,7 +21,17 @@ export default function ProductDetailClient({ product }) {
 
   const handleAddToCart = () => {
     addItem(product);
-    toast.success(`${product.name} added to cart!`, { icon: '🛒' });
+    toast.success(
+      (t) => (
+        <span
+          onClick={() => { toast.dismiss(t.id); router.push('/cart'); }}
+          className="cursor-pointer"
+        >
+          {product.name} added to cart!
+        </span>
+      ),
+      { icon: '🛒' }
+    );
   };
 
   return (

@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { FiShoppingCart, FiCheck } from 'react-icons/fi';
 import toast from 'react-hot-toast';
@@ -8,6 +9,7 @@ import { getProductIcon } from '@/lib/productIcon';
 export default function ProductCard({ product }) {
   const { addItem, items } = useCart();
   const inCart = items.some((i) => i._id === product._id);
+  const router = useRouter();
 
   const mrp = product.price || 0;
   const sale = product.salePrice && product.salePrice < mrp ? product.salePrice : mrp;
@@ -17,7 +19,17 @@ export default function ProductCard({ product }) {
 
   const handleAddToCart = () => {
     addItem(product);
-    toast.success(`${product.name} added to cart!`, { icon: '🛒' });
+    toast.success(
+      (t) => (
+        <span
+          onClick={() => { toast.dismiss(t.id); router.push('/cart'); }}
+          className="cursor-pointer"
+        >
+          {product.name} added to cart!
+        </span>
+      ),
+      { icon: '🛒' }
+    );
   };
 
   return (
