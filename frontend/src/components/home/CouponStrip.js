@@ -1,38 +1,18 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { FiTag } from 'react-icons/fi';
+import { FiTag, FiCopy, FiCheck } from 'react-icons/fi';
 import { couponApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
-// Matches the section's bg so the notch circles look "punched" out of the card edges
-const PAGE_BG = 'bg-gray-50';
-
-const FLAP_COLORS = [
-  'from-purple-600 to-indigo-700',
-  'from-orange-500 to-red-600',
-  'from-emerald-500 to-teal-600',
-  'from-primary-600 to-primary-700',
-];
-
-function headline(coupon) {
-  if (coupon.type === 'percent') {
-    return `Flat ${coupon.value}% off*`;
-  }
-  return `Flat ₹${coupon.value.toLocaleString('en-IN')} off*`;
+function offerText(coupon) {
+  const off = coupon.type === 'percent'
+    ? `${coupon.value}% OFF${coupon.maxDiscount ? ` up to ₹${coupon.maxDiscount.toLocaleString('en-IN')}` : ''}`
+    : `₹${coupon.value.toLocaleString('en-IN')} OFF`;
+  const min = coupon.minOrderAmount > 0 ? ` on orders above ₹${coupon.minOrderAmount.toLocaleString('en-IN')}` : '';
+  return `Get ${off}${min}`;
 }
 
-function description(coupon) {
-  if (coupon.type === 'percent') {
-    return `Save ${coupon.value}%${coupon.maxDiscount ? ` (up to ₹${coupon.maxDiscount.toLocaleString('en-IN')})` : ''} using this code.`;
-  }
-  return `Save ₹${coupon.value.toLocaleString('en-IN')} using this code.`;
-}
-
-function Notch({ className }) {
-  return <div className={`absolute w-4 h-4 rounded-full ${PAGE_BG} ${className}`} />;
-}
-
-function CouponCard({ coupon, colorClass }) {
+function CouponItem({ coupon }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -47,40 +27,16 @@ function CouponCard({ coupon, colorClass }) {
   };
 
   return (
-    <div className="relative flex-shrink-0 w-80 snap-start flex bg-white rounded-2xl shadow-md overflow-hidden">
-      {/* Left flap */}
-      <div className={`relative w-16 flex-shrink-0 bg-gradient-to-b ${colorClass} flex items-center justify-center`}>
-        <span className="text-white text-xs font-bold tracking-widest [writing-mode:vertical-rl] rotate-180 select-none">
-          DISCOUNT
-        </span>
-      </div>
-
-      {/* Ticket-edge notches, punched at the flap/content divide */}
-      <Notch className="left-16 -top-2 -translate-x-1/2" />
-      <Notch className="left-16 -bottom-2 -translate-x-1/2" />
-      {/* Ticket-edge notch on the outer right edge */}
-      <Notch className="-right-2 top-1/2 -translate-y-1/2" />
-
-      {/* Right content */}
-      <div className="relative flex-1 min-w-0 px-5 py-4">
-        <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center">
-          <FiTag className="text-rose-500 text-sm" />
-        </div>
-
-        <p className="text-gray-500 text-sm pr-8">{headline(coupon)}</p>
-        <p className="text-gray-900 font-extrabold text-xl tracking-wide mt-0.5 truncate pr-8">{coupon.code}</p>
-        <p className="text-gray-600 text-sm mt-2">{description(coupon)}</p>
-        <p className="text-primary-600 text-xs font-medium mt-1">
-          {coupon.minOrderAmount > 0 ? `*On orders above ₹${coupon.minOrderAmount.toLocaleString('en-IN')}` : '*No minimum order'}
-        </p>
-
-        <button
-          onClick={handleCopy}
-          className="mt-3 w-full border border-gray-200 border-dashed rounded-full py-2 font-bold text-sm text-gray-900 hover:bg-gray-50 transition-colors"
-        >
-          {copied ? 'Copied!' : 'Copy Code'}
-        </button>
-      </div>
+    <div className="flex items-center gap-3 flex-shrink-0">
+      <span className="text-sm text-gray-700 whitespace-nowrap">{offerText(coupon)}</span>
+      <button
+        onClick={handleCopy}
+        className={`flex items-center gap-1.5 text-xs font-bold rounded-full pl-3 pr-2.5 py-1.5 border border-dashed transition-colors whitespace-nowrap ${
+          copied ? 'border-green-300 bg-green-50 text-green-700' : 'border-primary-300 bg-primary-50 text-primary-700 hover:bg-primary-100'
+        }`}
+      >
+        {coupon.code} {copied ? <FiCheck /> : <FiCopy />}
+      </button>
     </div>
   );
 }
@@ -99,15 +55,18 @@ export default function CouponStrip() {
   if (!loaded || coupons.length === 0) return null;
 
   return (
-    <section className={`py-8 ${PAGE_BG}`}>
+    <section className="py-6 bg-gray-50">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="flex items-center gap-2 mb-4">
-          <FiTag className="text-primary-600" />
-          <h2 className="text-lg font-bold text-gray-900">Available Offers</h2>
-        </div>
-        <div className="flex gap-5 overflow-x-auto pb-2 snap-x snap-mandatory">
+        <div className="bg-primary-50 border border-primary-100 rounded-xl px-5 py-3.5 flex flex-wrap items-center gap-x-8 gap-y-3 overflow-x-auto">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <FiTag className="text-primary-600" />
+            <h2 className="text-sm font-bold text-gray-900 whitespace-nowrap">Available Offers</h2>
+          </div>
           {coupons.map((c, i) => (
-            <CouponCard key={c._id} coupon={c} colorClass={FLAP_COLORS[i % FLAP_COLORS.length]} />
+            <div key={c._id} className="flex items-center gap-8 flex-shrink-0">
+              {i > 0 && <span className="hidden sm:block h-6 w-px bg-primary-200" />}
+              <CouponItem coupon={c} />
+            </div>
           ))}
         </div>
       </div>
