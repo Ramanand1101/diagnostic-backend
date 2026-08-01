@@ -2,7 +2,6 @@ import Link from 'next/link';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import Hero from '@/components/home/Hero';
-import CouponStrip from '@/components/home/CouponStrip';
 import NewsletterSection from '@/components/home/NewsletterSection';
 import FeaturedLabsSection from '@/components/home/FeaturedLabsSection';
 import RecommendedTestsCarousel from '@/components/home/RecommendedTestsCarousel';
@@ -26,6 +25,8 @@ const DEFAULT_CONTENT = {
     title: 'Book Lab Tests from Trusted NABL Certified Labs',
     subtitle: 'Compare prices from trusted diagnostic laboratories, book online in minutes, and receive secure digital reports.',
     tagline: 'NABL Certified Labs | Fast & Accurate Reports | Home Sample Collection',
+    promoText: 'Get <strong>10% OFF*</strong> on orders above ₹500 | Use: <strong>WELCOME10</strong>',
+    promoVisible: true,
   },
   stats: [
     { value: '2000+', label: 'Tests & Packages' },
@@ -115,9 +116,6 @@ export default async function HomePage() {
       <Navbar />
       <main>
         <Hero heroContent={hero} />
-
-        {/* Active coupon codes — replaces the old entry popup */}
-        <CouponStrip />
 
         {/* Stats — one solid stat block, 2 columns on mobile / 4 in a row on desktop */}
         <section className="py-12 bg-gray-50">

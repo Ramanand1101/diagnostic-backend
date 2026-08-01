@@ -14,6 +14,8 @@ const DEFAULT_CONTENT = {
     title: 'Book Lab Tests from Trusted NABL Certified Labs',
     subtitle: 'Compare prices from trusted diagnostic laboratories, book online in minutes, and receive secure digital reports.',
     tagline: 'NABL Certified Labs | Fast & Accurate Reports | Home Sample Collection',
+    promoText: 'Get <strong>10% OFF*</strong> on orders above ₹500 | Use: <strong>WELCOME10</strong>',
+    promoVisible: true,
   },
   stats: [
     { value: '2000+', label: 'Tests & Packages' },
@@ -248,6 +250,29 @@ function HeroTab({ hero, onChange }) {
         />
       </div>
 
+      {/* Promo bar */}
+      <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Promo Strip</p>
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hero.promoVisible !== false}
+              onChange={(e) => update('promoVisible', e.target.checked)}
+              className="w-4 h-4 rounded accent-primary-600"
+            />
+            Visible
+          </label>
+        </div>
+        <RichTextEditor
+          label="Promo Text (HTML — use Bold for highlighted words)"
+          value={hero.promoText}
+          onChange={(v) => update('promoText', v)}
+          placeholder="Get <strong>10% OFF*</strong> on orders above ₹500 | Use: <strong>WELCOME10</strong>"
+          rows={1}
+        />
+      </div>
+
       {/* Preview */}
       <div>
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Preview</p>
@@ -267,6 +292,14 @@ function HeroTab({ hero, onChange }) {
             <div className="bg-sky-500 text-white text-xs px-4 py-2 rounded-full font-bold whitespace-nowrap">Search</div>
           </div>
         </div>
+        {hero.promoVisible !== false && (
+          <div className="bg-white border border-gray-200 rounded-xl mt-2 py-2 text-center">
+            <div
+              className="text-sm text-gray-600 rich-html"
+              dangerouslySetInnerHTML={{ __html: hero.promoText || '' }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
