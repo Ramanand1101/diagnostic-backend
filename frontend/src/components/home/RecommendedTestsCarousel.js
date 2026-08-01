@@ -127,9 +127,9 @@ export default function RecommendedTestsCarousel() {
   if (!loading && products.length === 0) return null;
 
   return (
-    <section className="py-14 bg-[#F8FAFC]">
+    <section className="py-8 bg-[#F8FAFC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Discover Our Highly Recommended Lab Tests</h2>
           <p className="text-sm text-gray-500 mt-1">Handpicked tests across every health category, at trusted NABL-certified labs</p>
         </div>

@@ -81,7 +81,7 @@ async function getHomeContent() {
 
 function SectionHeader({ title, subtitle, href, linkLabel = 'View all' }) {
   return (
-    <div className="flex items-end justify-between mb-7">
+    <div className="flex items-end justify-between mb-5">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
         {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
@@ -140,9 +140,9 @@ export default async function HomePage() {
         <RecommendedTestsCarousel />
 
         {/* Why choose us / Features */}
-        <section className="py-16 bg-white">
+        <section className="py-10 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-10">
+            <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900">{whyUs.title}</h2>
               <div className="text-sm text-gray-500 mt-2 rich-html" dangerouslySetInnerHTML={{ __html: whyUs.subtitle }} />
             </div>
@@ -164,9 +164,9 @@ export default async function HomePage() {
         </section>
 
         {/* How it works */}
-        <section className="py-16 bg-[#F8FAFC]">
+        <section className="py-10 bg-[#F8FAFC]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
+            <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900">{howItWorks.title}</h2>
               <div className="text-sm text-gray-500 mt-2 rich-html" dangerouslySetInnerHTML={{ __html: howItWorks.subtitle }} />
             </div>
@@ -193,7 +193,7 @@ export default async function HomePage() {
         </section>
 
         {/* Popular tests */}
-        <section className="py-14 bg-white">
+        <section className="py-10 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <SectionHeader
               title="Popular Health Tests"
@@ -207,7 +207,7 @@ export default async function HomePage() {
 
         {/* Cities we serve */}
         {cities.length > 0 && (
-          <section className="py-12 bg-[#F8FAFC] border-t border-gray-100">
+          <section className="py-8 bg-[#F8FAFC] border-t border-gray-100">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
                 <FiMapPin className="text-primary-600" /> Book Lab Tests in Your City
@@ -226,7 +226,7 @@ export default async function HomePage() {
         )}
 
         {/* Trust banner */}
-        <section className="bg-gradient-to-br from-primary-700 to-primary-900 py-14">
+        <section className="bg-gradient-to-br from-primary-700 to-primary-900 py-10">
           <div className="max-w-4xl mx-auto px-4 text-center text-white">
             <h2 className="text-2xl md:text-3xl font-bold mb-3">{trustBanner.title}</h2>
             <div className="text-primary-200 mb-8 text-base rich-html" dangerouslySetInnerHTML={{ __html: trustBanner.subtitle }} />

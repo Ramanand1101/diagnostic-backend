@@ -26,7 +26,7 @@ export default function NewsletterSection() {
   };
 
   return (
-    <section className="bg-white border-t border-gray-100 py-16 px-4">
+    <section className="bg-white border-t border-gray-100 py-10 px-4">
       <div className="max-w-2xl mx-auto text-center">
         <div className="w-14 h-14 bg-secondary-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
           <FiBell className="text-secondary-500 text-2xl" />

@@ -87,7 +87,7 @@ export default function FeaturedLabsSection() {
     <section className="py-6 bg-[#F8FAFC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex items-end justify-between mb-7">
+        <div className="flex items-end justify-between mb-5">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h2 className="text-2xl font-bold text-gray-900">
