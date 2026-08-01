@@ -117,30 +117,18 @@ export default async function HomePage() {
       <main>
         <Hero heroContent={hero} />
 
-        {/* Stats — one solid stat block on mobile (2x2), individual gradient cards on desktop */}
+        {/* Stats — one solid stat block, 2 columns on mobile / 4 in a row on desktop */}
         <section className="py-12 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="md:hidden bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl px-6 py-8 shadow-lg">
-              <div className="grid grid-cols-2 gap-y-7 gap-x-4 text-center">
+            <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl px-6 py-8 md:px-10 shadow-lg">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-y-7 gap-x-4 text-center">
                 {stats.map(({ value, label }) => (
                   <div key={label}>
-                    <p className="text-3xl font-extrabold text-white leading-none">{value}</p>
+                    <p className="text-3xl md:text-4xl font-extrabold text-white leading-none">{value}</p>
                     <p className="text-sm text-primary-100 mt-2 font-medium">{label}</p>
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="hidden md:grid grid-cols-4 gap-5">
-              {stats.map(({ value, label }) => (
-                <div key={label}
-                  className="relative rounded-2xl p-[1.5px] bg-gradient-to-br from-purple-400 via-indigo-400 to-blue-300 shadow-md">
-                  <div className="rounded-2xl bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 px-6 py-8 text-center h-full">
-                    <p className="text-3xl md:text-4xl font-extrabold text-indigo-900 leading-none">{value}</p>
-                    <p className="text-sm text-slate-500 mt-2 font-medium">{label}</p>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </section>
