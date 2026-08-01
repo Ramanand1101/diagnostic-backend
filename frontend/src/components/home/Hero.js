@@ -10,6 +10,7 @@ import { useCity } from '@/context/CityContext';
 
 import CityPickerModal from '@/components/layout/CityPickerModal';
 import ScratchCoupon from '@/components/home/ScratchCoupon';
+import PromoPopup from '@/components/home/PromoPopup';
 
 
 const TYPEWRITER = ['CBC Test', 'Thyroid Panel', 'Vitamin D', 'HbA1c', 'Full Body Checkup', 'Lipid Profile'];
@@ -505,6 +506,9 @@ export default function HeroSlider({ heroContent }) {
           </div>
         </div>
       )}
+
+      {/* Entry popup — greets first-time-this-session visitors with the same offer */}
+      {hc.promoVisible !== false && <PromoPopup promoText={hc.promoText} />}
 
       <CityPickerModal open={cityModalOpen} onClose={() => setCityModalOpen(false)} />
     </div>
