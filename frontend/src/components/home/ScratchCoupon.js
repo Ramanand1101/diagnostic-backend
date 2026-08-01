@@ -109,12 +109,14 @@ export default function ScratchCoupon({ promoText }) {
   if (!ready) return <div className="h-10" />;
 
   return (
-    <div className="relative">
-      {/* Pulsing glow behind the card — draws the eye to it until it's scratched */}
+    <div className="relative z-0">
+      {/* Pulsing glow behind the card — draws the eye to it until it's scratched.
+          Needs the parent's `z-0` (a stacking context) or a bare negative z-index
+          here would paint behind the section's opaque white background instead. */}
       {!revealed && (
-        <span className="absolute -inset-1 rounded-xl bg-gradient-to-r from-amber-400 to-pink-500 opacity-70 blur-md animate-pulse -z-10" />
+        <span className="absolute -inset-1 rounded-xl bg-gradient-to-r from-amber-400 to-pink-500 opacity-70 blur-md animate-pulse z-0" />
       )}
-      <div ref={containerRef} className="relative h-11 sm:h-10 rounded-xl overflow-hidden select-none">
+      <div ref={containerRef} className="relative z-10 h-11 sm:h-10 rounded-xl overflow-hidden select-none">
         {/* Real promo content — always in the DOM, visible once the foil layer is gone */}
         <div className="absolute inset-0 flex items-center justify-center px-4 bg-white">
           <div
