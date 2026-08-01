@@ -47,6 +47,14 @@ export default function LabDetailClient({ lab, initialProducts = [] }) {
                 <div className="flex items-center gap-1 text-primary-100 text-sm">
                   <FiMapPin /> {lab.address}{lab.city ? `, ${lab.city}` : ''}
                 </div>
+                {(lab.publicPhone || lab.phone) && (
+                  <div className="flex items-center gap-1 text-primary-100 text-sm mt-1">
+                    <FiPhone />
+                    <a href={`tel:${lab.publicPhone || lab.phone}`} className="hover:text-white transition-colors">
+                      {lab.publicPhone || lab.phone}
+                    </a>
+                  </div>
+                )}
                 {lab.ratingAvg > 0 && (
                   <div className="flex items-center gap-1 mt-2 text-yellow-300">
                     <FiStar className="fill-yellow-300" />
@@ -67,15 +75,11 @@ export default function LabDetailClient({ lab, initialProducts = [] }) {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Lab info — full-width bar above the grid instead of a side column,
-            so the tests grid below gets the full page width for 5 columns */}
+            so the tests grid below gets the full page width for 5 columns.
+            Phone lives in the hero above now, so this only shows if there's
+            still something else (website/hours/etc) worth a row for. */}
+        {(lab.website || lab.openingHours || lab.reportDeliveryTime || lab.sampleCollectionTime) && (
         <div className="bg-primary-50 border border-primary-100 rounded-xl px-5 py-4 mb-6 flex flex-wrap items-center gap-x-8 gap-y-3">
-          <h3 className="font-semibold text-gray-900 w-full sm:w-auto">Lab Information</h3>
-          {(lab.publicPhone || lab.phone) && (
-            <div className="flex items-center gap-2 text-sm text-gray-700">
-              <FiPhone className="text-primary-500 flex-shrink-0" />
-              <a href={`tel:${lab.publicPhone || lab.phone}`} className="hover:text-primary-600">{lab.publicPhone || lab.phone}</a>
-            </div>
-          )}
           {lab.website && (
             <div className="flex items-center gap-2 text-sm text-gray-700">
               <FiGlobe className="text-primary-500 flex-shrink-0" />
@@ -101,6 +105,7 @@ export default function LabDetailClient({ lab, initialProducts = [] }) {
             </div>
           )}
         </div>
+        )}
 
         <div>
           {lab.description && (

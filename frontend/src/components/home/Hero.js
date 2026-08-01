@@ -9,7 +9,6 @@ import { heroSlideApi, searchApi } from '@/lib/api';
 import { useCity } from '@/context/CityContext';
 
 import CityPickerModal from '@/components/layout/CityPickerModal';
-import PromoPopup from '@/components/home/PromoPopup';
 
 
 const TYPEWRITER = ['CBC Test', 'Thyroid Panel', 'Vitamin D', 'HbA1c', 'Full Body Checkup', 'Lipid Profile'];
@@ -497,8 +496,15 @@ export default function HeroSlider({ heroContent }) {
         <p className="text-gray-400 text-[11px]">{hc.tagline}</p>
       </div>
 
-      {/* Entry popup — greets first-time-this-session visitors with the same offer */}
-      {hc.promoVisible !== false && <PromoPopup promoText={hc.promoText} />}
+      {/* Promo banner — inline strip right below the hero card, replaces the old entry popup */}
+      {hc.promoVisible !== false && hc.promoText && (
+        <div className="bg-white py-4 px-4 text-center">
+          <p
+            className="text-lg sm:text-xl font-semibold text-gray-800 rich-html"
+            dangerouslySetInnerHTML={{ __html: hc.promoText }}
+          />
+        </div>
+      )}
 
       <CityPickerModal open={cityModalOpen} onClose={() => setCityModalOpen(false)} />
     </div>
