@@ -117,10 +117,21 @@ export default async function HomePage() {
       <main>
         <Hero heroContent={hero} />
 
-        {/* Stats cards */}
+        {/* Stats — one solid stat block on mobile (2x2), individual gradient cards on desktop */}
         <section className="py-12 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+            <div className="md:hidden bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl px-6 py-8 shadow-lg">
+              <div className="grid grid-cols-2 gap-y-7 gap-x-4 text-center">
+                {stats.map(({ value, label }) => (
+                  <div key={label}>
+                    <p className="text-3xl font-extrabold text-white leading-none">{value}</p>
+                    <p className="text-sm text-primary-100 mt-2 font-medium">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="hidden md:grid grid-cols-4 gap-5">
               {stats.map(({ value, label }) => (
                 <div key={label}
                   className="relative rounded-2xl p-[1.5px] bg-gradient-to-br from-purple-400 via-indigo-400 to-blue-300 shadow-md">

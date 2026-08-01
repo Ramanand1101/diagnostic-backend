@@ -142,8 +142,16 @@ export default function Navbar() {
               )}
             </div>
 
+            {/* Phone — visible on mobile without opening the hamburger drawer */}
+            <a
+              href={`tel:${CONTACT_PHONE.replace(/[^+\d]/g, '')}`}
+              className="md:hidden ml-auto flex items-center gap-1 text-primary-600 text-xs font-semibold"
+            >
+              <FiPhone className="text-sm" /> {CONTACT_PHONE}
+            </a>
+
             {/* Mobile hamburger */}
-            <button className="md:hidden ml-auto" onClick={() => setMenuOpen((v) => !v)}>
+            <button className="md:hidden" onClick={() => setMenuOpen((v) => !v)}>
               {menuOpen ? <FiX className="text-xl" /> : <FiMenu className="text-xl" />}
             </button>
           </div>
