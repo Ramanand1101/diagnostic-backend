@@ -65,11 +65,12 @@ export default function LabDetailClient({ lab, initialProducts = [] }) {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left info */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left info — kept narrow (1/4 instead of 1/3) so the tests grid gets more
+              room to show extra columns on larger screens */}
           <div className="lg:col-span-1">
-            <div className="card space-y-4">
+            <div className="card space-y-4 lg:sticky lg:top-4">
               <h3 className="font-semibold text-gray-900">Lab Information</h3>
               {lab.phone && (
                 <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -111,7 +112,7 @@ export default function LabDetailClient({ lab, initialProducts = [] }) {
           </div>
 
           {/* Right tabs */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             {lab.description && (
               <div className="card mb-6">
                 <h3 className="font-semibold text-gray-900 mb-3">About</h3>
@@ -131,7 +132,7 @@ export default function LabDetailClient({ lab, initialProducts = [] }) {
               products.length === 0 ? (
                 <div className="text-center py-10 text-gray-500 bg-white rounded-xl border border-gray-100">No tests listed for this lab.</div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {products.map((p) => <ProductCard key={p._id} product={p} />)}
                 </div>
               )
