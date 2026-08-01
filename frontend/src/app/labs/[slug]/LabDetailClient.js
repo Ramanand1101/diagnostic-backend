@@ -66,77 +66,73 @@ export default function LabDetailClient({ lab, initialProducts = [] }) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left info — kept narrow (1/4 instead of 1/3) so the tests grid gets more
-              room to show extra columns on larger screens */}
-          <div className="lg:col-span-1">
-            <div className="card space-y-4 lg:sticky lg:top-4">
-              <h3 className="font-semibold text-gray-900">Lab Information</h3>
-              {lab.phone && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <FiPhone className="text-primary-500 flex-shrink-0" />
-                  <a href={`tel:${lab.phone}`} className="hover:text-primary-600">{lab.phone}</a>
-                </div>
-              )}
-              {lab.email && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <FiMail className="text-primary-500 flex-shrink-0" />
-                  <a href={`mailto:${lab.email}`} className="hover:text-primary-600">{lab.email}</a>
-                </div>
-              )}
-              {lab.website && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <FiGlobe className="text-primary-500 flex-shrink-0" />
-                  <a href={lab.website} target="_blank" rel="noopener noreferrer" className="hover:text-primary-600 truncate">{lab.website}</a>
-                </div>
-              )}
-              {lab.openingHours && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <FiClock className="text-primary-500 flex-shrink-0" />
-                  <span>{lab.openingHours}</span>
-                </div>
-              )}
-              {lab.reportDeliveryTime && (
-                <div className="pt-3 border-t border-gray-100">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Report Delivery</p>
-                  <p className="text-sm font-medium">{lab.reportDeliveryTime}</p>
-                </div>
-              )}
-              {lab.sampleCollectionTime && (
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Sample Collection</p>
-                  <p className="text-sm font-medium">{lab.sampleCollectionTime}</p>
-                </div>
-              )}
+        {/* Lab info — full-width bar above the grid instead of a side column,
+            so the tests grid below gets the full page width for 5 columns */}
+        <div className="bg-primary-50 border border-primary-100 rounded-xl px-5 py-4 mb-6 flex flex-wrap items-center gap-x-8 gap-y-3">
+          <h3 className="font-semibold text-gray-900 w-full sm:w-auto">Lab Information</h3>
+          {lab.phone && (
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <FiPhone className="text-primary-500 flex-shrink-0" />
+              <a href={`tel:${lab.phone}`} className="hover:text-primary-600">{lab.phone}</a>
             </div>
+          )}
+          {lab.email && (
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <FiMail className="text-primary-500 flex-shrink-0" />
+              <a href={`mailto:${lab.email}`} className="hover:text-primary-600">{lab.email}</a>
+            </div>
+          )}
+          {lab.website && (
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <FiGlobe className="text-primary-500 flex-shrink-0" />
+              <a href={lab.website} target="_blank" rel="noopener noreferrer" className="hover:text-primary-600 truncate">{lab.website}</a>
+            </div>
+          )}
+          {lab.openingHours && (
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <FiClock className="text-primary-500 flex-shrink-0" />
+              <span>{lab.openingHours}</span>
+            </div>
+          )}
+          {lab.reportDeliveryTime && (
+            <div className="text-sm text-gray-700">
+              <span className="text-xs text-gray-500 uppercase tracking-wider mr-1">Report:</span>
+              <span className="font-medium">{lab.reportDeliveryTime}</span>
+            </div>
+          )}
+          {lab.sampleCollectionTime && (
+            <div className="text-sm text-gray-700">
+              <span className="text-xs text-gray-500 uppercase tracking-wider mr-1">Sample:</span>
+              <span className="font-medium">{lab.sampleCollectionTime}</span>
+            </div>
+          )}
+        </div>
+
+        <div>
+          {lab.description && (
+            <div className="card mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3">About</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">{lab.description}</p>
+            </div>
+          )}
+          <div className="flex gap-2 mb-4">
+            {['tests', 'reviews'].map((t) => (
+              <button key={t} onClick={() => setTab(t)}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${tab === t ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                {t === 'tests' ? `Tests & Packages (${products.length})` : `Reviews (${reviews.length})`}
+              </button>
+            ))}
           </div>
 
-          {/* Right tabs */}
-          <div className="lg:col-span-3">
-            {lab.description && (
-              <div className="card mb-6">
-                <h3 className="font-semibold text-gray-900 mb-3">About</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">{lab.description}</p>
+          {tab === 'tests' && (
+            products.length === 0 ? (
+              <div className="text-center py-10 text-gray-500 bg-white rounded-xl border border-gray-100">No tests listed for this lab.</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                {products.map((p) => <ProductCard key={p._id} product={p} />)}
               </div>
-            )}
-            <div className="flex gap-2 mb-4">
-              {['tests', 'reviews'].map((t) => (
-                <button key={t} onClick={() => setTab(t)}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${tab === t ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                  {t === 'tests' ? `Tests & Packages (${products.length})` : `Reviews (${reviews.length})`}
-                </button>
-              ))}
-            </div>
-
-            {tab === 'tests' && (
-              products.length === 0 ? (
-                <div className="text-center py-10 text-gray-500 bg-white rounded-xl border border-gray-100">No tests listed for this lab.</div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {products.map((p) => <ProductCard key={p._id} product={p} />)}
-                </div>
-              )
-            )}
+            )
+          )}
 
             {tab === 'reviews' && (
               reviews.length === 0 ? (
@@ -165,7 +161,6 @@ export default function LabDetailClient({ lab, initialProducts = [] }) {
             )}
           </div>
         </div>
-      </div>
     </main>
   );
 }
