@@ -1,5 +1,4 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -17,16 +16,6 @@ export default function MobileBottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { count: cartCount } = useCart();
-  const [showCallOptions, setShowCallOptions] = useState(false);
-  const callRef = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (callRef.current && !callRef.current.contains(e.target)) setShowCallOptions(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  useEffect(() => { setShowCallOptions(false); }, [pathname]);
 
   if (HIDDEN_PREFIXES.some((p) => pathname.startsWith(p))) return null;
 
@@ -71,38 +60,13 @@ export default function MobileBottomNav() {
             Chat
           </a>
 
-          <div className="relative" ref={callRef}>
-            <button
-              type="button"
-              onClick={() => setShowCallOptions((v) => !v)}
-              className={`flex flex-col items-center justify-center gap-1 py-2.5 w-full text-xs font-semibold ${showCallOptions ? 'text-primary-600' : 'text-gray-800'}`}
-            >
-              <FiPhone className="text-xl" />
-              Call
-            </button>
-
-            {showCallOptions && (
-              <div className="absolute bottom-full right-0 mb-2 w-44 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden">
-                <a
-                  href={`tel:${digits}`}
-                  onClick={() => setShowCallOptions(false)}
-                  className="flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  <FiPhone className="text-primary-600" /> Direct Call
-                </a>
-                <div className="h-px bg-gray-100" />
-                <a
-                  href={`https://wa.me/${digits.replace('+', '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setShowCallOptions(false)}
-                  className="flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  <RiWhatsappLine className="text-green-500" /> WhatsApp
-                </a>
-              </div>
-            )}
-          </div>
+          <a
+            href={`tel:${digits}`}
+            className="flex flex-col items-center justify-center gap-1 py-2.5 text-xs font-semibold text-gray-800"
+          >
+            <FiPhone className="text-xl" />
+            Call
+          </a>
         </div>
       </nav>
     </>

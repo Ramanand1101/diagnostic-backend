@@ -9,6 +9,7 @@ import { heroSlideApi, searchApi } from '@/lib/api';
 import { useCity } from '@/context/CityContext';
 
 import CityPickerModal from '@/components/layout/CityPickerModal';
+import ScratchCoupon from '@/components/home/ScratchCoupon';
 
 
 const TYPEWRITER = ['CBC Test', 'Thyroid Panel', 'Vitamin D', 'HbA1c', 'Full Body Checkup', 'Lipid Profile'];
@@ -496,13 +497,12 @@ export default function HeroSlider({ heroContent }) {
         <p className="text-gray-400 text-[11px]">{hc.tagline}</p>
       </div>
 
-      {/* Promo bar */}
+      {/* Promo bar — scratch-off card, revealing the real offer underneath */}
       {hc.promoVisible !== false && (
-        <div className="bg-white border-y border-gray-100 py-2">
-          <div
-            className="text-center text-[11px] sm:text-sm text-gray-600 leading-relaxed px-4 rich-html"
-            dangerouslySetInnerHTML={{ __html: hc.promoText }}
-          />
+        <div className="bg-white border-y border-gray-100 py-2 px-4">
+          <div className="max-w-sm mx-auto">
+            <ScratchCoupon promoText={hc.promoText} />
+          </div>
         </div>
       )}
 
