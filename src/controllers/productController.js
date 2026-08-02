@@ -253,16 +253,16 @@ exports.productDemoCsv = asyncHandler(async (req, res) => {
     { name: 'Lipid Profile', reportTime: 'Same day', sampleType: 'Blood', homeCollection: false, fastingRequired: true, description: 'Cholesterol analysis', category: { name: 'Pathology' } },
   ];
 
-  const headers = ['name', 'price', 'salePrice', 'labEmail', 'brand'];
+  const headers = ['name', 'price', 'salePrice', 'labPrice', 'labEmail', 'brand'];
   const aoa = [headers];
   for (const labEmail of emailList) {
     for (const t of source) {
-      aoa.push([t.name, 0, 0, labEmail, brand]);
+      aoa.push([t.name, 0, 0, 0, labEmail, brand]);
     }
   }
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{ wch: 42 }, { wch: 10 }, { wch: 10 }, { wch: 32 }, { wch: 20 }];
+  ws['!cols'] = [{ wch: 42 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 32 }, { wch: 20 }];
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'products');
@@ -339,6 +339,7 @@ exports.bulkUploadProductsCsv = asyncHandler(async (req, res) => {
         name:       tm.name,
         price:      Number(row.price)    || 0,
         salePrice:  row.saleprice ? Number(row.saleprice) : undefined,
+        labPrice:   row.labprice ? Number(row.labprice) : null,
         isActive:   true,
       };
 
