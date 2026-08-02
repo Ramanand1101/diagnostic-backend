@@ -1,13 +1,14 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   FiGrid, FiUsers, FiMapPin, FiPackage, FiTag, FiCalendar,
   FiFileText, FiPercent, FiStar, FiBook, FiFile, FiMail,
   FiSettings, FiHelpCircle, FiImage, FiUploadCloud, FiLayers,
   FiBriefcase, FiUserCheck, FiPhoneCall, FiActivity, FiList, FiLayout, FiFilePlus,
   FiDollarSign, FiChevronsLeft, FiChevronsRight, FiLink, FiToggleRight, FiX, FiShare2,
+  FiChevronDown,
 } from 'react-icons/fi';
 import HealthOnTimeLogo from '@/components/layout/HealthOnTimeLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -54,7 +55,19 @@ const navSections = [
   {
     label: 'Operations',
     items: [
-      { href: '/admin/bookings',    label: 'Bookings',            icon: FiCalendar,   permission: 'bookings' },
+      { href: '/admin/bookings',    label: 'Bookings',            icon: FiCalendar,   permission: 'bookings', children: [
+        { href: '/admin/bookings',                    label: 'All' },
+        { href: '/admin/bookings?status=pending',     label: 'Pending' },
+        { href: '/admin/bookings?status=confirmed',   label: 'Confirmed' },
+        { href: '/admin/bookings?status=rescheduled', label: 'Rescheduled' },
+        { href: '/admin/bookings?status=assigned',    label: 'Assigned' },
+        { href: '/admin/bookings?status=collected',   label: 'Collected' },
+        { href: '/admin/bookings?status=processing',  label: 'Processing' },
+        { href: '/admin/bookings?status=completed',   label: 'Completed' },
+        { href: '/admin/bookings?status=cancelled',   label: 'Cancelled' },
+        { href: '/admin/bookings?status=refunded',    label: 'Refunded' },
+        { href: '/admin/bookings?deleted=true',       label: 'Deleted' },
+      ] },
       { href: '/admin/billing',     label: 'Billing',             icon: FiDollarSign, permission: 'bookings' },
       { href: '/admin/settlements', label: 'Lab Settlements',     icon: FiDollarSign, permission: 'settlements' },
       { href: '/admin/reports',     label: 'Reports',             icon: FiFileText,   permission: 'reports' },
@@ -86,6 +99,61 @@ const navSections = [
     ],
   },
 ];
+
+// Renders an expandable nav item (e.g. Bookings) whose sub-links point at the same
+// page with different query params (?status=pending, ?deleted=true, ...) rather than
+// separate routes. Split out so only this part needs useSearchParams (wrapped in
+// Suspense below) instead of the whole sidebar.
+function ExpandableNavItem({ item, effectiveCollapsed, isTopActive, onCloseMobile }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [open, setOpen] = useState(isTopActive);
+  useEffect(() => { if (isTopActive) setOpen(true); }, [isTopActive]);
+
+  const currentFull = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title={effectiveCollapsed ? item.label : undefined}
+        className={`w-full flex items-center transition-colors ${
+          effectiveCollapsed ? 'justify-center px-0 py-3 mx-2 rounded-lg' : 'gap-3 px-5 py-2.5'
+        } text-sm font-medium ${
+          isTopActive && !open ? 'bg-primary-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+        }`}
+      >
+        <item.icon className="text-base flex-shrink-0" />
+        {!effectiveCollapsed && (
+          <>
+            <span className="truncate flex-1 text-left">{item.label}</span>
+            <FiChevronDown className={`text-xs flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+          </>
+        )}
+      </button>
+      {open && !effectiveCollapsed && (
+        <div className="ml-4 pl-4 border-l border-gray-800 space-y-0.5 py-1">
+          {item.children.map((child) => {
+            const childActive = currentFull === child.href;
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                onClick={onCloseMobile}
+                className={`block px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  childActive ? 'bg-primary-600/20 text-primary-300' : 'text-gray-500 hover:bg-gray-800 hover:text-white'
+                }`}
+              >
+                {child.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminSidebar({ mobileOpen = false, onCloseMobile = () => {} }) {
   const pathname = usePathname();
@@ -179,8 +247,21 @@ export default function AdminSidebar({ mobileOpen = false, onCloseMobile = () =>
               <div className="border-t border-gray-800 mx-3 my-1" />
             )}
 
-            {section.items.map(({ href, label, icon: Icon }) => {
+            {section.items.map((item) => {
+              const { href, label, icon: Icon, children } = item;
               const active = href === activeHref;
+              if (children) {
+                return (
+                  <Suspense key={href} fallback={
+                    <div className={`flex items-center gap-3 px-5 py-2.5 text-sm font-medium ${active ? 'bg-primary-600 text-white' : 'text-gray-400'}`}>
+                      <Icon className="text-base flex-shrink-0" />
+                      {!effectiveCollapsed && <span className="truncate">{label}</span>}
+                    </div>
+                  }>
+                    <ExpandableNavItem item={item} effectiveCollapsed={effectiveCollapsed} isTopActive={active} onCloseMobile={onCloseMobile} />
+                  </Suspense>
+                );
+              }
               return (
                 <Link
                   key={href}

@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { bookingApi, reportApi, labApi } from '@/lib/api';
 import { formatDate, formatCurrency, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
@@ -389,13 +390,18 @@ function BookingDetailModal({ booking, statuses, onClose, onChanged }) {
   );
 }
 
-export default function AdminBookingsPage() {
+function AdminBookingsPageContent() {
+  const searchParams = useSearchParams();
+  // Status/Deleted are now chosen via the "Bookings" dropdown in the sidebar (each
+  // sub-item links to this same page with a different ?status=/?deleted= query), not
+  // in-page tabs — so these two just mirror whatever the URL currently says.
+  const statusFilter = searchParams.get('status') || '';
+  const showDeleted = searchParams.get('deleted') === 'true';
+
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [showDeleted, setShowDeleted] = useState(false);
   const [q, setQ] = useState('');
   const [viewBooking, setViewBooking] = useState(null);
   const [editBooking, setEditBooking] = useState(null);
@@ -429,6 +435,9 @@ export default function AdminBookingsPage() {
   }, [page, limit, statusFilter, q, showDeleted, filters, sortBy, sortOrder]);
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
+  // Switching status/deleted via the sidebar dropdown starts back at page 1 — staying
+  // on, say, page 3 of "Completed" after jumping to "Pending" could 404 past the end.
+  useEffect(() => { setPage(1); }, [statusFilter, showDeleted]);
 
   const handleFilterChange = (next) => { setFilters(next); setPage(1); };
   const handleSort = (field, order) => { setSortBy(field); setSortOrder(order); setPage(1); };
@@ -464,12 +473,18 @@ export default function AdminBookingsPage() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
-  const statuses = ['pending', 'confirmed', 'rescheduled', 'assigned', 'collected', 'processing', 'completed', 'cancelled', 'refunded'];
-
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
+          {(statusFilter || showDeleted) && (
+            <p className="text-xs text-gray-500 mt-0.5 capitalize">
+              Showing: {showDeleted ? 'Deleted' : statusFilter}
+              {' — '}<span className="text-primary-600">use the Bookings menu in the sidebar to switch</span>
+            </p>
+          )}
+        </div>
         <span className="text-xs text-gray-400">{total} total</span>
       </div>
 
@@ -486,29 +501,6 @@ export default function AdminBookingsPage() {
 
       {/* Lab / date / customer / mobile filters */}
       <BookingFilterBar value={filters} onChange={handleFilterChange} labs={labs} />
-
-      {/* Status/Deleted filter tabs */}
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => { setShowDeleted(false); setStatusFilter(''); setPage(1); }}
-          className={`px-3 py-1.5 text-xs font-medium rounded-full ${!showDeleted && !statusFilter ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600'}`}>
-          All
-        </button>
-        {!showDeleted && statuses.map((s) => (
-          <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full capitalize transition-colors ${
-              statusFilter === s ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-300'
-            }`}>
-            {s}
-          </button>
-        ))}
-        <button
-          onClick={() => { setShowDeleted((v) => !v); setStatusFilter(''); setPage(1); }}
-          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ml-auto ${
-            showDeleted ? 'bg-red-500 text-white' : 'bg-white border border-red-200 text-red-600 hover:bg-red-50'
-          }`}>
-          🗑 Deleted
-        </button>
-      </div>
 
       {loading ? <PageLoader /> : (
         <div className="card p-0 overflow-hidden">
@@ -613,5 +605,13 @@ export default function AdminBookingsPage() {
         )}
       </Modal>
     </div>
+  );
+}
+
+export default function AdminBookingsPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <AdminBookingsPageContent />
+    </Suspense>
   );
 }
