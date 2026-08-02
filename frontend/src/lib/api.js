@@ -374,6 +374,7 @@ export const testMasterApi = {
 export const labCrmApi = {
   stats: () => api.get('/lab-crm/stats'),
   billing: (params) => api.get('/lab-crm/billing', { params }),
+  billingExportCsv: (params) => api.get('/lab-crm/billing/export-csv', { params, responseType: 'blob' }),
   patientList: (params) => api.get('/lab-crm/patients', { params }),
   patientDetail: (id) => api.get(`/lab-crm/patients/${id}`),
   settlements: (params) => api.get('/lab-crm/settlements', { params }),

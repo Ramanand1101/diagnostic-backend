@@ -7,6 +7,7 @@ const labOnly = [protect, allowRoles('lab')];
 
 router.get('/stats', ...labOnly, c.stats);
 router.get('/billing', ...labOnly, c.billing);
+router.get('/billing/export-csv', ...labOnly, c.billingExportCsv);
 router.get('/settlements', ...labOnly, c.settlements);
 router.get('/patients', ...labOnly, c.patientList);
 router.get('/patients/:id', ...labOnly, c.patientDetail);

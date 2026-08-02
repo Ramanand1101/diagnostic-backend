@@ -6,7 +6,7 @@ import { PageLoader } from '@/components/ui/Spinner';
 import toast from 'react-hot-toast';
 import {
   FiDollarSign, FiTrendingUp, FiCheckCircle, FiClock,
-  FiCalendar, FiFilter, FiChevronLeft, FiChevronRight,
+  FiCalendar, FiFilter, FiChevronLeft, FiChevronRight, FiDownload,
 } from 'react-icons/fi';
 
 const PRESETS = [
@@ -70,6 +70,7 @@ export default function LabBillingPage() {
   const [total, setTotal]           = useState(0);
   const [page, setPage]             = useState(1);
   const [loading, setLoading]       = useState(true);
+  const [downloading, setDownloading] = useState(false);
   const LIMIT = 20;
 
   const getRange = useCallback(() => {
@@ -97,6 +98,7 @@ export default function LabBillingPage() {
         unpaidRevenue: d.unpaidRevenue,
         unpaidCount:   d.unpaidCount,
         labPayoutRevenue: d.labPayoutRevenue,
+        labPayoutCount: d.labPayoutCount,
       });
       setBookings(d.bookings || []);
       setTotal(d.total || 0);
@@ -115,6 +117,27 @@ export default function LabBillingPage() {
     fetchData();
   }, [fetchData]);
 
+  const handleDownload = async () => {
+    const range = getRange();
+    if (!range) return;
+    setDownloading(true);
+    try {
+      const params = { ...range };
+      if (payFilter) params.paymentStatus = payFilter;
+      const res = await labCrmApi.billingExportCsv(params);
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `billing-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const totalPages = Math.ceil(total / LIMIT);
   const paidPct = stats && stats.totalRevenue > 0
     ? Math.round((stats.paidRevenue / stats.totalRevenue) * 100)
@@ -123,9 +146,18 @@ export default function LabBillingPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Revenue and payment summary for your lab</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Revenue and payment summary for your lab</p>
+        </div>
+        <button
+          onClick={handleDownload}
+          disabled={downloading || !stats}
+          className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+        >
+          <FiDownload className={downloading ? 'animate-spin' : ''} /> {downloading ? 'Downloading…' : 'Download CSV'}
+        </button>
       </div>
 
       {/* Period selector */}
@@ -215,7 +247,12 @@ export default function LabBillingPage() {
               actually get paid, once the test-level Lab Sale Price has been configured
               on a product (see Admin > Products). See Settlements for payout history. */}
           <div className="bg-primary-50 border border-primary-100 rounded-xl px-4 py-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-primary-800">Your Payout (your share of the above)</span>
+            <div>
+              <span className="text-sm font-medium text-primary-800">Your Payout (your share of the above)</span>
+              <p className="text-xs text-primary-500 mt-0.5">
+                {stats.labPayoutCount} booking{stats.labPayoutCount !== 1 ? 's' : ''} with lab pricing configured
+              </p>
+            </div>
             <span className="text-lg font-bold text-primary-700">{formatCurrency(stats.labPayoutRevenue)}</span>
           </div>
 

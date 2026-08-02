@@ -155,7 +155,7 @@ exports.billing = async (req, res) => {
       // Only counts bookings with a known lab price (see Booking.labPayable).
       Booking.aggregate([
         { $match: { ...statsFilter, paymentStatus: 'paid', labPayable: { $ne: null } } },
-        { $group: { _id: null, payout: { $sum: '$labPayable' } } },
+        { $group: { _id: null, payout: { $sum: '$labPayable' }, count: { $sum: 1 } } },
       ]),
       Booking.find(listFilter)
         .sort({ createdAt: -1 })
@@ -177,9 +177,61 @@ exports.billing = async (req, res) => {
       unpaidRevenue: totalRevenue - paidRevenue,
       unpaidCount:   bookingCount - paidCount,
       labPayoutRevenue: payoutAgg[0]?.payout || 0,
+      labPayoutCount: payoutAgg[0]?.count || 0,
       bookings, total: count,
       page: Number(page), limit: safeLimit,
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/v1/lab-crm/billing/export-csv — same filters as `billing` above, but every
+// matching row (up to 10k) instead of one page, for the lab to download their own records.
+exports.billingExportCsv = async (req, res) => {
+  try {
+    const lab = await getLabByOwner(req.user._id);
+    if (!lab) return res.status(404).json({ message: 'Lab not found' });
+
+    const { from, to, paymentStatus } = req.query;
+    const filter = { lab: lab._id, isDeleted: false };
+    if (from || to) {
+      filter.createdAt = {};
+      if (from) filter.createdAt.$gte = new Date(from + 'T00:00:00.000Z');
+      if (to)   filter.createdAt.$lte = new Date(to   + 'T23:59:59.999Z');
+    }
+    if (paymentStatus) filter.paymentStatus = paymentStatus;
+
+    const bookings = await Booking.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(10000)
+      .populate('user', 'name mobile')
+      .lean();
+
+    const escape = (v) => {
+      if (v === null || v === undefined) return '';
+      const s = String(v);
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const headers = ['bookingNo', 'patient', 'customer', 'mobile', 'date', 'tests', 'amount', 'yourPayout', 'paymentStatus', 'status'];
+    const rows = bookings.map((b) => [
+      b.bookingNo,
+      b.patientSnapshot?.name || '',
+      b.user?.name || b.guest?.name || '',
+      b.user?.mobile || b.guest?.mobile || '',
+      b.createdAt ? new Date(b.createdAt).toISOString().slice(0, 10) : '',
+      (b.items || []).map((i) => i.name).join('; '),
+      b.total || 0,
+      b.labPayable != null ? b.labPayable : '',
+      b.paymentStatus,
+      b.status,
+    ].map(escape).join(','));
+
+    const csv = [headers.join(','), ...rows].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="billing-export.csv"');
+    res.send(csv);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
