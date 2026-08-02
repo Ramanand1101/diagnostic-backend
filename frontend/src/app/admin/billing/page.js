@@ -219,12 +219,22 @@ export default function BillingPage() {
   const [sortOrder, setSortOrder] = useState('desc');
   const searchTimer = useRef(null);
 
-  // Fetch stats once
+  const statsParams = useCallback(() => ({
+    lab: filters.lab || undefined,
+    dateFrom: filters.dateFrom || undefined,
+    dateTo: filters.dateTo || undefined,
+    customer: filters.customer || undefined,
+    mobile: filters.mobile || undefined,
+  }), [filters]);
+
+  // Stat cards reflect the same lab/date/customer/mobile filters as the table below —
+  // e.g. searching "Metropolis" updates the totals to Metropolis-only figures, not the
+  // site-wide totals.
   useEffect(() => {
-    bookingApi.getStats()
+    bookingApi.getStats(statsParams())
       .then((res) => setStats(res.data))
       .catch(() => {});
-  }, []);
+  }, [statsParams]);
 
   useEffect(() => { labApi.getAll({ limit: 200 }).then((r) => setLabs(r.data.items || [])); }, []);
 
@@ -266,7 +276,7 @@ export default function BillingPage() {
       toast.success('Marked as paid');
       fetchBookings();
       // Refresh stats
-      bookingApi.getStats().then((res) => setStats(res.data)).catch(() => {});
+      bookingApi.getStats(statsParams()).then((res) => setStats(res.data)).catch(() => {});
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 

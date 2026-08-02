@@ -285,19 +285,34 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
 // GET /api/v1/bookings/stats — superadmin/subadmin only
 exports.getStats = asyncHandler(async (req, res) => {
+  const { lab, dateFrom, dateTo, customer, mobile } = req.query;
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+  // Same filters as listBookings — so the stat cards on the admin Billing page
+  // reflect exactly the same filtered set as the table underneath them, not the
+  // site-wide totals, whenever a lab/date/customer/mobile filter is applied.
+  const baseFilter = { isDeleted: false };
+  if (lab) baseFilter.lab = lab;
+  await applyDateAndCustomerFilters(baseFilter, { dateFrom, dateTo, customer, mobile });
+
+  // "This month" intersects the calendar month with whatever date filter is already
+  // active, rather than ignoring it — e.g. lab=X + this-month-card both apply together.
+  const monthFilter = { ...baseFilter, createdAt: { ...(baseFilter.createdAt || {}) } };
+  if (!monthFilter.createdAt.$gte || monthFilter.createdAt.$gte < monthStart) {
+    monthFilter.createdAt.$gte = monthStart;
+  }
+
   const [allAgg, paidAgg, unpaidAgg, monthAgg, payMethodAgg, statusAgg, profitAgg] = await Promise.all([
-    Booking.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
-    Booking.aggregate([{ $match: { isDeleted: false, paymentStatus: 'paid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
-    Booking.aggregate([{ $match: { isDeleted: false, paymentStatus: 'unpaid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
-    Booking.aggregate([{ $match: { isDeleted: false, createdAt: { $gte: monthStart } } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
-    Booking.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$total' } } }]),
-    Booking.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: baseFilter }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { ...baseFilter, paymentStatus: 'paid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { ...baseFilter, paymentStatus: 'unpaid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: monthFilter }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: baseFilter }, { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$total' } } }]),
+    Booking.aggregate([{ $match: baseFilter }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
     // Only bookings with a known lab price (see Booking.labPayable) — excluded rather
     // than counted as ₹0, so this stays accurate while labPrice is being rolled out.
-    Booking.aggregate([{ $match: { isDeleted: false, adminProfit: { $ne: null } } }, { $group: { _id: null, total: { $sum: '$adminProfit' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { ...baseFilter, adminProfit: { $ne: null } } }, { $group: { _id: null, total: { $sum: '$adminProfit' }, count: { $sum: 1 } } }]),
   ]);
 
   res.json({
@@ -318,29 +333,14 @@ exports.getStats = asyncHandler(async (req, res) => {
 
 const BOOKING_SORT_FIELDS = ['createdAt', 'total', 'bookingNo', 'status', 'paymentStatus'];
 
-exports.listBookings = asyncHandler(async (req, res) => {
-  const { status, lab, q, deleted, page = 1, limit = 20, dateFrom, dateTo, customer, mobile, sortBy, sortOrder } = req.query;
-  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
-  const filter = { isDeleted: deleted === 'true' };
-  if (status) filter.status = status;
-  if (q) filter.bookingNo = new RegExp(q, 'i');
+// Shared by listBookings and getStats — both admin Bookings and Billing pages send the
+// same lab/date/customer/mobile filters, and the Billing page's stat cards need to
+// reflect the exact same filtered set as the table below them, not the site-wide total.
+async function applyDateAndCustomerFilters(filter, { dateFrom, dateTo, customer, mobile }) {
   if (dateFrom || dateTo) {
     filter.createdAt = {};
     if (dateFrom) filter.createdAt.$gte = new Date(dateFrom + 'T00:00:00.000Z');
     if (dateTo)   filter.createdAt.$lte = new Date(dateTo   + 'T23:59:59.999Z');
-  }
-
-  if (req.user.role === 'lab') {
-    const Lab = require('../models/Lab');
-    const myLab = await Lab.findOne({ owners: req.user._id });
-    filter.lab = myLab?._id || null;
-  } else if (req.user.role === 'superadmin' || req.user.role === 'subadmin') {
-    if (lab) filter.lab = lab;
-  } else {
-    // customer, hot_employee, corporate, employee, or any other non-admin role —
-    // this same endpoint backs the personal "My Bookings" dashboard, so it must
-    // never return other people's bookings.
-    filter.user = req.user._id;
   }
 
   // Customer name / mobile search — Mongoose can't regex-match a populated field in
@@ -361,6 +361,29 @@ exports.listBookings = asyncHandler(async (req, res) => {
 
     filter.$or = [{ user: { $in: userIds } }, ...guestOr];
   }
+}
+
+exports.listBookings = asyncHandler(async (req, res) => {
+  const { status, lab, q, deleted, page = 1, limit = 20, dateFrom, dateTo, customer, mobile, sortBy, sortOrder } = req.query;
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
+  const filter = { isDeleted: deleted === 'true' };
+  if (status) filter.status = status;
+  if (q) filter.bookingNo = new RegExp(q, 'i');
+
+  if (req.user.role === 'lab') {
+    const Lab = require('../models/Lab');
+    const myLab = await Lab.findOne({ owners: req.user._id });
+    filter.lab = myLab?._id || null;
+  } else if (req.user.role === 'superadmin' || req.user.role === 'subadmin') {
+    if (lab) filter.lab = lab;
+  } else {
+    // customer, hot_employee, corporate, employee, or any other non-admin role —
+    // this same endpoint backs the personal "My Bookings" dashboard, so it must
+    // never return other people's bookings.
+    filter.user = req.user._id;
+  }
+
+  await applyDateAndCustomerFilters(filter, { dateFrom, dateTo, customer, mobile });
 
   const sortField = BOOKING_SORT_FIELDS.includes(sortBy) ? sortBy : 'createdAt';
   const sortDir = sortOrder === 'asc' ? 1 : -1;
