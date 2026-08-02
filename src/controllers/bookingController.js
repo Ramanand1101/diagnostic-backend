@@ -296,23 +296,29 @@ exports.getStats = asyncHandler(async (req, res) => {
   if (lab) baseFilter.lab = lab;
   await applyDateAndCustomerFilters(baseFilter, { dateFrom, dateTo, customer, mobile });
 
+  // Every money figure below should behave according to the booking's actual status —
+  // a cancelled/refunded booking isn't real revenue, even if it was paid before being
+  // cancelled. `byStatus` is the one exception: its whole job is counting per status,
+  // cancelled/refunded included, so it stays on the unrestricted baseFilter.
+  const revenueFilter = { ...baseFilter, status: { $nin: ['cancelled', 'refunded'] } };
+
   // "This month" intersects the calendar month with whatever date filter is already
   // active, rather than ignoring it — e.g. lab=X + this-month-card both apply together.
-  const monthFilter = { ...baseFilter, createdAt: { ...(baseFilter.createdAt || {}) } };
+  const monthFilter = { ...revenueFilter, createdAt: { ...(revenueFilter.createdAt || {}) } };
   if (!monthFilter.createdAt.$gte || monthFilter.createdAt.$gte < monthStart) {
     monthFilter.createdAt.$gte = monthStart;
   }
 
   const [allAgg, paidAgg, unpaidAgg, monthAgg, payMethodAgg, statusAgg, profitAgg] = await Promise.all([
-    Booking.aggregate([{ $match: baseFilter }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
-    Booking.aggregate([{ $match: { ...baseFilter, paymentStatus: 'paid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
-    Booking.aggregate([{ $match: { ...baseFilter, paymentStatus: 'unpaid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: revenueFilter }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { ...revenueFilter, paymentStatus: 'paid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { ...revenueFilter, paymentStatus: 'unpaid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
     Booking.aggregate([{ $match: monthFilter }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
-    Booking.aggregate([{ $match: baseFilter }, { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$total' } } }]),
+    Booking.aggregate([{ $match: revenueFilter }, { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$total' } } }]),
     Booking.aggregate([{ $match: baseFilter }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
     // Only bookings with a known lab price (see Booking.labPayable) — excluded rather
     // than counted as ₹0, so this stays accurate while labPrice is being rolled out.
-    Booking.aggregate([{ $match: { ...baseFilter, adminProfit: { $ne: null } } }, { $group: { _id: null, total: { $sum: '$adminProfit' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { ...revenueFilter, adminProfit: { $ne: null } } }, { $group: { _id: null, total: { $sum: '$adminProfit' }, count: { $sum: 1 } } }]),
   ]);
 
   res.json({

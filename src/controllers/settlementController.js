@@ -20,6 +20,9 @@ function eligibleFilter({ lab, from, to }) {
     lab,
     settlementStatus: 'unsettled',
     paymentStatus: 'paid',
+    // A cancelled/refunded booking isn't real revenue even if it was paid before being
+    // cancelled — never settle a lab for a test that isn't actually going ahead.
+    status: { $nin: ['cancelled', 'refunded'] },
     labPayable: { $ne: null },
     isDeleted: false,
     createdAt: { $gte: new Date(from + 'T00:00:00.000Z'), $lte: new Date(to + 'T23:59:59.999Z') },

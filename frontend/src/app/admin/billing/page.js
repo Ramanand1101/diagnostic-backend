@@ -369,6 +369,8 @@ export default function BillingPage() {
                   <SortableTh field="status" label="Status" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
                   <SortableTh field="paymentStatus" label="Payment" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
                   <SortableTh field="total" label="Amount" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} align="right" />
+                  <th className="table-header text-right">Lab Price</th>
+                  <th className="table-header text-right">Profit</th>
                   <th className="table-header">Invoice</th>
                 </tr>
               </thead>
@@ -395,6 +397,14 @@ export default function BillingPage() {
                       </div>
                     </td>
                     <td className="table-cell text-right font-bold text-gray-900">{formatCurrency(b.total)}</td>
+                    <td className="table-cell text-right text-primary-700">
+                      {b.labPayable != null ? formatCurrency(b.labPayable) : <span className="text-xs text-amber-600">Not set</span>}
+                    </td>
+                    <td className="table-cell text-right font-medium">
+                      {b.adminProfit != null
+                        ? <span className={b.adminProfit >= 0 ? 'text-green-700' : 'text-red-600'}>{formatCurrency(b.adminProfit)}</span>
+                        : <span className="text-xs text-gray-400">—</span>}
+                    </td>
                     <td className="table-cell">
                       <button
                         onClick={() => setInvoiceBooking(b)}
@@ -406,7 +416,7 @@ export default function BillingPage() {
                   </tr>
                 ))}
                 {bookings.length === 0 && (
-                  <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-10">No bookings found</td></tr>
+                  <tr><td colSpan={10} className="table-cell text-center text-gray-400 py-10">No bookings found</td></tr>
                 )}
               </tbody>
             </table>

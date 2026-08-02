@@ -134,22 +134,27 @@ exports.billing = async (req, res) => {
       if (to)   baseFilter.createdAt.$lte = new Date(to   + 'T23:59:59.999Z');
     }
 
+    // The table below shows every booking (cancelled ones too, for a full audit trail),
+    // but a cancelled/refunded booking isn't real revenue — the stat cards above it
+    // should behave according to the booking's actual status, not just paymentStatus.
+    const statsFilter = { ...baseFilter, status: { $nin: ['cancelled', 'refunded'] } };
+
     const listFilter = { ...baseFilter };
     if (paymentStatus) listFilter.paymentStatus = paymentStatus;
 
     const [totalAgg, paidAgg, payoutAgg, bookings, count] = await Promise.all([
       Booking.aggregate([
-        { $match: baseFilter },
+        { $match: statsFilter },
         { $group: { _id: null, revenue: { $sum: '$total' }, count: { $sum: 1 } } },
       ]),
       Booking.aggregate([
-        { $match: { ...baseFilter, paymentStatus: 'paid' } },
+        { $match: { ...statsFilter, paymentStatus: 'paid' } },
         { $group: { _id: null, revenue: { $sum: '$total' }, count: { $sum: 1 } } },
       ]),
       // "Your Payout" — the lab's own cut, not the full customer-paid amount above.
       // Only counts bookings with a known lab price (see Booking.labPayable).
       Booking.aggregate([
-        { $match: { ...baseFilter, paymentStatus: 'paid', labPayable: { $ne: null } } },
+        { $match: { ...statsFilter, paymentStatus: 'paid', labPayable: { $ne: null } } },
         { $group: { _id: null, payout: { $sum: '$labPayable' } } },
       ]),
       Booking.find(listFilter)
@@ -198,8 +203,10 @@ exports.settlements = async (req, res) => {
       Settlement.find(filter).sort('-createdAt').skip(skip).limit(safeLimit),
       Settlement.countDocuments(filter),
       // Total ever earned, regardless of whether it's been batched into a settlement yet.
+      // Excludes cancelled/refunded — that was never real revenue even if it was paid
+      // before being cancelled.
       Booking.aggregate([
-        { $match: { lab: lab._id, isDeleted: false, paymentStatus: 'paid', labPayable: { $ne: null } } },
+        { $match: { lab: lab._id, isDeleted: false, paymentStatus: 'paid', labPayable: { $ne: null }, status: { $nin: ['cancelled', 'refunded'] } } },
         { $group: { _id: null, total: { $sum: '$labPayable' } } },
       ]),
       Settlement.aggregate([
