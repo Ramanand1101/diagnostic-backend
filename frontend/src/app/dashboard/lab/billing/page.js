@@ -279,7 +279,7 @@ export default function LabBillingPage() {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Patient / Customer</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Tests</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Amount</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Your Payout</th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Payment</th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Status</th>
                     </tr>
@@ -303,7 +303,9 @@ export default function LabBillingPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-gray-900 whitespace-nowrap">
-                          {formatCurrency(b.total)}
+                          {b.labPayable != null
+                            ? formatCurrency(b.labPayable)
+                            : <span className="text-xs font-normal text-amber-600">Price not set</span>}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${

@@ -14,6 +14,7 @@ const STATUS_TABS = [
   { key: '', label: 'All' },
   { key: 'pending', label: 'Pending' },
   { key: 'confirmed', label: 'Confirmed' },
+  { key: 'rescheduled', label: 'Rescheduled' },
   { key: 'assigned', label: 'Assigned' },
   { key: 'collected', label: 'Collected' },
   { key: 'processing', label: 'Processing' },
@@ -40,7 +41,7 @@ const JOURNEY_ACTIONS = [
 
 const JOURNEY_IDX = Object.fromEntries(JOURNEY.map((s, i) => [s.key, i]));
 
-const CANCEL_ALLOWED = ['pending', 'confirmed', 'assigned'];
+const CANCEL_ALLOWED = ['pending', 'confirmed', 'rescheduled', 'assigned'];
 
 const actionColorClass = {
   blue:   'bg-blue-600 text-white hover:bg-blue-700',
@@ -50,7 +51,9 @@ const actionColorClass = {
 };
 
 function JourneyStepper({ status }) {
-  const currentIdx = JOURNEY_IDX[status] ?? -1;
+  // 'rescheduled' isn't a journey stage — it just means the slot moved — so treat it
+  // the same as 'confirmed' for the stepper's highlighting.
+  const currentIdx = JOURNEY_IDX[status === 'rescheduled' ? 'confirmed' : status] ?? -1;
   const isCancelled = status === 'cancelled';
 
   if (isCancelled) {

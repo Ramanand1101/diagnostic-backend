@@ -13,6 +13,7 @@ export const statusColor = (status) => {
   const map = {
     pending: 'bg-yellow-100 text-yellow-800',
     confirmed: 'bg-primary-100 text-primary-700',
+    rescheduled: 'bg-blue-100 text-blue-800',
     assigned: 'bg-purple-100 text-purple-800',
     collected: 'bg-secondary-100 text-secondary-800',
     processing: 'bg-secondary-100 text-secondary-700',

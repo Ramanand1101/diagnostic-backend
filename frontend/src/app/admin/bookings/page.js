@@ -464,7 +464,7 @@ export default function AdminBookingsPage() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
-  const statuses = ['pending', 'confirmed', 'assigned', 'collected', 'processing', 'completed', 'cancelled', 'refunded'];
+  const statuses = ['pending', 'confirmed', 'rescheduled', 'assigned', 'collected', 'processing', 'completed', 'cancelled', 'refunded'];
 
   return (
     <div className="space-y-5">

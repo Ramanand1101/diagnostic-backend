@@ -464,8 +464,19 @@ exports.updateBooking = asyncHandler(async (req, res) => {
 
   if (slotDate) {
     const Lab = require('../models/Lab');
-    const existing = await Booking.findById(req.params.id).select('lab items');
+    const existing = await Booking.findById(req.params.id).select('lab items slotDate slotTime status');
     if (!existing) return res.status(404).json({ message: 'Booking not found' });
+
+    // A real reschedule — the date or time actually changing — flips the status so
+    // it's visible in the Bookings list, distinct from a same-slot edit (e.g. notes
+    // only). Skip for terminal states, where "rescheduled" wouldn't make sense.
+    const oldDateKey = existing.slotDate ? new Date(existing.slotDate).toISOString().slice(0, 10) : null;
+    const newDateKey = new Date(slotDate).toISOString().slice(0, 10);
+    const dateOrTimeChanged = oldDateKey !== newDateKey || (slotTime !== undefined && slotTime !== existing.slotTime);
+    if (dateOrTimeChanged && !['cancelled', 'refunded', 'completed'].includes(existing.status)) {
+      update.status = 'rescheduled';
+    }
+
     const labDoc = await Lab.findById(lab || existing.lab).select('city state brand');
     if (labDoc) {
       const blockingRule = await findBlockingRule(labDoc, slotDate);
