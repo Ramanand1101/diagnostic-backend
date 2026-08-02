@@ -63,6 +63,7 @@ const navSections = [
         { href: '/admin/bookings?status=assigned',    label: 'Assigned' },
         { href: '/admin/bookings?status=collected',   label: 'Collected' },
         { href: '/admin/bookings?status=processing',  label: 'Processing' },
+        { href: '/admin/bookings?status=report_partial', label: 'Report Partial' },
         { href: '/admin/bookings?status=completed',   label: 'Completed' },
         { href: '/admin/bookings?status=cancelled',   label: 'Cancelled' },
         { href: '/admin/bookings?status=refunded',    label: 'Refunded' },

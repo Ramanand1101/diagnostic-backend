@@ -42,7 +42,7 @@ export default function BookingsPage() {
       .finally(() => setLoading(false));
   }, [page, statusFilter]);
 
-  const statuses = ['pending', 'confirmed', 'rescheduled', 'assigned', 'collected', 'processing', 'completed', 'cancelled'];
+  const statuses = ['pending', 'confirmed', 'rescheduled', 'assigned', 'collected', 'processing', 'report_partial', 'completed', 'cancelled'];
 
   return (
     <div className="space-y-6">

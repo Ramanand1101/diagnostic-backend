@@ -116,9 +116,13 @@ export default function BookingDetailPage() {
   if (!booking) return <div className="text-center py-20 text-gray-500">Booking not found</div>;
 
   const statusSteps = ['pending', 'confirmed', 'assigned', 'collected', 'processing', 'completed'];
-  // 'rescheduled' isn't a step in the linear journey — it just means the slot moved,
-  // so treat it the same as 'confirmed' for highlighting purposes.
-  const currentStep = statusSteps.indexOf(booking.status === 'rescheduled' ? 'confirmed' : booking.status);
+  // 'rescheduled' and 'report_partial' aren't steps in the linear journey — they're
+  // side states (slot moved / report partly in) — map them to the nearest real step
+  // for highlighting purposes instead of breaking the indexOf lookup.
+  const stepStatus = booking.status === 'rescheduled' ? 'confirmed'
+    : booking.status === 'report_partial' ? 'processing'
+    : booking.status;
+  const currentStep = statusSteps.indexOf(stepStatus);
 
   return (
     <div className="space-y-6">

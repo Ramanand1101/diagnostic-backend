@@ -18,6 +18,7 @@ const STATUS_TABS = [
   { key: 'assigned', label: 'Assigned' },
   { key: 'collected', label: 'Collected' },
   { key: 'processing', label: 'Processing' },
+  { key: 'report_partial', label: 'Report Partial' },
   { key: 'completed', label: 'Completed' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
@@ -31,12 +32,13 @@ const JOURNEY = [
   { key: 'completed',  label: 'Completed',  shortLabel: 'Complete'  },
 ];
 
-// Each action button config: what status it transitions TO, from which status
+// Each action button config: what status it transitions TO, from which status.
+// No "Mark Completed" here — completion is report-driven now (upload the report, or
+// see reportController#uploadReport / bookingController#markReportDone), not a manual click.
 const JOURNEY_ACTIONS = [
   { label: 'Mark Assigned',    icon: FiUserCheck,    nextStatus: 'assigned',   fromStatus: 'confirmed',  color: 'blue'   },
   { label: 'Mark Collected',   icon: FiPackage,      nextStatus: 'collected',  fromStatus: 'assigned',   color: 'purple' },
   { label: 'Mark Processing',  icon: FiCpu,          nextStatus: 'processing', fromStatus: 'collected',  color: 'orange' },
-  { label: 'Mark Completed',   icon: FiCheckCircle,  nextStatus: 'completed',  fromStatus: 'processing', color: 'teal'   },
 ];
 
 const JOURNEY_IDX = Object.fromEntries(JOURNEY.map((s, i) => [s.key, i]));
@@ -51,9 +53,10 @@ const actionColorClass = {
 };
 
 function JourneyStepper({ status }) {
-  // 'rescheduled' isn't a journey stage — it just means the slot moved — so treat it
-  // the same as 'confirmed' for the stepper's highlighting.
-  const currentIdx = JOURNEY_IDX[status === 'rescheduled' ? 'confirmed' : status] ?? -1;
+  // 'rescheduled' and 'report_partial' aren't journey stages — they're side states
+  // (slot moved / report partly in) — map them to the nearest real stage instead.
+  const stepStatus = status === 'rescheduled' ? 'confirmed' : status === 'report_partial' ? 'processing' : status;
+  const currentIdx = JOURNEY_IDX[stepStatus] ?? -1;
   const isCancelled = status === 'cancelled';
 
   if (isCancelled) {

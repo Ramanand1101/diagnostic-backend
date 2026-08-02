@@ -41,7 +41,7 @@ const bookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'rescheduled', 'assigned', 'collected', 'processing', 'completed', 'cancelled', 'refunded'],
+    enum: ['pending', 'confirmed', 'rescheduled', 'assigned', 'collected', 'processing', 'report_partial', 'completed', 'cancelled', 'refunded'],
     default: 'confirmed'
   },
   paymentMethod: { type: String, enum: ['online', 'cash', 'guest'], default: 'online' },

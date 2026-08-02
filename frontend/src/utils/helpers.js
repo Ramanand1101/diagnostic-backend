@@ -17,6 +17,7 @@ export const statusColor = (status) => {
     assigned: 'bg-purple-100 text-purple-800',
     collected: 'bg-secondary-100 text-secondary-800',
     processing: 'bg-secondary-100 text-secondary-700',
+    report_partial: 'bg-amber-100 text-amber-800',
     completed: 'bg-green-100 text-green-800',
     cancelled: 'bg-accent-100 text-accent-700',
     refunded: 'bg-gray-100 text-gray-700',

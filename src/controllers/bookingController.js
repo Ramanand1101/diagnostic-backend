@@ -414,7 +414,16 @@ exports.getBooking = asyncHandler(async (req, res) => {
   res.json(booking);
 });
 
+// 'completed' and 'report_partial' are report-driven, not manually settable — they
+// only ever get set by reportController#uploadReport or bookingController#markReportDone,
+// based on the actual reportStatus. Manually forcing 'completed' here would let a
+// booking show as done with no report ever uploaded.
+const REPORT_DRIVEN_STATUSES = ['completed', 'report_partial'];
+
 exports.updateBookingStatus = asyncHandler(async (req, res) => {
+  if (REPORT_DRIVEN_STATUSES.includes(req.body.status)) {
+    return res.status(400).json({ message: 'This status is set automatically when a report is uploaded — it can\'t be set manually. Upload the report instead.' });
+  }
   const update = { status: req.body.status };
   if (req.body.status === 'cancelled') {
     update.cancelledBy = req.user._id;
@@ -469,11 +478,12 @@ exports.updateBooking = asyncHandler(async (req, res) => {
 
     // A real reschedule — the date or time actually changing — flips the status so
     // it's visible in the Bookings list, distinct from a same-slot edit (e.g. notes
-    // only). Skip for terminal states, where "rescheduled" wouldn't make sense.
+    // only). Only cancelled/refunded are truly terminal — even a completed booking can
+    // be rescheduled (e.g. a redo is needed after the fact).
     const oldDateKey = existing.slotDate ? new Date(existing.slotDate).toISOString().slice(0, 10) : null;
     const newDateKey = new Date(slotDate).toISOString().slice(0, 10);
     const dateOrTimeChanged = oldDateKey !== newDateKey || (slotTime !== undefined && slotTime !== existing.slotTime);
-    if (dateOrTimeChanged && !['cancelled', 'refunded', 'completed'].includes(existing.status)) {
+    if (dateOrTimeChanged && !['cancelled', 'refunded'].includes(existing.status)) {
       update.status = 'rescheduled';
     }
 

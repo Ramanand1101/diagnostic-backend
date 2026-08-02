@@ -473,6 +473,11 @@ function AdminBookingsPageContent() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
+  // 'completed' and 'report_partial' are report-driven (see reportController#uploadReport
+  // / bookingController#markReportDone) — excluded here since the backend now rejects
+  // manually setting them, so offering them in this dropdown would just error on save.
+  const manualStatuses = ['pending', 'confirmed', 'rescheduled', 'assigned', 'collected', 'processing', 'cancelled', 'refunded'];
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -583,7 +588,7 @@ function AdminBookingsPageContent() {
         {viewBooking && (
           <BookingDetailModal
             booking={viewBooking}
-            statuses={statuses}
+            statuses={manualStatuses}
             onClose={() => setViewBooking(null)}
             onChanged={async () => {
               const res = await bookingApi.getById(viewBooking._id);

@@ -89,7 +89,12 @@ exports.uploadReport = asyncHandler(async (req, res) => {
 
   booking.reportStatus = type;
   booking.missingTests = type === 'partial' ? missingTests : [];
-  if (type === 'complete' && !['cancelled', 'refunded'].includes(booking.status)) booking.status = 'completed';
+  // Status now follows the report, not a manual click — 'completed' only happens once
+  // the FULL report is in; a partial upload moves it to its own visible status instead
+  // of silently leaving it on whatever stage (e.g. 'processing') it was already at.
+  if (!['cancelled', 'refunded'].includes(booking.status)) {
+    booking.status = type === 'complete' ? 'completed' : 'report_partial';
+  }
   await booking.save();
 
   if (type === 'partial' && booking.lab?.email) {
