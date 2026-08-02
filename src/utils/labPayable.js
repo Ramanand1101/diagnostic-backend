@@ -30,7 +30,12 @@ async function recomputeLabPayableForProduct(productId) {
       ? knownLabItems.reduce((sum, i) => sum + i.labPrice * i.qty, 0)
       : null;
     booking.adminProfit = booking.labPayable != null ? booking.total - booking.labPayable : null;
-    await booking.save();
+    // validateModifiedOnly: only re-validate the fields actually touched above — a
+    // plain .save() re-validates the WHOLE document, including unrelated required
+    // fields (e.g. `patient`) that older legacy bookings may be missing, which would
+    // otherwise fail this save (and, since this runs inside a product update, the
+    // whole product save) over a field this function never touches.
+    await booking.save({ validateModifiedOnly: true });
   }
 }
 
