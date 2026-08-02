@@ -306,15 +306,28 @@ export default function BillingPage() {
       )}
 
       {stats && (
-        <div className="bg-green-50 border border-green-100 rounded-2xl px-5 py-4 flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <p className="text-sm font-semibold text-green-800">Admin Profit (Price − Lab Price)</p>
-            <p className="text-xs text-green-600 mt-0.5">
-              From {stats.profitBookingCount} booking{stats.profitBookingCount !== 1 ? 's' : ''} with lab pricing configured
-              {stats.profitBookingCount < stats.totalCount ? ` — ${stats.totalCount - stats.profitBookingCount} more still need a Lab Sale Price set` : ''}
-            </p>
+        <div className="bg-white border border-gray-100 rounded-2xl px-5 py-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            Split — Customer Paid vs. Lab Payout vs. Admin Profit
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+            <div className="sm:pr-5 pb-3 sm:pb-0">
+              <p className="text-xs text-gray-500">Total Amount (Customer Paid)</p>
+              <p className="text-xl font-bold text-gray-900 mt-0.5">{fmt(stats.totalRevenue)}</p>
+            </div>
+            <div className="sm:px-5 py-3 sm:py-0">
+              <p className="text-xs text-gray-500">Total Lab Payout</p>
+              <p className="text-xl font-bold text-primary-700 mt-0.5">{fmt(stats.totalLabPayable)}</p>
+            </div>
+            <div className="sm:pl-5 pt-3 sm:pt-0">
+              <p className="text-xs text-gray-500">Admin Profit (Price − Lab Price)</p>
+              <p className="text-xl font-bold text-green-700 mt-0.5">{fmt(stats.totalAdminProfit)}</p>
+            </div>
           </div>
-          <p className="text-2xl font-bold text-green-700">{fmt(stats.totalAdminProfit)}</p>
+          <p className="text-[11px] text-gray-400 mt-3">
+            From {stats.profitBookingCount} booking{stats.profitBookingCount !== 1 ? 's' : ''} with lab pricing configured
+            {stats.profitBookingCount < stats.totalCount ? ` — ${stats.totalCount - stats.profitBookingCount} more still need a Lab Sale Price set` : ''}
+          </p>
         </div>
       )}
 

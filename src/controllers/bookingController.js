@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 const Coupon  = require('../models/Coupon');
 const Product = require('../models/Product');
@@ -293,7 +294,10 @@ exports.getStats = asyncHandler(async (req, res) => {
   // reflect exactly the same filtered set as the table underneath them, not the
   // site-wide totals, whenever a lab/date/customer/mobile filter is applied.
   const baseFilter = { isDeleted: false };
-  if (lab) baseFilter.lab = lab;
+  // Booking.aggregate()'s $match, unlike .find(), does NOT auto-cast query strings to
+  // ObjectId against the schema — an uncast string here would silently match nothing,
+  // which is exactly why every stat card went to ₹0 the moment a lab filter was applied.
+  if (lab && mongoose.isValidObjectId(lab)) baseFilter.lab = new mongoose.Types.ObjectId(lab);
   await applyDateAndCustomerFilters(baseFilter, { dateFrom, dateTo, customer, mobile });
 
   // Every money figure below should behave according to the booking's actual status —
@@ -318,7 +322,9 @@ exports.getStats = asyncHandler(async (req, res) => {
     Booking.aggregate([{ $match: baseFilter }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
     // Only bookings with a known lab price (see Booking.labPayable) — excluded rather
     // than counted as ₹0, so this stays accurate while labPrice is being rolled out.
-    Booking.aggregate([{ $match: { ...revenueFilter, adminProfit: { $ne: null } } }, { $group: { _id: null, total: { $sum: '$adminProfit' }, count: { $sum: 1 } } }]),
+    // Sums both adminProfit and labPayable in one pass — same underlying set of
+    // priced bookings, so the two figures always add up to totalRevenue together.
+    Booking.aggregate([{ $match: { ...revenueFilter, adminProfit: { $ne: null } } }, { $group: { _id: null, total: { $sum: '$adminProfit' }, labPayable: { $sum: '$labPayable' }, count: { $sum: 1 } } }]),
   ]);
 
   res.json({
@@ -331,6 +337,7 @@ exports.getStats = asyncHandler(async (req, res) => {
     thisMonthRevenue: monthAgg[0]?.total|| 0,
     thisMonthCount:   monthAgg[0]?.count|| 0,
     totalAdminProfit: profitAgg[0]?.total || 0,
+    totalLabPayable: profitAgg[0]?.labPayable || 0,
     profitBookingCount: profitAgg[0]?.count || 0,
     byPaymentMethod: payMethodAgg,
     byStatus: statusAgg,

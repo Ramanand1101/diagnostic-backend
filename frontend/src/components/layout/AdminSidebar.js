@@ -108,8 +108,10 @@ const navSections = [
 function ExpandableNavItem({ item, effectiveCollapsed, isTopActive, onCloseMobile }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [open, setOpen] = useState(isTopActive);
-  useEffect(() => { if (isTopActive) setOpen(true); }, [isTopActive]);
+  // Starts closed even when a sub-page is active — auto-expanding on every visit to
+  // Bookings pushed the rest of the sidebar (Billing, Settlements, ...) out of view.
+  // The page itself already shows which status is active; click to expand on demand.
+  const [open, setOpen] = useState(false);
 
   const currentFull = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
 
