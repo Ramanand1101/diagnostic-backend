@@ -96,6 +96,7 @@ export default function LabBillingPage() {
         paidCount:     d.paidCount,
         unpaidRevenue: d.unpaidRevenue,
         unpaidCount:   d.unpaidCount,
+        labPayoutRevenue: d.labPayoutRevenue,
       });
       setBookings(d.bookings || []);
       setTotal(d.total || 0);
@@ -208,6 +209,14 @@ export default function LabBillingPage() {
               sub={`${stats.unpaidCount} unpaid booking${stats.unpaidCount !== 1 ? 's' : ''}`}
               accent="border-l-accent-400"
             />
+          </div>
+
+          {/* "Total Revenue" above is the full customer-paid amount — this is what you
+              actually get paid, once the test-level Lab Sale Price has been configured
+              on a product (see Admin > Products). See Settlements for payout history. */}
+          <div className="bg-primary-50 border border-primary-100 rounded-xl px-4 py-3 flex items-center justify-between">
+            <span className="text-sm font-medium text-primary-800">Your Payout (your share of the above)</span>
+            <span className="text-lg font-bold text-primary-700">{formatCurrency(stats.labPayoutRevenue)}</span>
           </div>
 
           {/* Collection progress bar */}

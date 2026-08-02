@@ -107,11 +107,18 @@ exports.createBooking = asyncHandler(async (req, res) => {
   const warnings = computeBookingWarnings({ slotDate: payload.slotDate, slotTime: payload.slotTime });
 
   let subtotal = 0;
+  // Keyed by item index so the items.map(...) below (which builds the actual
+  // stored items array) doesn't have to re-fetch each Product a second time.
+  const productLabPrices = [];
 
   for (const item of items) {
     const product = item.product ? await Product.findById(item.product) : null;
     const price = item.price || (product ? (product.salePrice || product.price) : 0);
     subtotal += Number(price) * Number(item.qty || 1);
+    // Never trust a client-sent labPrice — it determines what the lab is owed,
+    // so it's always read from the Product doc, same trust boundary as the
+    // slot/patient validation above.
+    productLabPrices.push(product && product.labPrice != null ? Number(product.labPrice) : null);
   }
 
   let discount = 0;
@@ -137,17 +144,27 @@ exports.createBooking = asyncHandler(async (req, res) => {
   const tax = Number(payload.tax || 0);
   const total = subtotal - discount + tax;
 
+  const bookingItems = items.map((i, idx) => ({
+    product: i.product,
+    name: i.name,
+    qty: i.qty || 1,
+    price: i.price || 0,
+    labPrice: productLabPrices[idx],
+  }));
+  const knownLabItems = bookingItems.filter((i) => i.labPrice != null);
+  const labPayable = knownLabItems.length
+    ? knownLabItems.reduce((sum, i) => sum + i.labPrice * i.qty, 0)
+    : null;
+  const adminProfit = labPayable != null ? total - labPayable : null;
+
   const booking = await Booking.create({
     bookingNo: await nextBookingNo(),
     user: user._id,
     guest: payload.guest,
     lab: payload.lab,
-    items: items.map((i) => ({
-      product: i.product,
-      name: i.name,
-      qty: i.qty || 1,
-      price: i.price || 0
-    })),
+    items: bookingItems,
+    labPayable,
+    adminProfit,
     patient: patient._id,
     patientSnapshot: { name: patient.name, age: patient.age, gender: patient.gender, relation: patient.relation },
     slotDate: payload.slotDate,
@@ -271,13 +288,16 @@ exports.getStats = asyncHandler(async (req, res) => {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [allAgg, paidAgg, unpaidAgg, monthAgg, payMethodAgg, statusAgg] = await Promise.all([
+  const [allAgg, paidAgg, unpaidAgg, monthAgg, payMethodAgg, statusAgg, profitAgg] = await Promise.all([
     Booking.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
     Booking.aggregate([{ $match: { isDeleted: false, paymentStatus: 'paid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
     Booking.aggregate([{ $match: { isDeleted: false, paymentStatus: 'unpaid' } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
     Booking.aggregate([{ $match: { isDeleted: false, createdAt: { $gte: monthStart } } }, { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }]),
     Booking.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$total' } } }]),
     Booking.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    // Only bookings with a known lab price (see Booking.labPayable) — excluded rather
+    // than counted as ₹0, so this stays accurate while labPrice is being rolled out.
+    Booking.aggregate([{ $match: { isDeleted: false, adminProfit: { $ne: null } } }, { $group: { _id: null, total: { $sum: '$adminProfit' }, count: { $sum: 1 } } }]),
   ]);
 
   res.json({
@@ -289,17 +309,26 @@ exports.getStats = asyncHandler(async (req, res) => {
     unpaidCount:    unpaidAgg[0]?.count|| 0,
     thisMonthRevenue: monthAgg[0]?.total|| 0,
     thisMonthCount:   monthAgg[0]?.count|| 0,
+    totalAdminProfit: profitAgg[0]?.total || 0,
+    profitBookingCount: profitAgg[0]?.count || 0,
     byPaymentMethod: payMethodAgg,
     byStatus: statusAgg,
   });
 });
 
+const BOOKING_SORT_FIELDS = ['createdAt', 'total', 'bookingNo', 'status', 'paymentStatus'];
+
 exports.listBookings = asyncHandler(async (req, res) => {
-  const { status, lab, q, deleted, page = 1, limit = 20 } = req.query;
+  const { status, lab, q, deleted, page = 1, limit = 20, dateFrom, dateTo, customer, mobile, sortBy, sortOrder } = req.query;
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const filter = { isDeleted: deleted === 'true' };
   if (status) filter.status = status;
   if (q) filter.bookingNo = new RegExp(q, 'i');
+  if (dateFrom || dateTo) {
+    filter.createdAt = {};
+    if (dateFrom) filter.createdAt.$gte = new Date(dateFrom + 'T00:00:00.000Z');
+    if (dateTo)   filter.createdAt.$lte = new Date(dateTo   + 'T23:59:59.999Z');
+  }
 
   if (req.user.role === 'lab') {
     const Lab = require('../models/Lab');
@@ -314,8 +343,30 @@ exports.listBookings = asyncHandler(async (req, res) => {
     filter.user = req.user._id;
   }
 
+  // Customer name / mobile search — Mongoose can't regex-match a populated field in
+  // one query, so registered users are matched via a two-step lookup (same pattern as
+  // labCrmController.js#patientList), then OR'd with a direct match on guest checkouts
+  // (booking.guest.{name,mobile}) since those never have a User document at all.
+  if (customer || mobile) {
+    const User = require('../models/User');
+    const userFilter = {};
+    if (customer) userFilter.name = new RegExp(customer, 'i');
+    if (mobile)   userFilter.mobile = new RegExp(mobile, 'i');
+    const matchingUsers = await User.find(userFilter).select('_id').lean();
+    const userIds = matchingUsers.map((u) => u._id);
+
+    const guestOr = [];
+    if (customer) guestOr.push({ 'guest.name': new RegExp(customer, 'i') });
+    if (mobile)   guestOr.push({ 'guest.mobile': new RegExp(mobile, 'i') });
+
+    filter.$or = [{ user: { $in: userIds } }, ...guestOr];
+  }
+
+  const sortField = BOOKING_SORT_FIELDS.includes(sortBy) ? sortBy : 'createdAt';
+  const sortDir = sortOrder === 'asc' ? 1 : -1;
+
   const skip = (Number(page) - 1) * safeLimit;
-  const items = await Booking.find(filter).populate('user lab items.product patient').sort('-createdAt').skip(skip).limit(safeLimit);
+  const items = await Booking.find(filter).populate('user lab items.product patient').sort({ [sortField]: sortDir }).skip(skip).limit(safeLimit);
   const total = await Booking.countDocuments(filter);
   res.json({ items, page: Number(page), limit: safeLimit, total });
 });
@@ -367,8 +418,26 @@ exports.updateBooking = asyncHandler(async (req, res) => {
   if (slotDate !== undefined) update.slotDate = slotDate;
   if (slotTime !== undefined) update.slotTime = slotTime;
   if (lab !== undefined) update.lab = lab;
-  if (items !== undefined) update.items = items;
   if (notes !== undefined) update.notes = notes;
+
+  // Items replaced → re-snapshot labPrice from each Product (never trust the client
+  // for this, same as createBooking) and recompute the settlement figures so they
+  // don't go stale against the new item list.
+  if (items !== undefined) {
+    const existingForTotal = await Booking.findById(req.params.id).select('total');
+    if (!existingForTotal) return res.status(404).json({ message: 'Booking not found' });
+    const withLabPrice = await Promise.all(items.map(async (i) => {
+      const product = i.product ? await Product.findById(i.product).select('labPrice') : null;
+      return { ...i, labPrice: product && product.labPrice != null ? Number(product.labPrice) : null };
+    }));
+    const knownLabItems = withLabPrice.filter((i) => i.labPrice != null);
+    const labPayable = knownLabItems.length
+      ? knownLabItems.reduce((sum, i) => sum + i.labPrice * (i.qty || 1), 0)
+      : null;
+    update.items = withLabPrice;
+    update.labPayable = labPayable;
+    update.adminProfit = labPayable != null ? existingForTotal.total - labPayable : null;
+  }
 
   if (slotDate) {
     const Lab = require('../models/Lab');

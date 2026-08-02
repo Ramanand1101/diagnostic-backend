@@ -376,6 +376,17 @@ export const labCrmApi = {
   billing: (params) => api.get('/lab-crm/billing', { params }),
   patientList: (params) => api.get('/lab-crm/patients', { params }),
   patientDetail: (id) => api.get(`/lab-crm/patients/${id}`),
+  settlements: (params) => api.get('/lab-crm/settlements', { params }),
+};
+
+// Lab Settlements (admin — pays labs their share of paid bookings)
+export const settlementApi = {
+  preview: (params) => api.get('/settlements/preview', { params }),
+  getAll: (params) => api.get('/settlements', { params }),
+  getOne: (id) => api.get(`/settlements/${id}`),
+  generate: (data) => api.post('/settlements', data),
+  updateStatus: (id, data) => api.patch(`/settlements/${id}/status`, data),
+  exportCsv: (params) => api.get('/settlements/export-csv', { params, responseType: 'blob' }),
 };
 
 // CRM

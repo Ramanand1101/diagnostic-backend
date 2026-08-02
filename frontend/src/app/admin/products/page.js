@@ -19,6 +19,7 @@ function ProductForm({ initial, labs, onSave, onClose }) {
     price: initial?.price || '',
     salePrice: initial?.salePrice || '',
     discountPercent: initial?.discountPercent || '',
+    labPrice: initial?.labPrice ?? '',
     isActive: initial?.isActive ?? true,
     isFeatured: initial?.isFeatured || false,
   });
@@ -78,6 +79,7 @@ function ProductForm({ initial, labs, onSave, onClose }) {
         price:      form.price       ? Number(form.price)       : undefined,
         salePrice:  form.salePrice   ? Number(form.salePrice)   : undefined,
         discountPercent: form.discountPercent ? Number(form.discountPercent) : undefined,
+        labPrice:   form.labPrice !== '' ? Number(form.labPrice) : null,
         isActive:   form.isActive,
         isFeatured: form.isFeatured,
       };
@@ -225,6 +227,15 @@ function ProductForm({ initial, labs, onSave, onClose }) {
             ✓ Customer saves ₹{Number(form.price) - Number(form.salePrice)} ({form.discountPercent}% off)
           </div>
         )}
+        <div className="col-span-2 pt-2 border-t border-gray-100">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Lab Sale Price (₹)</label>
+          <input type="number" min="0" value={form.labPrice}
+            onChange={(e) => setForm({ ...form, labPrice: e.target.value })}
+            className="input max-w-xs" placeholder="e.g. 250" />
+          <p className="text-xs text-gray-400 mt-1">
+            What this lab is paid per booking of this test — kept separate from the customer-facing price above. Admin profit = Price − Lab Price.
+          </p>
+        </div>
         <div className="col-span-2 flex flex-wrap gap-4">
           {[{ key: 'isActive', label: 'Active' }, { key: 'isFeatured', label: 'Featured' }].map(({ key, label }) => (
             <label key={key} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
@@ -651,6 +662,7 @@ export default function AdminProductsPage() {
                   <th className="table-header">Type</th>
                   <th className="table-header">Lab</th>
                   <th className="table-header">Price</th>
+                  <th className="table-header">Lab Price</th>
                   <th className="table-header">Status</th>
                   <th className="table-header">Actions</th>
                 </tr>
@@ -666,6 +678,11 @@ export default function AdminProductsPage() {
                     <td className="table-cell">{p.lab?.name || '-'}</td>
                     <td className="table-cell">{formatCurrency(p.salePrice || p.price)}</td>
                     <td className="table-cell">
+                      {p.labPrice != null
+                        ? formatCurrency(p.labPrice)
+                        : <span className="badge text-xs bg-amber-50 text-amber-700">Not set</span>}
+                    </td>
+                    <td className="table-cell">
                       <span className={`badge text-xs ${p.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                         {p.isActive ? 'Active' : 'Inactive'}
                       </span>
@@ -679,7 +696,7 @@ export default function AdminProductsPage() {
                   </tr>
                 ))}
                 {products.length === 0 && (
-                  <tr><td colSpan={7} className="table-cell text-center text-gray-400 py-10">No products found</td></tr>
+                  <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-10">No products found</td></tr>
                 )}
               </tbody>
             </table>

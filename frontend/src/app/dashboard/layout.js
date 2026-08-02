@@ -23,6 +23,7 @@ const labNav = [
   { href: '/dashboard/lab/products', label: 'Tests & Packages', icon: FiPackage },
   { href: '/dashboard/lab/bookings', label: 'Bookings', icon: FiCalendar },
   { href: '/dashboard/lab/billing', label: 'Billing', icon: FiDollarSign },
+  { href: '/dashboard/lab/settlements', label: 'Settlements', icon: FiDollarSign },
   { label: '── CRM ──', divider: true },
   { href: '/dashboard/lab/crm', label: 'CRM Dashboard', icon: FiActivity },
   { href: '/dashboard/lab/crm/patients', label: 'Patients', icon: FiUsers },

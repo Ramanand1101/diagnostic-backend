@@ -1,10 +1,12 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { bookingApi } from '@/lib/api';
+import { bookingApi, labApi } from '@/lib/api';
 import { formatDate, formatCurrency, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Badge from '@/components/ui/Badge';
+import BookingFilterBar from '@/components/ui/BookingFilterBar';
+import SortableTh from '@/components/ui/SortableTh';
 import toast from 'react-hot-toast';
 import {
   FiDollarSign, FiCheckCircle, FiClock, FiTrendingUp,
@@ -211,6 +213,10 @@ export default function BillingPage() {
   const [q, setQ] = useState('');
   const [limit] = useState(20);
   const [invoiceBooking, setInvoiceBooking] = useState(null);
+  const [labs, setLabs] = useState([]);
+  const [filters, setFilters] = useState({ lab: '', datePreset: '', dateFrom: '', dateTo: '', customer: '', mobile: '' });
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
   const searchTimer = useRef(null);
 
   // Fetch stats once
@@ -220,10 +226,20 @@ export default function BillingPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => { labApi.getAll({ limit: 200 }).then((r) => setLabs(r.data.items || [])); }, []);
+
   // Fetch paginated bookings
   const fetchBookings = useCallback(() => {
     setLoading(true);
-    const params = { page, limit, q: q || undefined, deleted: 'false' };
+    const params = {
+      page, limit, q: q || undefined, deleted: 'false',
+      lab: filters.lab || undefined,
+      dateFrom: filters.dateFrom || undefined,
+      dateTo: filters.dateTo || undefined,
+      customer: filters.customer || undefined,
+      mobile: filters.mobile || undefined,
+      sortBy, sortOrder,
+    };
     if (payFilter) params.paymentStatus = payFilter;
     bookingApi.getAll(params)
       .then((res) => {
@@ -231,9 +247,12 @@ export default function BillingPage() {
         setTotal(res.data.total || 0);
       })
       .finally(() => setLoading(false));
-  }, [page, limit, payFilter, q]);
+  }, [page, limit, payFilter, q, filters, sortBy, sortOrder]);
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
+
+  const handleFilterChange = (next) => { setFilters(next); setPage(1); };
+  const handleSort = (field, order) => { setSortBy(field); setSortOrder(order); setPage(1); };
 
   const handleSearch = (e) => {
     clearTimeout(searchTimer.current);
@@ -276,6 +295,19 @@ export default function BillingPage() {
         </div>
       )}
 
+      {stats && (
+        <div className="bg-green-50 border border-green-100 rounded-2xl px-5 py-4 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <p className="text-sm font-semibold text-green-800">Admin Profit (Price − Lab Price)</p>
+            <p className="text-xs text-green-600 mt-0.5">
+              From {stats.profitBookingCount} booking{stats.profitBookingCount !== 1 ? 's' : ''} with lab pricing configured
+              {stats.profitBookingCount < stats.totalCount ? ` — ${stats.totalCount - stats.profitBookingCount} more still need a Lab Sale Price set` : ''}
+            </p>
+          </div>
+          <p className="text-2xl font-bold text-green-700">{fmt(stats.totalAdminProfit)}</p>
+        </div>
+      )}
+
       {/* Payment method breakdown */}
       {stats?.byPaymentMethod?.length > 0 && (
         <div className="bg-white border border-gray-100 rounded-2xl p-5">
@@ -311,6 +343,8 @@ export default function BillingPage() {
         </div>
       </div>
 
+      <BookingFilterBar value={filters} onChange={handleFilterChange} labs={labs} />
+
       {/* Bookings table */}
       {loading ? <PageLoader /> : (
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
@@ -318,13 +352,13 @@ export default function BillingPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th className="table-header">Booking #</th>
+                  <SortableTh field="bookingNo" label="Booking #" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
                   <th className="table-header">Customer</th>
                   <th className="table-header">Lab</th>
-                  <th className="table-header">Date</th>
-                  <th className="table-header">Status</th>
-                  <th className="table-header">Payment</th>
-                  <th className="table-header text-right">Amount</th>
+                  <SortableTh field="createdAt" label="Date" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                  <SortableTh field="status" label="Status" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                  <SortableTh field="paymentStatus" label="Payment" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                  <SortableTh field="total" label="Amount" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} align="right" />
                   <th className="table-header">Invoice</th>
                 </tr>
               </thead>

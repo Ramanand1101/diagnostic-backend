@@ -14,6 +14,10 @@ const productSchema = new mongoose.Schema({
   price:           { type: Number, default: 0 },
   salePrice:       Number,
   discountPercent: Number,
+  // What the lab is paid per unit for this test — separate from price/salePrice
+  // (what the customer pays). null = admin hasn't configured this product's lab
+  // payout yet; kept distinct from 0 so reporting can tell "unknown" from "free".
+  labPrice:        { type: Number, default: null },
 
   // ── Optional overrides / extras per product ───────────────────────────────
   brand:           String,

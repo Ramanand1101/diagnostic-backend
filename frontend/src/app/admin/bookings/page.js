@@ -1,11 +1,13 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { bookingApi, reportApi } from '@/lib/api';
+import { bookingApi, reportApi, labApi } from '@/lib/api';
 import { formatDate, formatCurrency, getErrorMessage } from '@/utils/helpers';
 import { PageLoader } from '@/components/ui/Spinner';
 import Pagination from '@/components/ui/Pagination';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
+import BookingFilterBar from '@/components/ui/BookingFilterBar';
+import SortableTh from '@/components/ui/SortableTh';
 import toast from 'react-hot-toast';
 import { FiEye, FiSearch, FiEdit, FiTrash2, FiRotateCcw, FiMapPin, FiCalendar, FiClock, FiFileText, FiDownload, FiUploadCloud, FiMail } from 'react-icons/fi';
 
@@ -398,11 +400,25 @@ export default function AdminBookingsPage() {
   const [viewBooking, setViewBooking] = useState(null);
   const [editBooking, setEditBooking] = useState(null);
   const [limit, setLimit] = useState(20);
+  const [labs, setLabs] = useState([]);
+  const [filters, setFilters] = useState({ lab: '', datePreset: '', dateFrom: '', dateTo: '', customer: '', mobile: '' });
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
   const searchTimer = useRef(null);
+
+  useEffect(() => { labApi.getAll({ limit: 200 }).then((r) => setLabs(r.data.items || [])); }, []);
 
   const fetchBookings = useCallback(() => {
     setLoading(true);
-    const params = { page, limit, q: q || undefined, deleted: showDeleted ? 'true' : undefined };
+    const params = {
+      page, limit, q: q || undefined, deleted: showDeleted ? 'true' : undefined,
+      lab: filters.lab || undefined,
+      dateFrom: filters.dateFrom || undefined,
+      dateTo: filters.dateTo || undefined,
+      customer: filters.customer || undefined,
+      mobile: filters.mobile || undefined,
+      sortBy, sortOrder,
+    };
     if (statusFilter && !showDeleted) params.status = statusFilter;
     bookingApi.getAll(params)
       .then((res) => {
@@ -410,9 +426,12 @@ export default function AdminBookingsPage() {
         setTotal(res.data.total || 0);
       })
       .finally(() => setLoading(false));
-  }, [page, limit, statusFilter, q, showDeleted]);
+  }, [page, limit, statusFilter, q, showDeleted, filters, sortBy, sortOrder]);
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
+
+  const handleFilterChange = (next) => { setFilters(next); setPage(1); };
+  const handleSort = (field, order) => { setSortBy(field); setSortOrder(order); setPage(1); };
 
   const handleSearchChange = (e) => {
     clearTimeout(searchTimer.current);
@@ -465,6 +484,9 @@ export default function AdminBookingsPage() {
         />
       </div>
 
+      {/* Lab / date / customer / mobile filters */}
+      <BookingFilterBar value={filters} onChange={handleFilterChange} labs={labs} />
+
       {/* Status/Deleted filter tabs */}
       <div className="flex flex-wrap gap-2">
         <button onClick={() => { setShowDeleted(false); setStatusFilter(''); setPage(1); }}
@@ -494,13 +516,13 @@ export default function AdminBookingsPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th className="table-header">Booking #</th>
+                  <SortableTh field="bookingNo" label="Booking #" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
                   <th className="table-header">Patient</th>
                   <th className="table-header">Lab</th>
-                  <th className="table-header">Date &amp; Time</th>
-                  <th className="table-header">Status</th>
-                  <th className="table-header">Payment</th>
-                  <th className="table-header">Total</th>
+                  <SortableTh field="createdAt" label="Date & Time" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                  <SortableTh field="status" label="Status" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                  <SortableTh field="paymentStatus" label="Payment" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                  <SortableTh field="total" label="Total" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} align="right" />
                   <th className="table-header">Actions</th>
                 </tr>
               </thead>

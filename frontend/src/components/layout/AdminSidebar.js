@@ -56,6 +56,7 @@ const navSections = [
     items: [
       { href: '/admin/bookings',    label: 'Bookings',            icon: FiCalendar,   permission: 'bookings' },
       { href: '/admin/billing',     label: 'Billing',             icon: FiDollarSign, permission: 'bookings' },
+      { href: '/admin/settlements', label: 'Lab Settlements',     icon: FiDollarSign, permission: 'settlements' },
       { href: '/admin/reports',     label: 'Reports',             icon: FiFileText,   permission: 'reports' },
       { href: '/admin/lab-changes', label: 'Lab Profile Changes', icon: FiFilePlus,   permission: 'lab-changes' },
       { href: '/admin/users',       label: 'Users',               icon: FiUsers,      permission: 'users' },

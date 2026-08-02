@@ -1183,6 +1183,14 @@ export default function CartPage() {
   const { user } = useAuth();
 
   const [step, setStep] = useState('cart'); // 'cart' | 'payment' | 'success'
+
+  // Each step swaps in a whole new screen on the same URL (no navigation), so the
+  // browser keeps whatever scroll offset the user was at on the previous screen —
+  // e.g. payment used to open mid-page if the booking form had been scrolled down.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [step]);
+
   const [paymentMeta, setPaymentMeta] = useState(null); // { form, activeUser }
   const [confirmedBookings, setConfirmedBookings] = useState([]);
   const [animConfig, setAnimConfig] = useState(null);   // null = not loaded

@@ -4,6 +4,7 @@ const Booking = require('../models/Booking');
 const Report = require('../models/Report');
 const Lead = require('../models/Lead');
 const FollowUp = require('../models/FollowUp');
+const Settlement = require('../models/Settlement');
 
 // Helper: get lab by owner
 const getLabByOwner = async (userId) => Lab.findOne({ owners: userId });
@@ -136,7 +137,7 @@ exports.billing = async (req, res) => {
     const listFilter = { ...baseFilter };
     if (paymentStatus) listFilter.paymentStatus = paymentStatus;
 
-    const [totalAgg, paidAgg, bookings, count] = await Promise.all([
+    const [totalAgg, paidAgg, payoutAgg, bookings, count] = await Promise.all([
       Booking.aggregate([
         { $match: baseFilter },
         { $group: { _id: null, revenue: { $sum: '$total' }, count: { $sum: 1 } } },
@@ -144,6 +145,12 @@ exports.billing = async (req, res) => {
       Booking.aggregate([
         { $match: { ...baseFilter, paymentStatus: 'paid' } },
         { $group: { _id: null, revenue: { $sum: '$total' }, count: { $sum: 1 } } },
+      ]),
+      // "Your Payout" — the lab's own cut, not the full customer-paid amount above.
+      // Only counts bookings with a known lab price (see Booking.labPayable).
+      Booking.aggregate([
+        { $match: { ...baseFilter, paymentStatus: 'paid', labPayable: { $ne: null } } },
+        { $group: { _id: null, payout: { $sum: '$labPayable' } } },
       ]),
       Booking.find(listFilter)
         .sort({ createdAt: -1 })
@@ -164,8 +171,50 @@ exports.billing = async (req, res) => {
       paidRevenue,  paidCount,
       unpaidRevenue: totalRevenue - paidRevenue,
       unpaidCount:   bookingCount - paidCount,
+      labPayoutRevenue: payoutAgg[0]?.payout || 0,
       bookings, total: count,
       page: Number(page), limit: safeLimit,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/v1/lab-crm/settlements — read-only history of settlements admin has
+// generated for this lab, plus a running earnings/settled/pending summary.
+exports.settlements = async (req, res) => {
+  try {
+    const lab = await getLabByOwner(req.user._id);
+    if (!lab) return res.status(404).json({ message: 'Lab not found' });
+
+    const { page = 1, limit = 20, status } = req.query;
+    const safeLimit = Math.min(Number(limit) || 20, 200);
+    const skip = (Number(page) - 1) * safeLimit;
+
+    const filter = { lab: lab._id };
+    if (status) filter.status = status;
+
+    const [items, total, earningsAgg, settledAgg] = await Promise.all([
+      Settlement.find(filter).sort('-createdAt').skip(skip).limit(safeLimit),
+      Settlement.countDocuments(filter),
+      // Total ever earned, regardless of whether it's been batched into a settlement yet.
+      Booking.aggregate([
+        { $match: { lab: lab._id, isDeleted: false, paymentStatus: 'paid', labPayable: { $ne: null } } },
+        { $group: { _id: null, total: { $sum: '$labPayable' } } },
+      ]),
+      Settlement.aggregate([
+        { $match: { lab: lab._id } },
+        { $group: { _id: null, paid: { $sum: '$amountPaid' } } },
+      ]),
+    ]);
+
+    const totalEarnings = earningsAgg[0]?.total || 0;
+    const settledAmount = settledAgg[0]?.paid || 0;
+
+    res.json({
+      items, total, page: Number(page), limit: safeLimit,
+      totalEarnings, settledAmount,
+      pendingAmount: totalEarnings - settledAmount,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

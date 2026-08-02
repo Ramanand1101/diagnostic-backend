@@ -373,6 +373,7 @@ const PERMISSION_MODULES = [
   { key: 'bulk-upload',   label: 'Bulk Upload' },
   { key: 'crm',           label: 'CRM' },
   { key: 'bookings',      label: 'Bookings' },
+  { key: 'settlements',   label: 'Lab Settlements' },
   { key: 'reports',       label: 'Reports' },
   { key: 'lab-changes',   label: 'Lab Profile Changes' },
   { key: 'lab-holidays',  label: 'Lab Holiday Management' },

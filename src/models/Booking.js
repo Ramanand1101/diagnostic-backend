@@ -13,7 +13,10 @@ const bookingSchema = new mongoose.Schema({
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     name: String,
     qty: { type: Number, default: 1 },
-    price: Number
+    price: Number,
+    // Lab payout snapshot, taken from Product.labPrice at booking time — null if
+    // that product had no lab price configured yet (see labPayable/adminProfit below).
+    labPrice: { type: Number, default: null },
   }],
   // Who the tests in this booking are for — always exactly one person (the customer
   // themselves or a family member); mixed-patient carts create one Booking per patient.
@@ -47,6 +50,12 @@ const bookingSchema = new mongoose.Schema({
   discount: Number,
   tax: Number,
   total: Number,
+  // Lab settlement fields — null (not 0) when unknown, so reporting can exclude
+  // rather than misreport bookings placed before/against unpriced products.
+  labPayable:  { type: Number, default: null },  // Σ(item.labPrice * item.qty) across priced items
+  adminProfit: { type: Number, default: null },  // total - labPayable, only set when labPayable is known
+  settlementStatus: { type: String, enum: ['unsettled', 'settled'], default: 'unsettled', index: true },
+  settlement: { type: mongoose.Schema.Types.ObjectId, ref: 'Settlement', default: null, index: true },
   coupon: String,
   notes: String,
   prescriptionUrl: String,
@@ -68,5 +77,6 @@ bookingSchema.index({ lab:  1, isDeleted: 1, createdAt: -1 });
 bookingSchema.index({ lab:  1, slotDate:  1 });
 bookingSchema.index({ status: 1, createdAt: -1 });
 bookingSchema.index({ paymentStatus: 1, createdAt: -1 });
+bookingSchema.index({ lab: 1, settlementStatus: 1, paymentStatus: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Booking', bookingSchema);
