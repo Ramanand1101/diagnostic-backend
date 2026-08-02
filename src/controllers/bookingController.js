@@ -414,15 +414,24 @@ exports.getBooking = asyncHandler(async (req, res) => {
   res.json(booking);
 });
 
-// 'completed' and 'report_partial' are report-driven, not manually settable — they
-// only ever get set by reportController#uploadReport or bookingController#markReportDone,
-// based on the actual reportStatus. Manually forcing 'completed' here would let a
-// booking show as done with no report ever uploaded.
-const REPORT_DRIVEN_STATUSES = ['completed', 'report_partial'];
+// These three are never manually settable via this generic endpoint — each has its own
+// flow that carries the data actually backing the status change, so a bare status flip
+// here can't silently fake it:
+//  - 'rescheduled' only comes from updateBooking (Edit/Reschedule), which requires an
+//    actual new slotDate/slotTime — setting it here would show "rescheduled" with no
+//    slot change at all.
+//  - 'completed'/'report_partial' only come from reportController#uploadReport or
+//    bookingController#markReportDone, based on the actual reportStatus.
+const SYSTEM_DRIVEN_STATUSES = ['rescheduled', 'completed', 'report_partial'];
+const SYSTEM_DRIVEN_MESSAGE = {
+  rescheduled: 'This status is set automatically when the date/time is actually changed — use "Reschedule" and pick a new slot instead.',
+  completed: 'This status is set automatically when a report is uploaded — it can\'t be set manually. Upload the report instead.',
+  report_partial: 'This status is set automatically when a report is uploaded — it can\'t be set manually. Upload the report instead.',
+};
 
 exports.updateBookingStatus = asyncHandler(async (req, res) => {
-  if (REPORT_DRIVEN_STATUSES.includes(req.body.status)) {
-    return res.status(400).json({ message: 'This status is set automatically when a report is uploaded — it can\'t be set manually. Upload the report instead.' });
+  if (SYSTEM_DRIVEN_STATUSES.includes(req.body.status)) {
+    return res.status(400).json({ message: SYSTEM_DRIVEN_MESSAGE[req.body.status] });
   }
   const update = { status: req.body.status };
   if (req.body.status === 'cancelled') {

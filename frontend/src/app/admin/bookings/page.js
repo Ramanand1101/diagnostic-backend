@@ -473,10 +473,11 @@ function AdminBookingsPageContent() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
-  // 'completed' and 'report_partial' are report-driven (see reportController#uploadReport
-  // / bookingController#markReportDone) — excluded here since the backend now rejects
-  // manually setting them, so offering them in this dropdown would just error on save.
-  const manualStatuses = ['pending', 'confirmed', 'rescheduled', 'assigned', 'collected', 'processing', 'cancelled', 'refunded'];
+  // 'rescheduled' (only set by the actual Edit/Reschedule flow, which requires a real
+  // date/time change), 'completed' and 'report_partial' (only set by report upload) are
+  // excluded here — the backend now rejects setting any of them through this generic
+  // dropdown, so offering them would just error on save.
+  const manualStatuses = ['pending', 'confirmed', 'assigned', 'collected', 'processing', 'cancelled', 'refunded'];
 
   return (
     <div className="space-y-5">
