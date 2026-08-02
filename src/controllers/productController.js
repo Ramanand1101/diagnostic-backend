@@ -6,6 +6,7 @@ const makeSlug   = require('../utils/slug');
 const { parseCSV } = require('../utils/csvParser');
 const { resolveLabIdsForLocation } = require('../utils/geoLabs');
 const { filterAvailableProducts } = require('../utils/testAvailability');
+const { recomputeLabPayableForProduct } = require('../utils/labPayable');
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -159,24 +160,39 @@ exports.createProduct = asyncHandler(async (req, res) => {
 });
 
 exports.updateProduct = asyncHandler(async (req, res) => {
+  const existing = await Product.findById(req.params.id).select('lab name slug');
+  if (!existing) return res.status(404).json({ message: 'Product not found' });
+
   // Lab role: guard to own lab only
   if (req.user.role === 'lab') {
     const Lab = require('../models/Lab');
     const myLab = await Lab.findOne({ owners: req.user._id });
-    if (!myLab) return res.status(403).json({ message: 'No lab found for this user' });
-    const existing = await Product.findOne({ _id: req.params.id, lab: myLab._id });
-    if (!existing) return res.status(403).json({ message: 'Not your product' });
+    if (!myLab || String(existing.lab) !== String(myLab._id)) {
+      return res.status(403).json({ message: 'Not your product' });
+    }
   }
 
   const tmData  = await resolveTestMaster(req.body.testMaster);
   const payload = { ...req.body, ...tmData };
-  if (payload.name && !payload.slug) payload.slug = makeSlug(payload.name);
+  // Only regenerate the slug when the name is actually changing and no explicit slug
+  // was given — the form always resubmits `name` even on unrelated edits (e.g. just
+  // setting a price), so regenerating unconditionally here previously dropped the
+  // lab-specific suffix that createProduct adds, letting two labs' identically-named
+  // tests collide on the unique slug index.
+  if (payload.name && payload.name !== existing.name && !payload.slug) {
+    const labId = payload.lab || existing.lab;
+    const labSuffix = labId ? String(labId).slice(-6) : Date.now().toString().slice(-6);
+    payload.slug = makeSlug(`${payload.name}-${labSuffix}`);
+  }
 
   const product = await Product.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true })
     .populate(TM_POPULATE)
     .populate('lab', LAB_SELECT);
   if (!product) return res.status(404).json({ message: 'Product not found' });
   try { await syncObjects('products', [toAlgoliaRecord(product)]); } catch {}
+  if (payload.labPrice !== undefined) {
+    await recomputeLabPayableForProduct(product._id);
+  }
   res.json(product);
 });
 
