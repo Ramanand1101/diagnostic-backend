@@ -252,6 +252,7 @@ export const productApi = {
 export const bookingApi = {
   create: (data) => api.post('/bookings', data),
   getStats: (params) => api.get('/bookings/stats', { params }),
+  exportCsv: (params) => api.get('/bookings/export-csv', { params, responseType: 'blob' }),
   getAll: (params) => api.get('/bookings', { params }),
   getById: (id) => api.get(`/bookings/${id}`),
   updateStatus: (id, data) => api.patch(`/bookings/${id}/status`, data),

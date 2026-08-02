@@ -377,10 +377,11 @@ async function applyDateAndCustomerFilters(filter, { dateFrom, dateTo, customer,
 }
 
 exports.listBookings = asyncHandler(async (req, res) => {
-  const { status, lab, q, deleted, page = 1, limit = 20, dateFrom, dateTo, customer, mobile, sortBy, sortOrder } = req.query;
+  const { status, paymentStatus, lab, q, deleted, page = 1, limit = 20, dateFrom, dateTo, customer, mobile, sortBy, sortOrder } = req.query;
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const filter = { isDeleted: deleted === 'true' };
   if (status) filter.status = status;
+  if (paymentStatus) filter.paymentStatus = paymentStatus;
   if (q) filter.bookingNo = new RegExp(q, 'i');
 
   if (req.user.role === 'lab') {
@@ -405,6 +406,54 @@ exports.listBookings = asyncHandler(async (req, res) => {
   const items = await Booking.find(filter).populate('user lab items.product patient').sort({ [sortField]: sortDir }).skip(skip).limit(safeLimit);
   const total = await Booking.countDocuments(filter);
   res.json({ items, page: Number(page), limit: safeLimit, total });
+});
+
+// GET /api/v1/bookings/export-csv — same filters as listBookings (admin/subadmin only,
+// via allowModule('bookings','view') on the route), but every matching row (up to 10k)
+// instead of one page.
+exports.exportCsv = asyncHandler(async (req, res) => {
+  const { status, paymentStatus, lab, q, deleted, dateFrom, dateTo, customer, mobile, sortBy, sortOrder } = req.query;
+  const filter = { isDeleted: deleted === 'true' };
+  if (status) filter.status = status;
+  if (paymentStatus) filter.paymentStatus = paymentStatus;
+  if (q) filter.bookingNo = new RegExp(q, 'i');
+  if (lab) filter.lab = lab;
+  await applyDateAndCustomerFilters(filter, { dateFrom, dateTo, customer, mobile });
+
+  const sortField = BOOKING_SORT_FIELDS.includes(sortBy) ? sortBy : 'createdAt';
+  const sortDir = sortOrder === 'asc' ? 1 : -1;
+
+  const bookings = await Booking.find(filter)
+    .populate('user', 'name mobile')
+    .populate('lab', 'name')
+    .sort({ [sortField]: sortDir })
+    .limit(10000)
+    .lean();
+
+  const escape = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const headers = ['bookingNo', 'customer', 'mobile', 'lab', 'date', 'status', 'paymentStatus', 'amount', 'labPrice', 'profit'];
+  const rows = bookings.map((b) => [
+    b.bookingNo,
+    b.user?.name || b.guest?.name || '',
+    b.user?.mobile || b.guest?.mobile || '',
+    b.lab?.name || '',
+    b.createdAt ? new Date(b.createdAt).toISOString().slice(0, 10) : '',
+    b.status,
+    b.paymentStatus,
+    b.total || 0,
+    b.labPayable != null ? b.labPayable : '',
+    b.adminProfit != null ? b.adminProfit : '',
+  ].map(escape).join(','));
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="bookings-billing-export.csv"');
+  res.send(csv);
 });
 
 exports.getBooking = asyncHandler(async (req, res) => {

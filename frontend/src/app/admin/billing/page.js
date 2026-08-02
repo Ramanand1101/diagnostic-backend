@@ -10,7 +10,7 @@ import SortableTh from '@/components/ui/SortableTh';
 import toast from 'react-hot-toast';
 import {
   FiDollarSign, FiCheckCircle, FiClock, FiTrendingUp,
-  FiSearch, FiFileText, FiPrinter, FiX,
+  FiSearch, FiFileText, FiPrinter, FiX, FiDownload,
 } from 'react-icons/fi';
 
 // ── Invoice Modal ─────────────────────────────────────────────────────────────
@@ -217,6 +217,7 @@ export default function BillingPage() {
   const [filters, setFilters] = useState({ lab: '', datePreset: '', dateFrom: '', dateTo: '', customer: '', mobile: '' });
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [downloading, setDownloading] = useState(false);
   const searchTimer = useRef(null);
 
   const statsParams = useCallback(() => ({
@@ -280,14 +281,50 @@ export default function BillingPage() {
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const params = {
+        q: q || undefined, deleted: 'false',
+        lab: filters.lab || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+        customer: filters.customer || undefined,
+        mobile: filters.mobile || undefined,
+        sortBy, sortOrder,
+      };
+      if (payFilter) params.paymentStatus = payFilter;
+      const res = await bookingApi.exportCsv(params);
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `billing-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const fmt = (n) => `₹${(n || 0).toLocaleString('en-IN')}`;
 
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Revenue overview, payment tracking, and invoices.</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Revenue overview, payment tracking, and invoices.</p>
+        </div>
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+        >
+          <FiDownload className={downloading ? 'animate-spin' : ''} /> {downloading ? 'Downloading…' : 'Download CSV'}
+        </button>
       </div>
 
       {/* Invoice modal */}

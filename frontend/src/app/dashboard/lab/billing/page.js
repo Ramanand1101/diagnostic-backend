@@ -139,9 +139,6 @@ export default function LabBillingPage() {
   };
 
   const totalPages = Math.ceil(total / LIMIT);
-  const paidPct = stats && stats.totalRevenue > 0
-    ? Math.round((stats.paidRevenue / stats.totalRevenue) * 100)
-    : 0;
 
   return (
     <div className="space-y-6">
@@ -213,7 +210,7 @@ export default function LabBillingPage() {
         <PageLoader />
       ) : stats ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <StatCard
               icon={FiTrendingUp}
               label="Total Bookings"
@@ -222,58 +219,12 @@ export default function LabBillingPage() {
             />
             <StatCard
               icon={FiDollarSign}
-              label="Total Revenue"
-              value={formatCurrency(stats.totalRevenue)}
-              sub={`From ${stats.bookingCount} booking${stats.bookingCount !== 1 ? 's' : ''}`}
-              accent="border-l-blue-400"
-            />
-            <StatCard
-              icon={FiCheckCircle}
-              label="Amount Received"
-              value={formatCurrency(stats.paidRevenue)}
-              sub={`${stats.paidCount} paid booking${stats.paidCount !== 1 ? 's' : ''}`}
-              accent="border-l-green-400"
-            />
-            <StatCard
-              icon={FiClock}
-              label="Pending Amount"
-              value={formatCurrency(stats.unpaidRevenue)}
-              sub={`${stats.unpaidCount} unpaid booking${stats.unpaidCount !== 1 ? 's' : ''}`}
-              accent="border-l-accent-400"
+              label="Total Payout"
+              value={formatCurrency(stats.labPayoutRevenue)}
+              sub={`${stats.labPayoutCount} booking${stats.labPayoutCount !== 1 ? 's' : ''} with lab pricing configured`}
+              accent="border-l-primary-400"
             />
           </div>
-
-          {/* "Total Revenue" above is the full customer-paid amount — this is what you
-              actually get paid, once the test-level Lab Sale Price has been configured
-              on a product (see Admin > Products). See Settlements for payout history. */}
-          <div className="bg-primary-50 border border-primary-100 rounded-xl px-4 py-3 flex items-center justify-between">
-            <div>
-              <span className="text-sm font-medium text-primary-800">Your Payout (your share of the above)</span>
-              <p className="text-xs text-primary-500 mt-0.5">
-                {stats.labPayoutCount} booking{stats.labPayoutCount !== 1 ? 's' : ''} with lab pricing configured
-              </p>
-            </div>
-            <span className="text-lg font-bold text-primary-700">{formatCurrency(stats.labPayoutRevenue)}</span>
-          </div>
-
-          {/* Collection progress bar */}
-          {stats.totalRevenue > 0 && (
-            <div className="card p-4 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-700">Collection Progress</span>
-                <span className="font-bold text-green-600">{paidPct}% collected</span>
-              </div>
-              <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-700"
-                  style={{ width: `${paidPct}%` }}
-                />
-              </div>
-              <p className="text-xs text-gray-400">
-                {formatCurrency(stats.paidRevenue)} received out of {formatCurrency(stats.totalRevenue)} total
-              </p>
-            </div>
-          )}
 
           {/* Payment filter */}
           <div className="flex items-center gap-3 flex-wrap">

@@ -3,6 +3,7 @@ const { protect, allowModule } = require('../middleware/authMiddleware');
 const controller = require('../controllers/bookingController');
 
 router.get('/stats', protect, allowModule('bookings', 'view'), controller.getStats);
+router.get('/export-csv', protect, allowModule('bookings', 'view'), controller.exportCsv);
 router.post('/', protect, controller.createBooking);
 // This same endpoint backs each role's personal "My Bookings" view (scoped by the
 // controller) as well as the admin-wide list — subadmins still need the 'view'
