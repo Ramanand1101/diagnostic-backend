@@ -7,11 +7,11 @@ const User    = require('../models/User');
 const Patient = require('../models/Patient');
 const Counter = require('../models/Counter');
 const { queueEmail } = require('../queues/index');
-const { sendSms, sendWhatsapp } = require('../config/sms');
-const { WARNING_MESSAGES, computeBookingWarnings } = require('../utils/bookingWarnings');
+const { computeBookingWarnings } = require('../utils/bookingWarnings');
 const { logActivity, requestMeta } = require('../utils/activityLog');
 const { findBlockingRule } = require('../utils/labHolidayCheck');
 const { isAvailable } = require('../utils/testAvailability');
+const { sendBookingConfirmation } = require('../utils/bookingConfirmation');
 
 // Atomic, collision-safe booking number — DDMMYYYY-1550 (resets per day, starts at 1550)
 async function nextBookingNo() {
@@ -158,6 +158,13 @@ exports.createBooking = asyncHandler(async (req, res) => {
     : null;
   const adminProfit = labPayable != null ? total - labPayable : null;
 
+  // 'online' bookings can only become 'paid' via paymentController#verifyPayment, once
+  // a real Razorpay payment signature has been checked — never from whatever the client
+  // happens to send here (that used to be exactly how the old demo checkout "paid" a
+  // booking with zero money moving).
+  const paymentMethod = payload.paymentMethod || 'online';
+  const paymentStatus = paymentMethod === 'online' ? 'unpaid' : (payload.paymentStatus || 'unpaid');
+
   const booking = await Booking.create({
     bookingNo: await nextBookingNo(),
     user: user._id,
@@ -173,8 +180,8 @@ exports.createBooking = asyncHandler(async (req, res) => {
     visitType: payload.visitType || 'lab',
     address: payload.address,
     status: payload.status || 'confirmed',
-    paymentMethod: payload.paymentMethod || 'online',
-    paymentStatus: payload.paymentStatus || 'unpaid',
+    paymentMethod,
+    paymentStatus,
     subtotal,
     discount,
     tax,
@@ -198,88 +205,12 @@ exports.createBooking = asyncHandler(async (req, res) => {
     ...requestMeta(req),
   });
 
-  // Queue confirmation email/SMS/WhatsApp — response is sent before these complete
-  ;(async () => {
-    const populated = await Booking.findById(booking._id).populate('lab', 'name address city phone');
-    const userRecord = await User.findById(user._id).select('name email mobile').lean();
-    const lab = populated.lab;
-
-    const toEmail = userRecord?.email || user.email || payload.guest?.email;
-    const toMobile = userRecord?.mobile || payload.guest?.mobile;
-    const warningTexts = warnings.map((w) => WARNING_MESSAGES[w]).filter(Boolean);
-
-    if (toEmail) {
-      try {
-        const itemsHtml = booking.items.map((i) =>
-          `<tr><td style="padding:6px 12px;border-bottom:1px solid #f0f0f0">${i.name}</td><td style="padding:6px 12px;border-bottom:1px solid #f0f0f0;text-align:right">₹${i.price}</td></tr>`
-        ).join('');
-        const labAddress = lab ? [lab.address, lab.city].filter(Boolean).join(', ') : '';
-        await queueEmail({
-          to: toEmail,
-          subject: `Booking Confirmed – ${booking.bookingNo}`,
-          html: `
-            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
-              <div style="background:#0ea5e9;padding:24px 32px;border-radius:12px 12px 0 0">
-                <h1 style="color:#fff;margin:0;font-size:20px">Booking Confirmed ✓</h1>
-                <p style="color:#bae6fd;margin:4px 0 0;font-size:14px">Booking ID: <strong>${booking.bookingNo}</strong></p>
-              </div>
-              <div style="background:#fff;padding:24px 32px;border:1px solid #e5e7eb;border-top:none">
-                <p style="margin:0 0 16px">Hi <strong>${userRecord?.name || user.name || 'there'}</strong>,<br>Your lab test booking has been confirmed.</p>
-                ${lab ? `<div style="background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:16px">
-                  <p style="margin:0;font-weight:600;font-size:15px">${lab.name}</p>
-                  ${labAddress ? `<p style="margin:4px 0 0;color:#64748b;font-size:13px">📍 ${labAddress}</p>` : ''}
-                  ${(lab.publicPhone || lab.phone) ? `<p style="margin:4px 0 0;color:#64748b;font-size:13px">📞 ${lab.publicPhone || lab.phone}</p>` : ''}
-                </div>` : ''}
-                <p style="margin:0 0 6px;font-weight:600">Appointment</p>
-                <p style="margin:0 0 16px;color:#475569;font-size:14px">
-                  📅 ${booking.slotDate ? new Date(booking.slotDate).toDateString() : 'To be confirmed'}
-                  ${booking.slotTime ? ` at ${booking.slotTime}` : ''}<br>
-                  🏠 Visit type: ${booking.visitType === 'home' ? 'Home Collection' : 'Visit Lab'}
-                </p>
-                <table style="width:100%;border-collapse:collapse;font-size:14px">
-                  <thead><tr style="background:#f8fafc">
-                    <th style="padding:8px 12px;text-align:left;font-weight:600">Test</th>
-                    <th style="padding:8px 12px;text-align:right;font-weight:600">Price</th>
-                  </tr></thead>
-                  <tbody>${itemsHtml}</tbody>
-                </table>
-                ${booking.discount > 0 ? `<p style="text-align:right;margin:8px 0 4px;font-size:13px;color:#16a34a">Discount: –₹${booking.discount}</p>` : ''}
-                <p style="text-align:right;margin:8px 0 0;font-weight:700;font-size:16px;color:#0ea5e9">Total: ₹${booking.total}</p>
-                ${warnings.includes('lateNight') ? `
-                <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-top:16px">
-                  <p style="margin:0;font-size:13px;color:#92400e">🌙 ${WARNING_MESSAGES.lateNight}</p>
-                </div>` : ''}
-                ${warnings.includes('shortNotice') ? `
-                <div style="background:#fef2f2;border:1px solid #f87171;border-radius:8px;padding:12px 16px;margin-top:12px">
-                  <p style="margin:0;font-size:13px;color:#991b1b">⏰ ${WARNING_MESSAGES.shortNotice}</p>
-                </div>` : ''}
-                <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
-                <p style="font-size:12px;color:#94a3b8;margin:0">If you have any questions, reply to this email or call the lab directly.</p>
-              </div>
-            </div>`,
-        });
-      } catch (emailErr) {
-        console.error('[Booking] email queue failed:', emailErr.message);
-      }
-    }
-
-    if (toMobile) {
-      const dateStr = booking.slotDate ? new Date(booking.slotDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-      const baseLine = `Booking Confirmed! ID ${booking.bookingNo} at ${lab?.name || 'the lab'}${dateStr ? ` on ${dateStr}` : ''}${booking.slotTime ? ` at ${booking.slotTime}` : ''}. Total: Rs.${booking.total}.`;
-      const fullMessage = [baseLine, ...warningTexts].join(' ');
-
-      try {
-        await sendSms({ to: toMobile, message: fullMessage });
-      } catch (smsErr) {
-        console.error('[Booking] SMS failed:', smsErr.message);
-      }
-      try {
-        await sendWhatsapp({ to: toMobile, message: fullMessage });
-      } catch (waErr) {
-        console.error('[Booking] WhatsApp failed:', waErr.message);
-      }
-    }
-  })();
+  // Only send the "Booking Confirmed" message if this booking is actually paid already
+  // (non-online methods) — an online booking is still 'unpaid' at this point and gets
+  // its confirmation later, from paymentController#verifyPayment once payment clears.
+  if (booking.paymentStatus === 'paid') {
+    sendBookingConfirmation(booking._id);
+  }
 
   res.status(201).json({ ...booking.toObject(), warnings });
 });

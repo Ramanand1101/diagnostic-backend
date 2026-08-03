@@ -6,10 +6,11 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { bookingApi, userApi, authApi, patientApi, couponApi, settingApi, labHolidayApi, testAvailabilityApi } from '@/lib/api';
+import { bookingApi, paymentApi, userApi, authApi, patientApi, couponApi, settingApi, labHolidayApi, testAvailabilityApi } from '@/lib/api';
 import BookingAnimation from '@/components/booking/BookingAnimation';
 import PatientFormModal from '@/components/patient/PatientFormModal';
 import { getErrorMessage } from '@/utils/helpers';
+import { loadRazorpayCheckout } from '@/utils/loadRazorpayCheckout';
 import {
   FiTrash2, FiShoppingCart, FiMapPin, FiArrowLeft,
   FiCheckCircle, FiAlertCircle, FiLoader, FiSearch, FiPlus, FiUser, FiChevronDown,
@@ -854,21 +855,10 @@ function AddMoreSearch({ cartCity }) {
 }
 
 // ── Payment Screen ────────────────────────────────────────────────────────────
-const BANKS = [
-  'State Bank of India','HDFC Bank','ICICI Bank','Axis Bank',
-  'Kotak Mahindra Bank','Bank of Baroda','Punjab National Bank',
-  'Yes Bank','IndusInd Bank','Federal Bank',
-];
-
 function PaymentScreen({ form, groups, total, couponCode, onSuccess, onBack }) {
-  const [payTab, setPayTab] = useState('upi');
-  const [upiId, setUpiId] = useState('');
-  const [cardNo, setCardNo] = useState('');
-  const [cardName, setCardName] = useState(form.patientName || '');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
-  const [bank, setBank] = useState('');
+  const { user } = useAuth();
   const [processing, setProcessing] = useState(false);
+  const [createdBookings, setCreatedBookings] = useState(null);
 
   const labName = groups[0]?.labName || 'Lab';
   const itemCount = groups.reduce((s, g) => s + g.items.length, 0);
@@ -876,59 +866,95 @@ function PaymentScreen({ form, groups, total, couponCode, onSuccess, onBack }) {
     ? new Date(form.slotDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
     : '';
 
-  const fmtCard = (v) => v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
-  const fmtExpiry = (v) => { const d = v.replace(/\D/g, '').slice(0, 4); return d.length >= 2 ? `${d.slice(0,2)}/${d.slice(2)}` : d; };
-
   const hasSlot = !!form.slotDate && !!form.slotTime;
-  const canPay = hasSlot && (
-    payTab === 'upi'        ? upiId.includes('@')
-    : payTab === 'card'       ? cardNo.replace(/\s/g,'').length === 16 && cardExpiry.length === 5 && cardCvv.length === 3
-    : /* netbanking */          !!bank
-  );
+
+  // Creates the bookings (unpaid) exactly once per checkout attempt — a retry after
+  // closing the Razorpay popup reuses these instead of creating duplicates.
+  const ensureBookingsCreated = async () => {
+    if (createdBookings) return createdBookings;
+
+    // Groups computed before login (guest checkout) carry the 'self' placeholder
+    // instead of a real Patient ID — resolve it once now that the account exists
+    // (BookingForm's handleSubmit already auto-registered + logged in by this point).
+    let selfPatientId = null;
+    if (groups.some((g) => g.patientId === 'self')) {
+      const res = await patientApi.getMine();
+      const self = (res.data.items || []).find((p) => p.relation === 'self');
+      selfPatientId = self?._id || null;
+      if (selfPatientId && (form.patientAge || form.patientGender)) {
+        patientApi.update(selfPatientId, {
+          age: form.patientAge ? Number(form.patientAge) : undefined,
+          gender: form.patientGender,
+        }).catch(() => {});
+      }
+    }
+
+    const created = [];
+    for (const group of groups) {
+      const subtotal = group.items.reduce((s, i) => s + (i.salePrice || i.price), 0);
+      const res = await bookingApi.create({
+        lab: group.labId,
+        items: group.items.map((i) => ({ product: i._id, name: i.name, qty: 1, price: i.salePrice || i.price })),
+        patient: group.patientId === 'self' ? selfPatientId : group.patientId,
+        slotDate: form.slotDate,
+        slotTime: form.slotTime,
+        visitType: form.visitType,
+        address: form.visitType === 'home'
+          ? { line1: form.addressLine1, area: form.addressArea, city: form.addressCity, state: form.addressState, pincode: form.addressPincode }
+          : undefined,
+        subtotal,
+        total: subtotal,
+        coupon: couponCode || undefined,
+        paymentMethod: 'online',
+        status: 'confirmed',
+        // paymentStatus intentionally omitted — the server forces 'unpaid' for online
+        // bookings regardless of what's sent; only a verified Razorpay payment can flip it.
+      });
+      created.push(res.data);
+    }
+    setCreatedBookings(created);
+    return created;
+  };
 
   const handlePay = async () => {
     setProcessing(true);
-    await new Promise((r) => setTimeout(r, 2200));
     try {
-      // Groups computed before login (guest checkout) carry the 'self' placeholder
-      // instead of a real Patient ID — resolve it once now that the account exists
-      // (BookingForm's handleSubmit already auto-registered + logged in by this point).
-      let selfPatientId = null;
-      if (groups.some((g) => g.patientId === 'self')) {
-        const res = await patientApi.getMine();
-        const self = (res.data.items || []).find((p) => p.relation === 'self');
-        selfPatientId = self?._id || null;
-        if (selfPatientId && (form.patientAge || form.patientGender)) {
-          patientApi.update(selfPatientId, {
-            age: form.patientAge ? Number(form.patientAge) : undefined,
-            gender: form.patientGender,
-          }).catch(() => {});
-        }
-      }
+      const bookings = await ensureBookingsCreated();
 
-      const created = [];
-      for (const group of groups) {
-        const subtotal = group.items.reduce((s, i) => s + (i.salePrice || i.price), 0);
-        const res = await bookingApi.create({
-          lab: group.labId,
-          items: group.items.map((i) => ({ product: i._id, name: i.name, qty: 1, price: i.salePrice || i.price })),
-          patient: group.patientId === 'self' ? selfPatientId : group.patientId,
-          slotDate: form.slotDate,
-          slotTime: form.slotTime,
-          visitType: form.visitType,
-          address: form.visitType === 'home'
-            ? { line1: form.addressLine1, area: form.addressArea, city: form.addressCity, state: form.addressState, pincode: form.addressPincode }
-            : undefined,
-          subtotal,
-          total: subtotal,
-          coupon: couponCode || undefined,
-          paymentMethod: 'online',
-          paymentStatus: 'paid',
-          status: 'confirmed',
-        });
-        created.push(res.data);
-      }
-      onSuccess(created);
+      const { data: order } = await paymentApi.createOrder(bookings.map((b) => b._id));
+      await loadRazorpayCheckout();
+
+      const rzp = new window.Razorpay({
+        key: order.keyId,
+        order_id: order.orderId,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'HealthOnTime',
+        description: `${itemCount} test${itemCount !== 1 ? 's' : ''} · ${labName}`,
+        prefill: {
+          name: user?.name || form.patientName || '',
+          email: user?.email || '',
+          contact: user?.mobile || '',
+        },
+        theme: { color: '#0284c7' },
+        handler: async (resp) => {
+          try {
+            const { data } = await paymentApi.verify(resp);
+            onSuccess(data.bookings);
+          } catch (err) {
+            toast.error(getErrorMessage(err) || 'Payment verification failed. Please contact support.');
+            setProcessing(false);
+          }
+        },
+        modal: {
+          ondismiss: () => setProcessing(false),
+        },
+      });
+      rzp.on('payment.failed', () => {
+        toast.error('Payment failed. Please try again.');
+        setProcessing(false);
+      });
+      rzp.open();
     } catch (err) {
       toast.error(getErrorMessage(err));
       setProcessing(false);
@@ -942,7 +968,9 @@ function PaymentScreen({ form, groups, total, couponCode, onSuccess, onBack }) {
         <div className="absolute inset-0 rounded-full border-4 border-t-primary-600 animate-spin" />
         <span className="absolute inset-0 flex items-center justify-center text-2xl">💳</span>
       </div>
-      <p className="text-lg font-bold text-gray-800 mb-1">Processing Payment…</p>
+      <p className="text-lg font-bold text-gray-800 mb-1">
+        {createdBookings ? 'Opening secure payment…' : 'Processing Payment…'}
+      </p>
       <p className="text-sm text-gray-400">Please wait, do not close this page</p>
     </div>
   );
@@ -971,107 +999,23 @@ function PaymentScreen({ form, groups, total, couponCode, onSuccess, onBack }) {
           </div>
         </div>
 
-        {/* Demo notice */}
-        <div className="bg-amber-50 border-b border-amber-100 px-5 py-2 flex items-center gap-2">
-          <span className="text-xs font-bold text-amber-700">⚡ DEMO MODE</span>
-          <span className="text-xs text-amber-600">— No real payment will be charged</span>
-        </div>
-
-        {/* Payment method tabs */}
-        <div className="flex border-b border-gray-100">
-          {[
-            { id: 'upi',        label: 'UPI',         emoji: '📱' },
-            { id: 'card',       label: 'Card',        emoji: '💳' },
-            { id: 'netbanking', label: 'Net Banking',  emoji: '🏦' },
-          ].map(({ id, label, emoji }) => (
-            <button key={id} onClick={() => setPayTab(id)}
-              className={`flex-1 py-3 text-xs font-semibold transition-colors flex flex-col items-center gap-0.5 ${
-                payTab === id
-                  ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/30'
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}>
-              <span className="text-base">{emoji}</span>{label}
-            </button>
-          ))}
-        </div>
-
         <div className="p-5 space-y-4">
-          {/* UPI Tab */}
-          {payTab === 'upi' && (
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Enter UPI ID</label>
-              <input type="text" value={upiId} onChange={(e) => setUpiId(e.target.value)}
-                placeholder="yourname@paytm / @gpay / @upi"
-                className="input text-sm w-full" />
-              <p className="text-xs text-gray-400 mt-1.5">e.g. 9876543210@paytm · name@okaxis · user@gpay</p>
-              <div className="flex gap-2 mt-3 flex-wrap">
-                {['PhonePe','GPay','Paytm','BHIM'].map((app) => (
-                  <button key={app} type="button" onClick={() => setUpiId(`demo@${app.toLowerCase()}`)}
-                    className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-primary-50 hover:border-primary-300 font-medium text-gray-600 transition-colors">
-                    {app}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Card Tab */}
-          {payTab === 'card' && (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">Card Number</label>
-                <input type="text" inputMode="numeric" value={cardNo}
-                  onChange={(e) => setCardNo(fmtCard(e.target.value))}
-                  placeholder="1234 5678 9012 3456"
-                  className="input text-sm font-mono tracking-widest" maxLength={19} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">Name on Card</label>
-                <input type="text" value={cardName}
-                  onChange={(e) => setCardName(e.target.value.toUpperCase())}
-                  placeholder="YOUR NAME"
-                  className="input text-sm tracking-wide uppercase" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1.5">Expiry</label>
-                  <input type="text" inputMode="numeric" value={cardExpiry}
-                    onChange={(e) => setCardExpiry(fmtExpiry(e.target.value))}
-                    placeholder="MM / YY" className="input text-sm" maxLength={5} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1.5">CVV</label>
-                  <input type="password" inputMode="numeric" value={cardCvv}
-                    onChange={(e) => setCardCvv(e.target.value.replace(/\D/g,'').slice(0,3))}
-                    placeholder="•••" className="input text-sm" maxLength={3} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Net Banking Tab */}
-          {payTab === 'netbanking' && (
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Select your bank</label>
-              <select value={bank} onChange={(e) => setBank(e.target.value)} className="input text-sm">
-                <option value="">— Choose your bank —</option>
-                {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
-            </div>
-          )}
+          <p className="text-sm text-gray-500 text-center px-2">
+            You&apos;ll be redirected to Razorpay&apos;s secure checkout to pay via UPI, Card, or Net Banking.
+          </p>
 
           {/* Pay button */}
-          <button onClick={handlePay} disabled={!canPay}
+          <button onClick={handlePay} disabled={!hasSlot}
             className={`w-full py-3.5 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 shadow-sm ${
-              canPay
+              hasSlot
                 ? 'bg-green-500 hover:bg-green-600 text-white shadow-green-200 active:scale-[0.98]'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             }`}>
-            🔒 Pay ₹{total.toLocaleString('en-IN')}
+            🔒 {createdBookings ? 'Retry Payment' : 'Pay'} ₹{total.toLocaleString('en-IN')}
           </button>
 
           <p className="text-center text-[11px] text-gray-400">
-            256-bit SSL encrypted &nbsp;·&nbsp; Demo mode — no real payment
+            256-bit SSL encrypted &nbsp;·&nbsp; Powered by Razorpay
           </p>
         </div>
       </div>

@@ -264,6 +264,12 @@ export const bookingApi = {
   sendReportReminder: (id) => api.post(`/bookings/${id}/report/remind`),
 };
 
+// Razorpay payment gateway
+export const paymentApi = {
+  createOrder: (bookingIds) => api.post('/payments/razorpay/order', { bookingIds }),
+  verify: (data) => api.post('/payments/razorpay/verify', data),
+};
+
 // Reports
 export const reportApi = {
   getAll: (params) => api.get('/reports', { params }),
