@@ -5,8 +5,14 @@ import { useCity } from '@/context/CityContext';
 import { labApi } from '@/lib/api';
 import CityLandmark from './CityLandmark';
 
-export default function CityPickerModal({ open, onClose }) {
-  const { city, setCity, setCoords } = useCity();
+// `value`/`onSelect` let a caller drive this off its own local state (e.g. the search
+// page, which keeps a URL-synced city separate from the global default) instead of the
+// shared CityContext. Omit both to fall back to the global city (Hero's usage).
+export default function CityPickerModal({ open, onClose, value, onSelect }) {
+  const cityCtx = useCity();
+  const city = value !== undefined ? value : cityCtx.city;
+  const setCity = onSelect || cityCtx.setCity;
+  const { setCoords } = cityCtx;
   const [cities, setCities] = useState([]);
   const [filter, setFilter] = useState('');
   const [detecting, setDetecting] = useState(false);

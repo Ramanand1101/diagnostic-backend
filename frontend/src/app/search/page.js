@@ -8,6 +8,7 @@ import { PageLoader } from '@/components/ui/Spinner';
 import { searchApi } from '@/lib/api';
 import { useCart } from '@/context/CartContext';
 import { useCity } from '@/context/CityContext';
+import CityPickerModal from '@/components/layout/CityPickerModal';
 import {
   FiSearch, FiX, FiMapPin, FiClock, FiCrosshair,
   FiChevronDown, FiChevronUp, FiChevronRight, FiFilter, FiShoppingCart, FiCheck,
@@ -438,6 +439,7 @@ function SearchContent() {
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [activeProduct, setActiveProduct] = useState(null);
   const [mobileSheet, setMobileSheet] = useState(false);
+  const [cityModalOpen, setCityModalOpen] = useState(false);
   const debounceRef = useRef(null);
   const isOwnNavRef = useRef(false);
   const [liveResults, setLiveResults] = useState([]);
@@ -522,13 +524,18 @@ function SearchContent() {
     return () => clearTimeout(debounceRef.current);
   }, [inputVal, multiTests, coords]);
 
-  const applyCity = () => {
-    runSearch(inputVal, city, multiTests, coords);
+  // Picking a city from the modal is a manual, explicit choice — it should win over
+  // any "near me" coords already in effect, same as CityPickerModal's default behavior.
+  const handleCityPick = (c) => {
+    setCoords(null);
+    setCity(c);
+    setCityModalOpen(false);
+    runSearch(inputVal, c, multiTests, null);
     isOwnNavRef.current = true;
     const params = new URLSearchParams();
     if (multiTests.length > 0) multiTests.forEach((t) => params.append('test', t));
     else if (inputVal.trim()) params.set('q', inputVal.trim());
-    if (city.trim()) params.set('city', city.trim());
+    if (c.trim()) params.set('city', c.trim());
     router.replace(`/search?${params.toString()}`, { scroll: false });
   };
 
@@ -737,20 +744,28 @@ function SearchContent() {
                   <FiCrosshair className={locating ? 'animate-pulse' : ''} />
                 </button>
               )}
-              <div className="relative flex-1 sm:flex-none">
-                <FiMapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && applyCity()}
-                  placeholder="City"
-                  className="input pl-8 w-full sm:w-32"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setCityModalOpen(true)}
+                className="flex items-center justify-between gap-1.5 px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600 transition-colors flex-1 sm:flex-none sm:w-32 min-w-0"
+              >
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <FiMapPin className="text-gray-400 text-sm shrink-0" />
+                  <span className={`truncate ${city ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>{city || 'City'}</span>
+                </span>
+                <FiChevronDown className="text-gray-400 text-xs shrink-0" />
+              </button>
               {city && (
                 <button
-                  onClick={() => { setCity(''); runSearch(inputVal, '', multiTests, coords); }}
+                  onClick={() => {
+                    setCity('');
+                    runSearch(inputVal, '', multiTests, coords);
+                    isOwnNavRef.current = true;
+                    const params = new URLSearchParams();
+                    if (multiTests.length > 0) multiTests.forEach((t) => params.append('test', t));
+                    else if (inputVal.trim()) params.set('q', inputVal.trim());
+                    router.replace(`/search?${params.toString()}`, { scroll: false });
+                  }}
                   className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-500 transition-colors flex-shrink-0">
                   <FiX />
                 </button>
@@ -983,6 +998,8 @@ function SearchContent() {
           </div>
         </div>
       )}
+
+      <CityPickerModal open={cityModalOpen} onClose={() => setCityModalOpen(false)} value={city} onSelect={handleCityPick} />
 
       <Footer />
     </>

@@ -885,10 +885,15 @@ function PaymentScreen({ form, groups, total, couponCode, onSuccess, onBack }) {
       const self = (res.data.items || []).find((p) => p.relation === 'self');
       selfPatientId = self?._id || null;
       if (selfPatientId && (form.patientAge || form.patientGender)) {
-        patientApi.update(selfPatientId, {
-          age: form.patientAge ? Number(form.patientAge) : undefined,
-          gender: form.patientGender,
-        }).catch(() => {});
+        // Must finish before booking creation below — createBooking snapshots the
+        // Patient doc's age/gender onto the booking at that instant, so a fire-and-forget
+        // update here would race it and the booking would capture blank age/gender.
+        try {
+          await patientApi.update(selfPatientId, {
+            age: form.patientAge ? Number(form.patientAge) : undefined,
+            gender: form.patientGender,
+          });
+        } catch { /* non-fatal — booking still proceeds with whatever the patient doc already had */ }
       }
     }
 
@@ -1077,6 +1082,11 @@ function SuccessScreen({ bookings }) {
   const warnings = first.warnings || [];
   const lab = first.lab || {};
   const patient = first.patientSnapshot || {};
+  // `patient` above is a frozen name/age/gender snapshot taken at booking time (stays
+  // correct even if the profile changes later) — it has no phone field, so that comes
+  // from the live, populated Patient doc instead (only present on the online/Razorpay
+  // flow's response, hence the optional chaining).
+  const patientPhone = first.patient?.phone;
   const totalPaid = bookings.reduce((s, b) => s + (b.total || 0), 0);
   const isPaid = first.paymentStatus === 'paid';
 
@@ -1244,6 +1254,9 @@ function SuccessScreen({ bookings }) {
                 <div className="flex justify-between"><span className="text-gray-400 text-xs">Name</span><span className="font-medium text-gray-800 text-xs">{patient.name || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400 text-xs">Age / Gender</span><span className="font-medium text-gray-800 text-xs">{[patient.age, patient.gender && patient.gender[0].toUpperCase() + patient.gender.slice(1)].filter(Boolean).join(' / ') || '—'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400 text-xs">Relation</span><span className="font-medium text-gray-800 text-xs capitalize">{patient.relation || 'Self'}</span></div>
+                {patientPhone && (
+                  <div className="flex justify-between"><span className="text-gray-400 text-xs">Mobile Number</span><span className="font-medium text-gray-800 text-xs">{patientPhone}</span></div>
+                )}
               </div>
             </div>
           </div>
