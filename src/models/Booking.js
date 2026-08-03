@@ -46,11 +46,11 @@ const bookingSchema = new mongoose.Schema({
   },
   paymentMethod: { type: String, enum: ['online', 'cash', 'guest'], default: 'online' },
   paymentStatus: { type: String, enum: ['unpaid', 'paid', 'failed', 'refunded'], default: 'unpaid' },
-  // Razorpay refs — paymentStatus only ever becomes 'paid' for an online booking once
-  // razorpaySignature has been verified server-side (see paymentController#verifyPayment).
-  razorpayOrderId:   { type: String, index: true },
-  razorpayPaymentId: String,
-  razorpaySignature: String,
+  // Points at the Payment doc covering this booking's online payment (see
+  // paymentController.js) — Payment is the source of truth for gateway/order details;
+  // paymentStatus above stays a fast-read denormalized flag for listing/filtering.
+  // Only ever becomes 'paid' once that Payment's razorpaySignature is verified server-side.
+  payment: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment', index: true },
   subtotal: Number,
   discount: Number,
   tax: Number,

@@ -857,16 +857,16 @@ function AddMoreSearch({ cartCity }) {
 // ── Payment Screen ────────────────────────────────────────────────────────────
 function PaymentScreen({ form, groups, total, couponCode, onSuccess, onBack }) {
   const { user } = useAuth();
-  const [processing, setProcessing] = useState(false);
+  const hasSlot = !!form.slotDate && !!form.slotTime;
+  const [processing, setProcessing] = useState(hasSlot);
   const [createdBookings, setCreatedBookings] = useState(null);
+  const autoStarted = useRef(false);
 
   const labName = groups[0]?.labName || 'Lab';
   const itemCount = groups.reduce((s, g) => s + g.items.length, 0);
   const slotLabel = form.slotDate
     ? new Date(form.slotDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
     : '';
-
-  const hasSlot = !!form.slotDate && !!form.slotTime;
 
   // Creates the bookings (unpaid) exactly once per checkout attempt — a retry after
   // closing the Razorpay popup reuses these instead of creating duplicates.
@@ -960,6 +960,16 @@ function PaymentScreen({ form, groups, total, couponCode, onSuccess, onBack }) {
       setProcessing(false);
     }
   };
+
+  // Skip the intermediate "review & pay" screen entirely — go straight to Razorpay's
+  // checkout as soon as this screen mounts. The fallback card below only ever shows
+  // if the customer closes the Razorpay popup without paying (see ondismiss above).
+  useEffect(() => {
+    if (autoStarted.current || !hasSlot) return;
+    autoStarted.current = true;
+    handlePay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (processing) return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
