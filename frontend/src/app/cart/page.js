@@ -11,9 +11,12 @@ import BookingAnimation from '@/components/booking/BookingAnimation';
 import PatientFormModal from '@/components/patient/PatientFormModal';
 import { getErrorMessage } from '@/utils/helpers';
 import { loadRazorpayCheckout } from '@/utils/loadRazorpayCheckout';
+import { CONTACT_PHONE, CONTACT_EMAIL } from '@/config/contact';
 import {
   FiTrash2, FiShoppingCart, FiMapPin, FiArrowLeft,
   FiCheckCircle, FiAlertCircle, FiLoader, FiSearch, FiPlus, FiUser, FiChevronDown,
+  FiCalendar, FiDownload, FiShare2, FiPhone, FiMail, FiMessageCircle, FiCircle,
+  FiClock, FiHeadphones, FiFileText,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -1040,92 +1043,327 @@ function PaymentScreen({ form, groups, total, couponCode, onSuccess, onBack }) {
   );
 }
 
+// Parses a slot range string like "03:00 PM – 04:00 PM" into real start/end Dates on
+// the given slot day — used only for the "Add to Calendar" .ics export.
+function parseSlotToDates(slotDate, slotTimeRange) {
+  if (!slotDate) return null;
+  const base = new Date(slotDate);
+  const parseTime = (str) => {
+    const m = (str || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    const period = m[3].toUpperCase();
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    const d = new Date(base);
+    d.setHours(h, min, 0, 0);
+    return d;
+  };
+  const [startStr, endStr] = (slotTimeRange || '').split(/[–-]/).map((s) => s.trim());
+  const start = parseTime(startStr);
+  if (!start) return null;
+  const end = parseTime(endStr) || new Date(start.getTime() + 3600000);
+  return { start, end };
+}
+
+const toICSDate = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
 // ── Success Screen ────────────────────────────────────────────────────────────
 function SuccessScreen({ bookings }) {
   const router = useRouter();
   const first = bookings[0] || {};
+  const rest = bookings.slice(1);
   const warnings = first.warnings || [];
-  const slotDate = first.slotDate
+  const lab = first.lab || {};
+  const patient = first.patientSnapshot || {};
+  const totalPaid = bookings.reduce((s, b) => s + (b.total || 0), 0);
+  const isPaid = first.paymentStatus === 'paid';
+
+  const slotDateFull = first.slotDate
     ? new Date(first.slotDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : '';
+  const confirmedAt = first.createdAt
+    ? new Date(first.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : '';
+
+  const mapsUrl = lab.name || lab.address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([lab.name, lab.address, lab.city].filter(Boolean).join(', '))}`
+    : null;
+  const whatsappUrl = `https://wa.me/${CONTACT_PHONE.replace(/\D/g, '')}?text=${encodeURIComponent(`Hi, I need help with my booking ${first.bookingNo}`)}`;
+
+  const handleAddToCalendar = () => {
+    const range = parseSlotToDates(first.slotDate, first.slotTime);
+    if (!range) { toast.error('Appointment time not available for this booking.'); return; }
+    const ics = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//HealthOnTime//Booking//EN', 'BEGIN:VEVENT',
+      `UID:${first.bookingNo}@healthontime.in`,
+      `DTSTAMP:${toICSDate(new Date())}`,
+      `DTSTART:${toICSDate(range.start)}`,
+      `DTEND:${toICSDate(range.end)}`,
+      `SUMMARY:Lab Test - ${lab.name || 'HealthOnTime'}`,
+      `DESCRIPTION:Booking ID: ${first.bookingNo}. Visit type: ${first.visitType === 'home' ? 'Home Collection' : 'Visit Lab'}.`,
+      lab.address ? `LOCATION:${[lab.address, lab.city].filter(Boolean).join(', ')}` : '',
+      'END:VEVENT', 'END:VCALENDAR',
+    ].filter(Boolean).join('\r\n');
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${first.bookingNo}.ics`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleShare = async () => {
+    const text = `My lab test booking is confirmed!\nBooking ID: ${first.bookingNo}\nLab: ${lab.name || ''}\n${slotDateFull}${first.slotTime ? ` · ${first.slotTime}` : ''}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Booking Confirmed', text }); } catch { /* user cancelled share sheet */ }
+    } else {
+      try { await navigator.clipboard.writeText(text); toast.success('Booking details copied to clipboard'); }
+      catch { toast.error('Could not copy booking details'); }
+    }
+  };
+
+  // Fresh-off-checkout state, so the progress stepper always reflects exactly this
+  // moment — confirmed, and the lab has just been notified. Later stages (sample
+  // collection, report) happen after this screen is gone; track them from "My Bookings".
+  const PROGRESS_STEPS = [
+    { label: 'Booking Confirmed', desc: confirmedAt, done: true },
+    { label: 'Lab Notified', desc: 'We have notified the lab', current: true },
+    { label: first.visitType === 'home' ? 'Sample Collection' : 'Visit Lab', desc: first.visitType === 'home' ? 'Our team will visit for sample collection' : 'Your upcoming visit' },
+    { label: 'Report Processing', desc: 'Lab will begin processing your sample' },
+    { label: 'Report Ready', desc: 'Download your digital report' },
+  ];
 
   return (
-    <div className="text-center py-10 max-w-lg mx-auto">
-      {/* Animated check */}
-      <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5"
-        style={{ animation: 'bounceIn 0.5s ease' }}>
-        <FiCheckCircle className="text-green-500" size={48} />
-      </div>
+    <div className="pb-10">
       <style>{`@keyframes bounceIn{0%{transform:scale(0.5);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}`}</style>
 
-      <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Booking Confirmed! 🎉</h1>
-      <p className="text-gray-500 text-sm mb-6 max-w-xs mx-auto">
-        Your lab test is booked and confirmed. We&apos;ll send you a reminder before your appointment.
-      </p>
-
-      {/* Warning banners */}
-      {warnings.includes('lateNight') && (
-        <div className="mb-4 text-left bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex gap-3 items-start">
-          <span className="text-xl shrink-0">🌙</span>
-          <div>
-            <p className="text-sm font-semibold text-amber-800">Important Notice</p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              Note: If the diagnostic center is closed or opens late, please cooperate. Our team will coordinate with the diagnostic center and inform you of any schedule changes if required.
-            </p>
-          </div>
-        </div>
-      )}
-      {warnings.includes('shortNotice') && (
-        <div className="mb-4 text-left bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex gap-3 items-start">
-          <span className="text-xl shrink-0">⏰</span>
-          <div>
-            <p className="text-sm font-semibold text-red-800">Important Notice</p>
-            <p className="text-xs text-red-700 mt-0.5">
-              Please check with the diagnostic center/lab regarding appointment availability before visiting.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Booking cards */}
-      <div className="space-y-4 mb-8 text-left">
-        {bookings.map((booking, i) => (
-          <div key={booking._id || i} className="bg-white border border-green-100 rounded-2xl overflow-hidden shadow-sm">
-            <div className="bg-green-500 px-5 py-3 flex items-center justify-between">
-              <span className="text-white font-bold text-sm tracking-wide">{booking.bookingNo}</span>
-              <span className="text-[11px] bg-white/25 text-white px-2.5 py-0.5 rounded-full font-semibold">
-                ✓ Confirmed
-              </span>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
+        {/* ── Main column ── */}
+        <div className="space-y-5 min-w-0">
+          {/* Confirmation banner */}
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 rounded-2xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center shrink-0"
+                style={{ animation: 'bounceIn 0.5s ease' }}>
+                <FiCheckCircle className="text-green-500" size={32} />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-1">Booking Confirmed! 🎉</h1>
+                <p className="text-gray-500 text-sm">
+                  Your {bookings.length > 1 ? 'lab tests have' : 'lab test has'} been booked successfully. A confirmation has been sent to your email and WhatsApp.
+                </p>
+              </div>
             </div>
-            <div className="px-5 py-4 space-y-2.5">
+
+            <div className="flex flex-wrap gap-3 mt-5">
+              <div className="bg-white/70 rounded-xl px-4 py-2.5 border border-green-100/80">
+                <p className="text-[11px] text-gray-400 font-medium">Booking ID</p>
+                <p className="text-sm font-bold text-gray-800">{first.bookingNo}</p>
+              </div>
+              <div className="bg-white/70 rounded-xl px-4 py-2.5 border border-green-100/80">
+                <p className="text-[11px] text-gray-400 font-medium">Status</p>
+                <p className="text-sm font-bold text-green-600">CONFIRMED</p>
+              </div>
+              <div className="bg-white/70 rounded-xl px-4 py-2.5 border border-green-100/80">
+                <p className="text-[11px] text-gray-400 font-medium">{isPaid ? 'Amount Paid' : 'Amount Due'}</p>
+                <p className="text-sm font-bold text-gray-800">₹{totalPaid.toLocaleString('en-IN')}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Warning banners */}
+          {warnings.includes('lateNight') && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex gap-3 items-start">
+              <span className="text-xl shrink-0">🌙</span>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Important Notice</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Note: If the diagnostic center is closed or opens late, please cooperate. Our team will coordinate with the diagnostic center and inform you of any schedule changes if required.
+                </p>
+              </div>
+            </div>
+          )}
+          {warnings.includes('shortNotice') && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex gap-3 items-start">
+              <span className="text-xl shrink-0">⏰</span>
+              <div>
+                <p className="text-sm font-semibold text-red-800">Important Notice</p>
+                <p className="text-xs text-red-700 mt-0.5">
+                  Please check with the diagnostic center/lab regarding appointment availability before visiting.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Lab / Appointment / Patient — 3 column info grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white border border-gray-100 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <FiMapPin className="text-primary-600" size={16} />
+                <p className="font-semibold text-gray-800 text-sm">Lab Information</p>
+              </div>
+              <p className="font-bold text-gray-900 text-sm mb-1">{lab.name || 'Lab'}</p>
+              {lab.address && <p className="text-xs text-gray-500 leading-relaxed mb-1">{[lab.address, lab.city].filter(Boolean).join(', ')}</p>}
+              {(lab.publicPhone || lab.phone) && (
+                <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-2"><FiPhone size={12} /> {lab.publicPhone || lab.phone}</p>
+              )}
+              {mapsUrl && (
+                <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-600 border border-primary-200 rounded-lg px-3 py-1.5 hover:bg-primary-50 transition-colors">
+                  <FiMapPin size={12} /> View in Maps
+                </a>
+              )}
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <FiCalendar className="text-primary-600" size={16} />
+                <p className="font-semibold text-gray-800 text-sm">Appointment Details</p>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Date</span><span className="font-medium text-gray-800 text-xs text-right">{slotDateFull}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Time</span><span className="font-medium text-gray-800 text-xs">{first.slotTime || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Visit Type</span><span className="font-medium text-gray-800 text-xs">{first.visitType === 'home' ? 'Home Collection' : 'Visit Lab'}</span></div>
+                <div className="flex justify-between items-center"><span className="text-gray-400 text-xs">Payment</span>
+                  <span className={`font-semibold text-xs flex items-center gap-1 ${isPaid ? 'text-green-600' : 'text-amber-600'}`}>
+                    {isPaid ? <FiCheckCircle size={12} /> : <FiClock size={12} />} {isPaid ? 'Success' : 'Pending'}
+                  </span>
+                </div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Amount</span><span className="font-bold text-gray-800 text-xs">₹{totalPaid.toLocaleString('en-IN')}</span></div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <FiUser className="text-primary-600" size={16} />
+                <p className="font-semibold text-gray-800 text-sm">Patient Details</p>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Name</span><span className="font-medium text-gray-800 text-xs">{patient.name || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Age / Gender</span><span className="font-medium text-gray-800 text-xs">{[patient.age, patient.gender && patient.gender[0].toUpperCase() + patient.gender.slice(1)].filter(Boolean).join(' / ') || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Relation</span><span className="font-medium text-gray-800 text-xs capitalize">{patient.relation || 'Self'}</span></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Important instructions */}
+          <div className="bg-white border border-gray-100 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <FiFileText className="text-primary-600" size={16} />
+              <p className="font-semibold text-gray-800 text-sm">Important Instructions</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
               {[
-                { label: 'Lab',     value: booking.lab?.name || 'Lab' },
-                booking.lab?.address && { label: 'Address', value: [booking.lab.address, booking.lab.city].filter(Boolean).join(', ') },
-                (booking.lab?.publicPhone || booking.lab?.phone) && { label: 'Lab Phone', value: booking.lab.publicPhone || booking.lab.phone },
-                { label: 'Date',    value: slotDate },
-                { label: 'Time',    value: booking.slotTime || '—' },
-                { label: 'Visit',   value: booking.visitType === 'home' ? 'Home Collection' : 'Visit Lab' },
-                { label: 'Paid',    value: `₹${(booking.total || 0).toLocaleString('en-IN')}`, green: true },
-              ].filter(Boolean).map(({ label, value, green }) => (
-                <div key={label} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-400 text-xs uppercase tracking-wide font-medium">{label}</span>
-                  <span className={`font-semibold ${green ? 'text-green-600' : 'text-gray-800'}`}>{value}</span>
+                { emoji: '📍', text: 'Reach the lab 10-15 minutes before your appointment time' },
+                { emoji: '🪪', text: 'Carry a valid photo ID proof for verification' },
+                { emoji: '🧘', text: 'Fasting may be required for some tests. Follow instructions if any.' },
+                { emoji: '📅', text: 'Show your Booking ID at the reception' },
+                { emoji: '💧', text: 'Stay hydrated and avoid heavy exercise before the test' },
+              ].map(({ emoji, text }) => (
+                <div key={text} className="text-center">
+                  <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center mx-auto mb-2 text-lg">{emoji}</div>
+                  <p className="text-[11px] text-gray-500 leading-snug">{text}</p>
                 </div>
               ))}
             </div>
           </div>
-        ))}
-      </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 justify-center">
-        <button onClick={() => router.push('/dashboard/bookings')}
-          className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-xl transition-colors shadow-sm">
-          View My Bookings
-        </button>
-        <button onClick={() => router.push('/')}
-          className="px-8 py-3 text-sm font-semibold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
-          Back to Home
-        </button>
+          {/* Other bookings in this order (multi-lab cart) */}
+          {rest.length > 0 && (
+            <div className="bg-white border border-gray-100 rounded-xl p-5">
+              <p className="font-semibold text-gray-800 text-sm mb-3">+{rest.length} more booking{rest.length !== 1 ? 's' : ''} in this order</p>
+              <div className="space-y-2">
+                {rest.map((b, i) => (
+                  <div key={b._id || i} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+                    <span className="font-semibold text-gray-700">{b.bookingNo}</span>
+                    <span className="text-gray-500 text-xs">{b.lab?.name || 'Lab'}</span>
+                    <span className="font-semibold text-green-600 text-xs">₹{(b.total || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2.5">
+            <button onClick={() => window.print()}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+              <FiDownload size={13} /> Print / Download Summary
+            </button>
+            <button onClick={handleAddToCalendar}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+              <FiCalendar size={13} /> Add to Calendar
+            </button>
+            <button onClick={handleShare}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+              <FiShare2 size={13} /> Share Booking
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={() => router.push('/dashboard/bookings')}
+              className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-xl transition-colors shadow-sm">
+              View My Bookings
+            </button>
+            <button onClick={() => router.push('/labs')}
+              className="px-8 py-3 text-sm font-semibold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+              Book Another Test
+            </button>
+            <button onClick={() => router.push('/')}
+              className="px-8 py-3 text-sm font-semibold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+              Back to Home
+            </button>
+          </div>
+        </div>
+
+        {/* ── Sidebar ── */}
+        <div className="space-y-5">
+          <div className="bg-white border border-gray-100 rounded-xl p-5">
+            <p className="font-semibold text-gray-800 text-sm mb-4">Booking Progress</p>
+            <div className="space-y-0">
+              {PROGRESS_STEPS.map((step, i) => (
+                <div key={step.label} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    {step.done
+                      ? <FiCheckCircle className="text-green-500 shrink-0" size={20} />
+                      : <FiCircle className={`shrink-0 ${step.current ? 'text-primary-600' : 'text-gray-300'}`} size={20} fill={step.current ? 'currentColor' : 'none'} />}
+                    {i < PROGRESS_STEPS.length - 1 && <div className={`w-px flex-1 my-1 ${step.done ? 'bg-green-200' : 'bg-gray-100'}`} style={{ minHeight: 24 }} />}
+                  </div>
+                  <div className="pb-4 min-w-0">
+                    <p className={`text-xs font-semibold ${step.done || step.current ? 'text-gray-800' : 'text-gray-400'}`}>{step.label}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{step.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-primary-50/60 border border-primary-100 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <FiHeadphones className="text-primary-600" size={16} />
+              <div>
+                <p className="font-semibold text-gray-800 text-sm">Need Help?</p>
+                <p className="text-[11px] text-gray-500">Our support team is here to help you 24x7</p>
+              </div>
+            </div>
+            <div className="space-y-2 mt-3">
+              <a href={`tel:${CONTACT_PHONE.replace(/[^+\d]/g, '')}`}
+                className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                <FiPhone size={13} className="text-primary-600" /> {CONTACT_PHONE}
+              </a>
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                <FiMessageCircle size={13} className="text-primary-600" /> Chat on WhatsApp
+              </a>
+              <a href={`mailto:${CONTACT_EMAIL}`}
+                className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                <FiMail size={13} className="text-primary-600" /> {CONTACT_EMAIL}
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1336,7 +1574,7 @@ export default function CartPage() {
       <>
         <Navbar />
         <main className="min-h-screen bg-gray-50">
-          <div className="max-w-2xl mx-auto px-4 py-12">
+          <div className="max-w-6xl mx-auto px-4 py-8">
             <SuccessScreen bookings={confirmedBookings} />
           </div>
         </main>
