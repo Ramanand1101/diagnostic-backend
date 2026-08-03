@@ -438,7 +438,7 @@ const DEFAULT_FORM = {
   addressLine1: '', addressArea: '', addressCity: '', addressState: '', addressPincode: '',
 };
 
-function BookingForm({ groups, onReadyForPayment }) {
+function BookingForm({ groups, onReadyForPayment, onSubmitStateChange }) {
   const router = useRouter();
   const { user, refreshUser, login } = useAuth();
 
@@ -449,6 +449,17 @@ function BookingForm({ groups, onReadyForPayment }) {
   const [blockedDates, setBlockedDates] = useState([]);
   const [unavailableToday, setUnavailableToday] = useState(null); // { product, reason } | null
   const [alternatives, setAlternatives] = useState([]);
+
+  // The actual submit button lives in the sidebar (CartPage) now, wired to this form
+  // via the native `form="booking-form"` attribute — it needs this state to show the
+  // right disabled/loading label without lifting the whole form up.
+  useEffect(() => {
+    onSubmitStateChange?.({
+      submitting,
+      blocked: !!unavailableToday,
+      label: submitting ? (user ? 'Checking details…' : 'Creating account…') : 'Proceed to Payment →',
+    });
+  }, [submitting, unavailableToday, user]);
 
   const labId = groups[0]?.labId;
   // `groups` here is lab-only (see displayGroups in CartPage) — flatten across all of
@@ -803,15 +814,8 @@ function BookingForm({ groups, onReadyForPayment }) {
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={submitting || !!unavailableToday}
-        className="w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold text-sm transition-colors mt-2"
-      >
-        {submitting
-          ? (user ? 'Checking details…' : 'Creating account…')
-          : 'Proceed to Payment →'}
-      </button>
+      {/* Submit button lives in the sidebar — see the sticky summary card in CartPage,
+          wired to this form via form="booking-form" */}
     </form>
   );
 }
@@ -1398,6 +1402,9 @@ export default function CartPage() {
 
   const [paymentMeta, setPaymentMeta] = useState(null); // { form, activeUser }
   const [confirmedBookings, setConfirmedBookings] = useState([]);
+  // Mirrors BookingForm's submit/validity state so the actual submit button — now in
+  // the sidebar, outside the <form> — can show the right label and disabled state.
+  const [formSubmitState, setFormSubmitState] = useState({ submitting: false, blocked: false, label: 'Proceed to Payment →' });
   const [animConfig, setAnimConfig] = useState(null);   // null = not loaded
   const [showAnim, setShowAnim] = useState(false);
   const [pendingPayment, setPendingPayment] = useState(null);
@@ -1668,8 +1675,12 @@ export default function CartPage() {
             </button>
           </div>
 
-          {/* TOP: Cart items (left) + Price summary (right, sticky) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6">
+          {/* Single grid for the whole page: cart items + patient/slot form stack in the
+              left column; the summary card sits in the right column with `sticky`, so
+              its stickable range covers this ENTIRE left column (not just the cart
+              items) instead of stopping short and leaving a blank column underneath
+              once the patient form scrolls past where the old, separate grid ended. */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
             {/* LEFT: Cart items grouped by lab — each test shows once, regardless of
                 how many patients it's booked for (that's what its own "Booking for"
@@ -1699,6 +1710,54 @@ export default function CartPage() {
                   </div>
                 </div>
               ))}
+
+              {isRestricted ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
+                  <div className="text-3xl mb-3">🚫</div>
+                  <p className="font-semibold text-amber-800 text-sm mb-1">
+                    {user.role === 'lab' ? 'Lab accounts cannot place bookings' : 'Admin accounts cannot place bookings'}
+                  </p>
+                  <p className="text-xs text-amber-600">
+                    Bookings can only be placed by patient/customer accounts.
+                  </p>
+                </div>
+              ) : distinctLabIds.length > 1 ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-5">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="text-2xl shrink-0">⚠️</div>
+                    <div>
+                      <p className="font-semibold text-red-800 text-sm">One lab at a time only</p>
+                      <p className="text-xs text-red-600 mt-0.5">
+                        You have tests from {distinctLabIds.length} different labs. Please keep tests from only one lab to proceed with booking.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {distinctLabIds.map((labId) => {
+                      const labItems = items.filter((i) => String(i.lab?._id || i.lab || 'unknown') === labId);
+                      return (
+                        <div key={labId} className="flex items-center justify-between bg-white border border-red-100 rounded-lg px-3 py-2.5">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">{labItems[0]?.lab?.name || 'Unknown Lab'}</p>
+                            <p className="text-xs text-gray-400">{labItems.length} test{labItems.length !== 1 ? 's' : ''}</p>
+                          </div>
+                          <button
+                            onClick={() => labItems.forEach((i) => removeItem(i.cartItemId))}
+                            className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors font-medium">
+                            Remove
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <BookingForm
+                  groups={displayGroups}
+                  onReadyForPayment={handleReadyForPayment}
+                  onSubmitStateChange={setFormSubmitState}
+                />
+              )}
             </div>
 
             {/* RIGHT: Booking + price summary, combined into one card (sticky) */}
@@ -1804,64 +1863,27 @@ export default function CartPage() {
                     You save ₹{(savings + (appliedCoupon?.discount || 0)).toLocaleString('en-IN')} on this order!
                   </p>
                 )}
-              </div>
-            </div>
-          </div>
 
-          {/* BOTTOM: Patient & Slot form — same width as cart items (lg:col-span-2) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-3">
-              {isRestricted ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
-                  <div className="text-3xl mb-3">🚫</div>
-                  <p className="font-semibold text-amber-800 text-sm mb-1">
-                    {user.role === 'lab' ? 'Lab accounts cannot place bookings' : 'Admin accounts cannot place bookings'}
-                  </p>
-                  <p className="text-xs text-amber-600">
-                    Bookings can only be placed by patient/customer accounts.
-                  </p>
-                </div>
-              ) : distinctLabIds.length > 1 ? (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-5">
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="text-2xl shrink-0">⚠️</div>
-                    <div>
-                      <p className="font-semibold text-red-800 text-sm">One lab at a time only</p>
-                      <p className="text-xs text-red-600 mt-0.5">
-                        You have tests from {distinctLabIds.length} different labs. Please keep tests from only one lab to proceed with booking.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    {distinctLabIds.map((labId) => {
-                      const labItems = items.filter((i) => String(i.lab?._id || i.lab || 'unknown') === labId);
-                      return (
-                        <div key={labId} className="flex items-center justify-between bg-white border border-red-100 rounded-lg px-3 py-2.5">
-                          <div>
-                            <p className="text-sm font-semibold text-gray-800">{labItems[0]?.lab?.name || 'Unknown Lab'}</p>
-                            <p className="text-xs text-gray-400">{labItems.length} test{labItems.length !== 1 ? 's' : ''}</p>
-                          </div>
-                          <button
-                            onClick={() => labItems.forEach((i) => removeItem(i.cartItemId))}
-                            className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors font-medium">
-                            Remove
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <BookingForm
-                    groups={displayGroups}
-                    onReadyForPayment={handleReadyForPayment}
-                  />
-                  <p className="text-xs text-center text-gray-400">
-                    By confirming, you agree to our terms &amp; conditions
-                  </p>
-                </>
-              )}
+                {/* Submit button for BookingForm's <form id="booking-form"> below — linked
+                    via the `form` attribute since it's outside that form in the DOM (the
+                    form lives in the left column). Only shown when that form actually
+                    exists (not for the restricted-account / multi-lab error states). */}
+                {!isRestricted && distinctLabIds.length <= 1 && (
+                  <>
+                    <button
+                      type="submit"
+                      form="booking-form"
+                      disabled={formSubmitState.submitting || formSubmitState.blocked}
+                      className="w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold text-sm transition-colors mt-5"
+                    >
+                      {formSubmitState.label}
+                    </button>
+                    <p className="text-xs text-center text-gray-400 mt-2.5">
+                      By confirming, you agree to our terms &amp; conditions
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
