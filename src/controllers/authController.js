@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const { sendMail } = require('../config/email');
-const { sendSms, sendWhatsapp } = require('../config/sms');
+const { sendOtpSms, sendWhatsapp } = require('../config/sms');
 const { logActivity, requestMeta } = require('../utils/activityLog');
 const { createOtpRecord } = require('../utils/otp');
 
@@ -112,7 +112,7 @@ exports.sendOtp = asyncHandler(async (req, res) => {
   if (channel === 'whatsapp') {
     await sendWhatsapp({ to: identifier, message });
   } else if (channel === 'sms') {
-    await sendSms({ to: identifier, message });
+    await sendOtpSms({ to: identifier, otp });
   } else {
     await sendMail({
       to: identifier,

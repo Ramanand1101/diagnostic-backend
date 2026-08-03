@@ -46,34 +46,51 @@ function formatIndian(mobile) {
   return `+91${digits}`;
 }
 
-// ── SMS via Fast2SMS ───────────────────────────────────────────────────────
-// Free Fast2SMS dev keys are only approved for the `otp` route (a fixed,
-// pre-approved template with a single numeric variable) — arbitrary text needs
-// the `q` (quick) route, which requires DLT registration on the account. Since
-// every current caller's message embeds a numeric code, we extract it and use
-// the OTP route; anything without a clear numeric code falls back to `q` and
-// simply surfaces whatever error Fast2SMS returns for that account's plan.
-async function sendSms({ to, message }) {
+async function fast2smsApiKey() {
   const db = await loadDbConfig('sms');
   const apiKey = db.apiKey || process.env.FAST2SMS_API_KEY;
   if (!apiKey) throw new Error('SMS not configured. Add a Fast2SMS API key in Admin > Integrations, or FAST2SMS_API_KEY to .env');
+  return apiKey;
+}
 
+// ── OTP SMS via Fast2SMS's `otp` route ───────────────────────────────────────
+// This route is pre-approved (no DLT registration needed) but only ever sends
+// Fast2SMS's own fixed template with your numeric code slotted in — it ignores any
+// text you send it. Only ever call this for an actual OTP code, never for a
+// free-text message (see sendSms below for why that used to go wrong).
+async function sendOtpSms({ to, otp }) {
+  const apiKey = await fast2smsApiKey();
   const mobile = formatIndian(to).replace('+91', '');
-  const otpMatch = String(message).match(/\b\d{4,8}\b/);
-
-  const params = new URLSearchParams({ authorization: apiKey, numbers: mobile });
-  if (otpMatch) {
-    params.set('route', 'otp');
-    params.set('variables_values', otpMatch[0]);
-  } else {
-    params.set('route', 'q');
-    params.set('message', message);
-  }
+  const params = new URLSearchParams({
+    authorization: apiKey, numbers: mobile, route: 'otp', variables_values: String(otp),
+  });
 
   const { statusCode, data } = await httpsGetJson(`https://www.fast2sms.com/dev/bulkV2?${params.toString()}`);
   if (statusCode < 200 || statusCode >= 300 || data.return !== true) {
     const reason = Array.isArray(data.message) ? data.message.join(', ') : (data.message || `HTTP ${statusCode}`);
-    throw new Error(`Fast2SMS send failed: ${reason}`);
+    throw new Error(`Fast2SMS OTP send failed: ${reason}`);
+  }
+  return data;
+}
+
+// ── Free-text SMS via Fast2SMS's `q` (quick) route ───────────────────────────
+// Requires DLT template registration on the Fast2SMS account — a free/trial key
+// (OTP-route only) will fail here with a clear error. This used to instead guess
+// whether a message "looked like" an OTP by pulling the first 4-8 digit run out of
+// it and silently sending it through the OTP route — which meant a booking
+// confirmation like "Booking Confirmed! ID 03082026-1557 ..." got detected as
+// OTP "03082026" and delivered as Fast2SMS's fixed "Your OTP is 03082026" template
+// instead of the actual message, with no error to indicate anything was wrong.
+// Failing loudly here (callers already catch/log this) is the honest behavior.
+async function sendSms({ to, message }) {
+  const apiKey = await fast2smsApiKey();
+  const mobile = formatIndian(to).replace('+91', '');
+  const params = new URLSearchParams({ authorization: apiKey, numbers: mobile, route: 'q', message });
+
+  const { statusCode, data } = await httpsGetJson(`https://www.fast2sms.com/dev/bulkV2?${params.toString()}`);
+  if (statusCode < 200 || statusCode >= 300 || data.return !== true) {
+    const reason = Array.isArray(data.message) ? data.message.join(', ') : (data.message || `HTTP ${statusCode}`);
+    throw new Error(`Fast2SMS send failed: ${reason} (free-text SMS needs a DLT-registered template on the Fast2SMS account — see fast2sms.com/dlt)`);
   }
   return data;
 }
@@ -94,4 +111,4 @@ async function sendWhatsapp({ to, message }) {
   });
 }
 
-module.exports = { sendSms, sendWhatsapp };
+module.exports = { sendSms, sendOtpSms, sendWhatsapp };

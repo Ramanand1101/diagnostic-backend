@@ -2,7 +2,7 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { sendMail } = require('../config/email');
-const { sendSms } = require('../config/sms');
+const { sendOtpSms } = require('../config/sms');
 const { isValidEmail, isValidPhone, emailDomain } = require('../utils/validators');
 const { logActivity, requestMeta } = require('../utils/activityLog');
 const { invalidateUserCache } = require('../middleware/authMiddleware');
@@ -145,7 +145,7 @@ exports.requestContactChange = asyncHandler(async (req, res) => {
 
     const { otp } = await createOtpRecord({ identifier: mobile, purpose: 'change_mobile' });
     try {
-      await sendSms({ to: mobile, message: `Your HealthOnTime OTP to confirm this mobile number is ${otp}. Valid for ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.` });
+      await sendOtpSms({ to: mobile, otp });
     } catch (e) {
       console.error('[requestContactChange] mobile OTP send failed:', e.message);
       return res.status(500).json({ message: 'Failed to send mobile OTP. Please try again.' });
