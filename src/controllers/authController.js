@@ -18,7 +18,7 @@ const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.(com|co\.in|co|in|net|inf
 const MOBILE_RE = /^[6-9]\d{9}$/;
 
 exports.register = asyncHandler(async (req, res) => {
-  const { name, email, mobile, password, role } = req.body;
+  const { name, email, mobile, password } = req.body;
 
   if (email && !EMAIL_RE.test(email))
     return res.status(400).json({ message: 'Please enter a valid email address.' });
@@ -28,12 +28,15 @@ exports.register = asyncHandler(async (req, res) => {
   const exists = await User.findOne({ $or: [{ email }, ...(mobile ? [{ mobile }] : [])] });
   if (exists) return res.status(400).json({ message: 'User already exists' });
 
+  // This endpoint is public (no auth) — role is NEVER taken from the request body.
+  // Every account created here is a plain customer; admin/lab/staff accounts are only
+  // ever created by an already-privileged admin through their own guarded endpoints.
   const user = await User.create({
     name,
     email,
     mobile,
     password,
-    role: role || 'customer'
+    role: 'customer'
   });
 
   const token = signToken(user);

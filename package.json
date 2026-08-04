@@ -10,7 +10,10 @@
     "seed:labs": "node src/seed/seedLabs.js",
     "seed:lucknow": "node src/seed/seedLucknow.js",
     "seed:lucknow-10labs": "node src/seed/seedLucknow10Labs.js",
-    "seed:lucknow-tests": "node src/seed/seedLucknowTests.js"
+    "seed:lucknow-tests": "node src/seed/seedLucknowTests.js",
+    "test": "jest --runInBand",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1066.0",
@@ -47,7 +50,11 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "jest": "^30.4.2",
+    "mongodb-memory-server": "^11.2.0",
     "nodemon": "^3.1.4",
-    "pm2": "^7.0.3"
+    "pm2": "^7.0.3",
+    "supertest": "^7.2.2"
   }
 }
